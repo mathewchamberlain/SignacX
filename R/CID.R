@@ -475,31 +475,68 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data_new.json", s
   }
   if ("hierarchylabels" %in% names(cr))
   {
-
+    
     Q = cr$hierarchylabels
-    json_data$L1$label_list = Q$L1
-    C = get_colors(Q$L1)
-    json_data$L1$label_colors = as.list(C[[1]])
-
-    Q = cr$hierarchylabels
-    json_data$L2$label_list = Q$L2
-    C = get_colors(Q$L2)
-    json_data$L2$label_colors = as.list(C[[1]])
-
-    Q = cr$hierarchylabels
+    if (length(Q) == 1)
+    {
+      json_data$L1$label_list = Q$L1
+      C = get_colors(Q$L1)
+      json_data$L1$label_colors = as.list(C[[1]])
+    }
+    if (length(Q) == 2)
+    {
+      json_data$L2$label_list = Q$L2
+      C = get_colors(Q$L2)
+      json_data$L2$label_colors = as.list(C[[1]])
+    }
+    if (length(Q) == 3)
+    {
     json_data$L3$label_list = Q$L3
     C = get_colors(Q$L3)
     json_data$L3$label_colors = as.list(C[[1]])
-
-    Q = cr$hierarchylabels
-    json_data$L4$label_list = Q$L4
-    C = get_colors(Q$L4)
-    json_data$L4$label_colors = as.list(C[[1]])
-
-    Q = cr$hierarchylabels
-    json_data$L5$label_list = Q$L5
-    C = get_colors(Q$L5)
-    json_data$L5$label_colors = as.list(C[[1]])
+    }
+    if (length(Q) == 4)
+    {
+      json_data$L4$label_list = Q$L4
+      C = get_colors(Q$L4)
+      json_data$L4$label_colors = as.list(C[[1]])
+    }
+    if (length(Q) == 5)
+    {
+      json_data$L5$label_list = Q$L5
+      C = get_colors(Q$L5)
+      json_data$L5$label_colors = as.list(C[[1]])
+    }
+    if (length(Q) == 6)
+    {
+      json_data$L6$label_list = Q$L6
+      C = get_colors(Q$L6)
+      json_data$L6$label_colors = as.list(C[[1]])
+    }
+    if (length(Q) == 7)
+    {
+      json_data$L7$label_list = Q$L7
+      C = get_colors(Q$L7)
+      json_data$L7$label_colors = as.list(C[[1]])
+    }
+    if (length(Q) == 8)
+    {
+      json_data$L8$label_list = Q$L8
+      C = get_colors(Q$L8)
+      json_data$L8$label_colors = as.list(C[[1]])
+    }
+    if (length(Q) == 9)
+    {
+      json_data$L9$label_list = Q$L9
+      C = get_colors(Q$L9)
+      json_data$L9$label_colors = as.list(C[[1]])
+    }
+    if (length(Q) == 10)
+    {
+      json_data$L10$label_list = Q$L10
+      C = get_colors(Q$L10)
+      json_data$L10$label_colors = as.list(C[[1]])
+    }
   }
   json_data = json_data[order(names(json_data))]
   # output
