@@ -75,8 +75,8 @@ CID.LoadEdges <- function(spring.dir)
 CID.Impute <- function(E, do.par = FALSE)
 {
   # SAVER wrapper
-  data("cellstate_markers")
-  data("markers")
+  load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/markers.rda")
+  load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/cellstate_markers.rda")
   genes = do.call(rbind, cellstate_markers)
   genes.ind <- which(rownames(E) %in% unique(c(as.character(markers$`HUGO symbols`), as.character(genes$`HUGO symbols`))))
   if (do.par)
@@ -86,6 +86,7 @@ CID.Impute <- function(E, do.par = FALSE)
   } else {
     SAVER::saver(E, pred.genes = genes.ind, pred.genes.only = T, estimates.only = T)
   }
+  
 }
 
 #' runs CID.CellID in batch mode
@@ -94,7 +95,7 @@ CID.Impute <- function(E, do.par = FALSE)
 #' @return A list where each element is a CID.CellID result. (See ?CID.CellID)
 #' @export
 
-CID.BatchMode <- function(E,f,pval,deep_dive,edges,impute)
+CID.BatchMode <- function(E,f,pval,deep_dive,edges,entropy,sorted,walktrap)
 {
   cat(" ..........  Running CID.CellID in batch mode on input matrices: \n");
   cat("             Detected N = ", NROW(E), " matrices \n", sep = "" );
@@ -119,8 +120,8 @@ CID.BatchMode <- function(E,f,pval,deep_dive,edges,impute)
 CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entropy = FALSE, sorted = FALSE, walktrap = TRUE)
 {
   # load markers
-  data("cellstate_markers")
-  data("markers")
+  load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/markers.rda")
+  load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/cellstate_markers.rda")
   if (!length(markers) > 0) {
     cat("ERROR: from CID:\n");
     cat("required markers failed to load.\n", sep = "");
@@ -219,7 +220,7 @@ CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entr
 
   if (walktrap)
     wt = CID.WalkTrap(acOut_knn_smooth, edges)
-
+  
   # Package output
   if (deep_dive & !is.null(edges) & walktrap) {
     cr = list(scores = dfY,
@@ -309,7 +310,7 @@ CID.append=function(expression,featuresG)
   Z = log(Z + 1, 2)
   Z = Matrix::t(scale(Matrix::t(Z)))
   # Get CellID scores
-  res = as.data.frame(t(do.call(cbind,
+  res = as.data.frame(Matrix::t(do.call(cbind,
                                 lapply(featuresG,function(x){
                                   if (sum(x$Polarity == "-") > 0)
                                   {
@@ -444,7 +445,7 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data_new.json", s
     Q = as.character(cr$walktrap)
     json_data$walktrap$label_list = Q
     Ntypes = length(unique(Q))
-    qual_col_pals = RColorBrewer::brewer.pal.info[brewer.pal.info$category == 'qual',]
+    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
     col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
     #pie(rep(1,num_col), col=(col_vector[1:num_col]))
     col_palette <- as.list(col_vector[1:Ntypes]); # or sample if you wish
