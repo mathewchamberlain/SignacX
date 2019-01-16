@@ -75,8 +75,8 @@ CID.LoadEdges <- function(spring.dir)
 CID.Impute <- function(E, do.par = FALSE)
 {
   # SAVER wrapper
-  load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/markers.rda")
-  load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/cellstate_markers.rda")
+  data(markers)
+  data(cellstate_markers)
   genes = do.call(rbind, cellstate_markers)
   genes.ind <- which(rownames(E) %in% unique(c(as.character(markers$`HUGO symbols`), as.character(genes$`HUGO symbols`))))
   if (do.par)
@@ -120,8 +120,8 @@ CID.BatchMode <- function(E,f,pval,deep_dive,edges,entropy,sorted,walktrap)
 CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entropy = FALSE, sorted = FALSE, walktrap = TRUE)
 {
   # load markers
-  load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/markers.rda")
-  load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/cellstate_markers.rda")
+  data(markers)
+  data(cellstate_markers)
   if (!length(markers) > 0) {
     cat("ERROR: from CID:\n");
     cat("required markers failed to load.\n", sep = "");
