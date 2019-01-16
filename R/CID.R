@@ -134,7 +134,7 @@ CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entr
 
   # if list, run batch mode
   if(class(E) == "list")
-    return(CID.BatchMode(E = E, edges = edges, deep_dive = deep_dive, f = f, pval = pval, impute = impute))
+    return(CID.BatchMode(E = E,f = f,pval = pval,deep_dive = deep_dive,edges = edges, entropy = entropy, sorted = sorted, walktrap = walktrap))
 
   # check inputs
   cat(" ..........  Entry in CID.CellID \n");
