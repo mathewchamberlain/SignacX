@@ -475,68 +475,64 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data_new.json", s
   }
   if ("hierarchylabels" %in% names(cr))
   {
-    
-    Q = cr$hierarchylabels
-    if (length(Q) == 1)
-    {
-      json_data$L1$label_list = Q$L1
-      C = get_colors(Q$L1)
+      N = length(cr$hierarchylabels)
+      json_data$L1$label_list = cr$hierarchylabels$L1;
+      C = get_colors(cr$hierarchylabels$L1)
       json_data$L1$label_colors = as.list(C[[1]])
-    }
-    if (length(Q) == 2)
+    if (N >= 2)
     {
-      json_data$L2$label_list = Q$L2
-      C = get_colors(Q$L2)
+      json_data$L2$label_list = cr$hierarchylabels$L2;
+      C = get_colors(cr$hierarchylabels$L2)
       json_data$L2$label_colors = as.list(C[[1]])
     }
-    if (length(Q) == 3)
-    {
-    json_data$L3$label_list = Q$L3
-    C = get_colors(Q$L3)
-    json_data$L3$label_colors = as.list(C[[1]])
-    }
-    if (length(Q) == 4)
-    {
-      json_data$L4$label_list = Q$L4
-      C = get_colors(Q$L4)
-      json_data$L4$label_colors = as.list(C[[1]])
-    }
-    if (length(Q) == 5)
-    {
-      json_data$L5$label_list = Q$L5
-      C = get_colors(Q$L5)
-      json_data$L5$label_colors = as.list(C[[1]])
-    }
-    if (length(Q) == 6)
-    {
-      json_data$L6$label_list = Q$L6
-      C = get_colors(Q$L6)
-      json_data$L6$label_colors = as.list(C[[1]])
-    }
-    if (length(Q) == 7)
-    {
-      json_data$L7$label_list = Q$L7
-      C = get_colors(Q$L7)
-      json_data$L7$label_colors = as.list(C[[1]])
-    }
-    if (length(Q) == 8)
-    {
-      json_data$L8$label_list = Q$L8
-      C = get_colors(Q$L8)
-      json_data$L8$label_colors = as.list(C[[1]])
-    }
-    if (length(Q) == 9)
-    {
-      json_data$L9$label_list = Q$L9
-      C = get_colors(Q$L9)
-      json_data$L9$label_colors = as.list(C[[1]])
-    }
-    if (length(Q) == 10)
-    {
-      json_data$L10$label_list = Q$L10
-      C = get_colors(Q$L10)
-      json_data$L10$label_colors = as.list(C[[1]])
-    }
+      if (N >= 3)
+      {
+        json_data$L3$label_list = cr$hierarchylabels$L3;
+        C = get_colors(cr$hierarchylabels$L3)
+        json_data$L3$label_colors = as.list(C[[1]])
+      }
+      if (N >= 4)
+      {
+        json_data$L4$label_list = cr$hierarchylabels$L4;
+        C = get_colors(cr$hierarchylabels$L4)
+        json_data$L4$label_colors = as.list(C[[1]])
+      }
+      if (N >= 5)
+      {
+        json_data$L5$label_list = cr$hierarchylabels$L5;
+        C = get_colors(cr$hierarchylabels$L5)
+        json_data$L5$label_colors = as.list(C[[1]])
+      }
+      if (N >= 6)
+      {
+        json_data$L6$label_list = cr$hierarchylabels$L6;
+        C = get_colors(cr$hierarchylabels$L6)
+        json_data$L6$label_colors = as.list(C[[1]])
+      }
+      if (N >= 7)
+      {
+        json_data$L7$label_list = cr$hierarchylabels$L7;
+        C = get_colors(cr$hierarchylabels$L7)
+        json_data$L7$label_colors = as.list(C[[1]])
+      }
+      if (N >= 8)
+      {
+        json_data$L8$label_list = cr$hierarchylabels$L8;
+        C = get_colors(cr$hierarchylabels$L8)
+        json_data$L8$label_colors = as.list(C[[1]])
+      }
+      if (N >= 9)
+      {
+        json_data$L9$label_list = cr$hierarchylabels$L9;
+        C = get_colors(cr$hierarchylabels$L9)
+        json_data$L9$label_colors = as.list(C[[1]])
+      }
+      if (N >= 10)
+      {
+        json_data$L10$label_list = cr$hierarchylabels$L10;
+        C = get_colors(cr$hierarchylabels$L10)
+        json_data$L10$label_colors = as.list(C[[1]])
+      }
   }
   json_data = json_data[order(names(json_data))]
   # output
@@ -589,21 +585,23 @@ get_colors <- function(P)
   }
   # sub cell types will be consistently labeled:
   sub_types = c( "Dendritic.cells.activated"  ,  "Dendritic.cells.resting"     , "Eosinophils"      ,
-                 "Macrophages.M0"             ,  "Macrophages.M1"              ,"Macrophages.M2"    ,
-                 "Mast.cells"                 ,  "Monocytes"                   , "Neutrophils"      ,
+                 "Macrophages.M0"             ,  "Macrophages.M1"              , "Macrophages.M2"   ,
+                 "Mast.Progenitors"           ,  "Monocytes"                   , "Neutrophils"      ,
                  "NK.cells"                   ,  "T.cells.CD4.memory.activated", "T.cells.CD4.naive",
                  "T.cells.CD8"                ,  "T.cells.follicular.helper"   , "T.cells.regs"     ,
-                 "Mast.cells.resting"         ,  "T.cells.CD4.memory.resting"  , "B.cells.memory"   ,
+                 "Mast.cells.activated"       ,  "T.cells.CD4.memory.resting"  , "B.cells.memory"   ,
                  "B.cells.naive"              ,  "T.cells"                     , "T.cells.CD4"      ,
-                 "T.cells.other"              ,  "T.cells.CD4.fh.regs"         , "Eos.Neutr.cells "  )
+                 "T.cells.other"              ,  "T.cells.CD4.fh.regs"         , "Not.Mast"         , 
+                 "Mast"                              )
   sub_colors =c( "#f0ff51"                    ,  "#f9d801"                     , "#d0e4e5"          ,
                  "#F9A602"                    ,  "#f97501"                     , "#d6b171"          ,
                  "#d4e881"                    ,  "#f93a01"                     , "#f7f2b2"          ,
                  "#ad9bf2"                    ,  "#4ebdbd"                     , "#8c9ee1"          ,
                  "#4e59bd"                    ,  "#4ebd9b"                     , "#90c5f4"          ,
                  "#e2e8c9"                    ,  "#def9f9"                     , "#aa3596"          ,
-                 "#edbde5"                    ,  "#4e59bd"                     , "#8c9ee1"           ,
-                 "#90c5f4"                    ,  "#90c5f4"                     , "#f7f2b2")
+                 "#edbde5"                    ,  "#4e59bd"                     , "#8c9ee1"          ,
+                 "#90c5f4"                    ,  "#90c5f4"                     , "#f7f2b2"          ,
+                 "#d4e881")
 
   for (i in 1:length(sub_types))
   {
