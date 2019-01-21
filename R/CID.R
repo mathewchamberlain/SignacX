@@ -117,7 +117,7 @@ CID.BatchMode <- function(E,f,pval,deep_dive,edges,entropy,sorted,walktrap)
 #' @param edges Data-frame containing the edgelist for graph edges for smoothing, OR a directory where "edges.csv" is located, OR a character vector / list for batch mode. Default is edges = NULL.
 #' @return Filtered markers where each marker must have at least ncells that express at least ncounts
 #' @export
-CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entropy = FALSE, sorted = FALSE, walktrap = TRUE)
+CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entropy = FALSE, sorted = FALSE, walktrap = FALSE)
 {
   # load markers
   data(markers)
