@@ -3,8 +3,9 @@
 #' @param data.dir Directory containing matrix.mtx and genes.txt.
 #' @return A sparse matrix with rownames equivalent to the names in genes.txt
 #' @export
-CID.LoadData <- function(data.dir)
+CID.LoadData <- function(spring.dir)
 {
+  data.dir = dirname(spring.dir)
   data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
   fn <- "matrix.mtx"
   gE <- paste(data.dir,fn,sep="/")
@@ -82,7 +83,7 @@ CID.Impute <- function(E, do.par = FALSE)
   if (do.par)
   {
     numCores = parallel::detectCores()
-    SAVER::saver(E, pred.genes = genes.ind, pred.genes.only = T, ncores = numCores / 2, estimates.only = T)
+    SAVER::saver(E, pred.genes = genes.ind, pred.genes.only = T, ncores = numCores / 4, estimates.only = T)
   } else {
     SAVER::saver(E, pred.genes = genes.ind, pred.genes.only = T, estimates.only = T)
   }
@@ -141,10 +142,6 @@ CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entr
   ta = proc.time()[3];
   stopifnot(class(E) %in% c("dgCMatrix","dgTMatrix", "matrix", "data.frame"))
   stopifnot(!is.null(rownames(E)));
-
-  # convert to sparse
-  #if(class(E) %in% c("matrix", "data.frame"))
-  #  E = Matrix::Matrix(as.matrix(E), sparse = T)
 
   if (sorted)  {
     markers = markers[markers$Polarity == "+",]
@@ -230,7 +227,15 @@ CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entr
               ddtypessmoothed = ac_dd_knn,
               hierarchylabels = dummy,
               walktrap = wt)
-    ;}
+  }
+  else if (deep_dive & !is.null(edges)) {
+    cr = list(scores = dfY,
+              ctypes = ac,
+              ctypessmoothed = acOut_knn_smooth,
+              ddtypes = ac_dd,
+              ddtypessmoothed = ac_dd_knn,
+              hierarchylabels = dummy)
+  }
   else if (!is.null(edges)) {
     cr = list(scores = dfY,
               ctypes = ac,
@@ -333,11 +338,11 @@ CID.deepdive <- function(XX, YY, acOut3 = ac_dd, expression = E, f = f)
     cat("             Hierarchy assignment: ", sum(logik), " ", YY, "\n", sep ="");
     ## get CID scores for cell types
     dfYe = CID.append(expression,XX)
+    ar = rownames(dfYe)
     dfYe = dfYe[,logik]
     dfYe = na.omit(dfYe)
-    if (!is.null(dfYe)){
-      indexMax = apply(dfYe, 2, which.max);
-      ar = rownames(dfYe);
+    if (!is.null(dfYe) & length(dfYe) > 1){
+      indexMax = apply(as.matrix(dfYe), 2, which.max);
       dummy = ar[indexMax];
       acOut3[logik] = dummy;}
   } else
@@ -421,122 +426,52 @@ CID.entropy <- function(ac,distMat)
 #' @param spring.dir Directory where file 'categorical_coloring_data.json' is located. If supplied, it will append this file to contain tracks for cell type / state classifications.
 #' @return Smoothed cell type or cell state assignments
 #' @export
-CID.writeJSON <- function(cr, json_new = "categorical_coloring_data_new.json", spring.dir = NULL)
+CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", spring.dir = NULL)
 {
   if (!is.null(spring.dir))
   {
     spring.dir = gsub("\\/$", "", spring.dir, perl = TRUE);
-    json_file = 'categorical_coloring_data.json'
-    gJ <- paste(spring.dir,json_file,sep = "/")
-    json_data <- rjson::fromJSON(file=gJ)
-  } else {
-    json_data = list("")
-  }
-  if ("ctypes" %in% names(cr))
-  {
-    Q = cr$ctypes
-    json_data$CellTypesCID$label_list = Q
-    Ntypes = length(unique(Q))
-    C = get_colors(Q)
-    json_data$CellTypesCID$label_colors = as.list(C[[1]])
+    if (file.exists(paste(spring.dir, 'categorical_coloring_data_old.json', sep = "/")))
+    {
+      json_file = 'categorical_coloring_data_old.json'
+      gJ <- paste(spring.dir,json_file,sep = "/")
+      json_data <- rjson::fromJSON(file=gJ)
+    } else {
+      json_file = 'categorical_coloring_data.json'
+      gJ <- paste(spring.dir,json_file,sep = "/")
+      json_data <- rjson::fromJSON(file=gJ)
+      json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
+      write(json_out,paste(spring.dir,'categorical_coloring_data_old.json',sep="/"))
+    }
   }
   if ("walktrap" %in% names(cr))
   {
     Q = as.character(cr$walktrap)
-    json_data$walktrap$label_list = Q
+    json_data$Clusters$label_list = Q
     Ntypes = length(unique(Q))
     qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
     col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
     #pie(rep(1,num_col), col=(col_vector[1:num_col]))
     col_palette <- as.list(col_vector[1:Ntypes]); # or sample if you wish
     names(col_palette) <- unique(Q)
-    json_data$walktrap$label_colors = col_palette
+    json_data$Clusters$label_colors = col_palette
   }
   if ("ctypessmoothed" %in% names(cr))
   {
     Q = cr$ctypessmoothed
-    json_data$CellTypesCID_smoothed$label_list = Q
+    json_data$CellTypesID$label_list = Q
     C = get_colors(Q)
-    json_data$CellTypesCID_smoothed$label_colors = as.list(C[[1]])
-  }
-  if ("ddtypes" %in% names(cr))
-  {
-    Q = cr$ddtypes
-    json_data$CellStatesCID$label_list = Q
-    C = get_colors(Q)
-    json_data$CellStatesCID$label_colors = as.list(C[[1]])
+    json_data$CellTypesID$label_colors = as.list(C[[1]])
   }
   if ("ddtypessmoothed" %in% names(cr))
   {
     Q = cr$ddtypessmoothed
-    json_data$CellStatesCID_smoothed$label_list = Q
+    json_data$CellStatesID$label_list = Q
     C = get_colors(Q)
-    json_data$CellStatesCID_smoothed$label_colors = as.list(C[[1]])
-  }
-  if ("hierarchylabels" %in% names(cr))
-  {
-      N = length(cr$hierarchylabels)
-      json_data$L1$label_list = cr$hierarchylabels$L1;
-      C = get_colors(cr$hierarchylabels$L1)
-      json_data$L1$label_colors = as.list(C[[1]])
-    if (N >= 2)
-    {
-      json_data$L2$label_list = cr$hierarchylabels$L2;
-      C = get_colors(cr$hierarchylabels$L2)
-      json_data$L2$label_colors = as.list(C[[1]])
-    }
-      if (N >= 3)
-      {
-        json_data$L3$label_list = cr$hierarchylabels$L3;
-        C = get_colors(cr$hierarchylabels$L3)
-        json_data$L3$label_colors = as.list(C[[1]])
-      }
-      if (N >= 4)
-      {
-        json_data$L4$label_list = cr$hierarchylabels$L4;
-        C = get_colors(cr$hierarchylabels$L4)
-        json_data$L4$label_colors = as.list(C[[1]])
-      }
-      if (N >= 5)
-      {
-        json_data$L5$label_list = cr$hierarchylabels$L5;
-        C = get_colors(cr$hierarchylabels$L5)
-        json_data$L5$label_colors = as.list(C[[1]])
-      }
-      if (N >= 6)
-      {
-        json_data$L6$label_list = cr$hierarchylabels$L6;
-        C = get_colors(cr$hierarchylabels$L6)
-        json_data$L6$label_colors = as.list(C[[1]])
-      }
-      if (N >= 7)
-      {
-        json_data$L7$label_list = cr$hierarchylabels$L7;
-        C = get_colors(cr$hierarchylabels$L7)
-        json_data$L7$label_colors = as.list(C[[1]])
-      }
-      if (N >= 8)
-      {
-        json_data$L8$label_list = cr$hierarchylabels$L8;
-        C = get_colors(cr$hierarchylabels$L8)
-        json_data$L8$label_colors = as.list(C[[1]])
-      }
-      if (N >= 9)
-      {
-        json_data$L9$label_list = cr$hierarchylabels$L9;
-        C = get_colors(cr$hierarchylabels$L9)
-        json_data$L9$label_colors = as.list(C[[1]])
-      }
-      if (N >= 10)
-      {
-        json_data$L10$label_list = cr$hierarchylabels$L10;
-        C = get_colors(cr$hierarchylabels$L10)
-        json_data$L10$label_colors = as.list(C[[1]])
-      }
+    json_data$CellStatesID$label_colors = as.list(C[[1]])
   }
   json_data = json_data[order(names(json_data))]
-  # output
-  json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
+  json_data_backup = json_data;
   if (is.null(spring.dir))
   {
     fn = json_new;
@@ -544,8 +479,33 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data_new.json", s
     spring.dir = gsub("\\/$", "", spring.dir, perl = TRUE);
   }
   fn = json_new
-  write(json_out,paste(spring.dir,fn,sep="/"))
-  cat(paste(spring.dir,fn,sep="/"), "has been written to directory! \n")
+  new.dirs = list.dirs(dirname(spring.dir))
+  if (length(new.dirs) != 1)
+  {
+    for (j in 1:length(new.dirs))
+    {
+      txt = list.files(new.dirs[j])
+      flag = "cell_filter.txt" %in% list.files(new.dirs);
+      if (!flag) {
+        cat("ERROR: from CID.writeJSON:\n");
+        cat("cell_filter.txt does not exist anywhere inside",new.dirs, ".\n", sep = "");
+        stop()
+      }
+      if ("cell_filter.txt" %in% txt)
+      {
+        idx = read.table(paste(new.dirs[j], "cell_filter.txt", sep = "/"), quote="\"", comment.char="", stringsAsFactors=FALSE)$V1 + 1;
+        for (k in 1:length(json_data))
+        {
+          json_data[[k]]$label_list = json_data[[k]]$label_list[idx]
+          json_data[[k]]$label_colors=json_data[[k]]$label_colors[names(json_data[[k]]$label_colors) %in% unique(json_data[[k]]$label_list)]
+        }
+        json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
+        write(json_out,paste(new.dirs[j],fn,sep="/"))
+        cat(paste(new.dirs[j],fn,sep="/"), "has been written to directory! \n")
+        json_data = json_data_backup;
+      }        
+    }
+  }
   return(json_data)
 }
 
@@ -558,7 +518,7 @@ get_colors <- function(P)
   main_types = c("B.cells"     ,     "Epithelial", "Fibroblasts"        ,
                  "Granulocytes",     "MPh"       , "Plasma.cells"       ,
                  "Secretory"   ,     "TNK"       , "Epithelial.Urinary" ,
-                 "Other"       ,     "Doublet"   , "pDCs"               ,
+                 "Other"       ,     "HSC"       , "pDCs"               ,
                  "Erythro"     ,     "Platelets")
   main_colors = c("#aa3596", "#387f50", "#a3ba37",
                   "#D3D3D3", "#f0ff51", "#d878de",
@@ -570,38 +530,30 @@ get_colors <- function(P)
     cs[P == main_types[i]] = main_colors[i]
     cs[P == paste(main_types[i],"-like",sep ="")] = main_colors[i]
   }
-  colfunc <- colorRampPalette(main_colors)
-  coms = apply(expand.grid(main_types, main_types), 1, paste, collapse="-")
-  col=colfunc(length(coms))
-  for (i in 1:length(coms))
-  {
-    cs[P == coms[i]] = col[i]
-  }
-  coms = apply(expand.grid(main_types, main_types, main_types), 1, paste, collapse="-")
-  col=colfunc(length(coms))
-  for (i in 1:length(coms))
-  {
-    cs[P == coms[i]] = col[i]
-  }
+
   # sub cell types will be consistently labeled:
-  sub_types = c( "Dendritic.cells.activated"  ,  "Dendritic.cells.resting"     , "Eosinophils"      ,
-                 "Macrophages.M0"             ,  "Macrophages.M1"              , "Macrophages.M2"   ,
-                 "Mast.Progenitors"           ,  "Monocytes"                   , "Neutrophils"      ,
-                 "NK.cells"                   ,  "T.cells.CD4.memory.activated", "T.cells.CD4.naive",
-                 "T.cells.CD8"                ,  "T.cells.follicular.helper"   , "T.cells.regs"     ,
-                 "Mast.cells.activated"       ,  "T.cells.CD4.memory.resting"  , "B.cells.memory"   ,
-                 "B.cells.naive"              ,  "T.cells"                     , "T.cells.CD4"      ,
-                 "T.cells.other"              ,  "T.cells.CD4.fh.regs"         , "Not.Mast"         , 
-                 "Mast"                              )
-  sub_colors =c( "#f0ff51"                    ,  "#f9d801"                     , "#d0e4e5"          ,
+  sub_types = c( "Dendritic.cells.activated"  ,  "Dendritic.cells.resting"     , "Eosinophils"       ,
+                 "Macrophages.M0"             ,  "Macrophages.M1"              , "Macrophages.M2"    ,
+                 "Mast.Progenitors"           ,  "Monocytes"                   , "Neutrophils"       ,
+                 "NK"                         ,  "T.cells.CD4.memory.activated", "T.cells.CD4.naive" ,
+                 "T.cells.CD8"                ,  "T.cells.FH"                  , "T.regs"            ,
+                 "Mast.cells.activated"       ,  "T.cells.CD4.memory.resting"  , "B.cells.memory"    ,
+                 "B.cells.naive"              ,  "T.cells"                     , "T.cells.CD4"       ,
+                 "T.cells.CD8"                ,  "T.cells.CD4.FH.regs"         , "Not.Mast"          , 
+                 "Mast"                       ,  "Mast.cells.activated"        , "Mast.cells.resting",
+                 "Macrophages"                ,  "Dendritic"                   , "T.cells.follicular.helper",
+                 "NK.cells")
+  sub_colors =c( "#a3b300"                    ,  "#f9d801"                     , "#d0e4e5"          ,
                  "#F9A602"                    ,  "#f97501"                     , "#d6b171"          ,
-                 "#d4e881"                    ,  "#f93a01"                     , "#f7f2b2"          ,
+                 "#d4e881"                    ,  "#f0ff51"                     , "#f7f2b2"          ,
                  "#ad9bf2"                    ,  "#4ebdbd"                     , "#8c9ee1"          ,
-                 "#4e59bd"                    ,  "#4ebd9b"                     , "#90c5f4"          ,
+                 "#4e59bd"                    ,  "#d4e881"                     , "#90c5f4"          ,
                  "#e2e8c9"                    ,  "#def9f9"                     , "#aa3596"          ,
-                 "#edbde5"                    ,  "#4e59bd"                     , "#8c9ee1"          ,
-                 "#90c5f4"                    ,  "#90c5f4"                     , "#f7f2b2"          ,
-                 "#d4e881")
+                 "#edc5e6"                    ,  "#4e59bd"                     , "#8c9ee1"          ,
+                 "#90c5f4"                    ,  "#90c5f4"                     , "#D3D3D3"          ,
+                 "#d4e881"                    ,  "#d4e881"                     , "#f7f2b2"          ,
+                 "#F9A602"                    ,  "#f93a01"                     , "#d4e881"          ,
+                 "#ad9bf2")
 
   for (i in 1:length(sub_types))
   {
