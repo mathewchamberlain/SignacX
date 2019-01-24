@@ -3,11 +3,10 @@
 #' @param data.dir Directory containing matrix.mtx and genes.txt.
 #' @return A sparse matrix with rownames equivalent to the names in genes.txt
 #' @export
-CID.LoadData <- function(spring.dir)
+CID.LoadData <- function(spring.dir, fn = "matrix.mtx")
 {
   data.dir = dirname(spring.dir)
   data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
-  fn <- "matrix.mtx"
   gE <- paste(data.dir,fn,sep="/")
   flag = file.exists(gE);
   if (!flag) {
