@@ -5,8 +5,9 @@
 #' @export
 CID.LoadData <- function(spring.dir, fn = "matrix.mtx")
 {
+  data.dir = gsub("\\/$", "", spring.dir, perl = TRUE);
+  if (! (file.exists(paste(spring.dir, "matrix.mtx", sep = "/")) & file.exists(paste(spring.dir, "genes.txt", sep = "/"))))
   data.dir = dirname(spring.dir)
-  data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
   gE <- paste(data.dir,fn,sep="/")
   flag = file.exists(gE);
   if (!flag) {
@@ -30,7 +31,7 @@ CID.LoadData <- function(spring.dir, fn = "matrix.mtx")
   flag = length(genes) %in% c(nrow(E), ncol(E));
   if (!flag) {
     cat("ERROR: from CID.LoadData:\n");
-    cat("length of genes in genes.txt = ", length(genes), " is not equal to nrow(E) = ", nrow(E), "or ncol(E) - ", ncol(E), "\n", sep = "");
+    cat("length of genes in genes.txt = ", length(genes), " is not equal to nrow(E) = ", nrow(E), ", or ncol(E) = ", ncol(E), "\n", sep = "");
     stop()
   }
   if (nrow(E) != length(genes))
@@ -51,7 +52,7 @@ CID.LoadEdges <- function(spring.dir)
   file.exists(edges)
   flag = file.exists(edges);
   if (!flag) {
-    cat("ERROR: from CID.entropy:\n");
+    cat("ERROR: from CID.LoadEdges:\n");
     cat("edges = ", edges, " does not exist.\n", sep = "");
     stop()
   }
@@ -72,21 +73,68 @@ CID.LoadEdges <- function(spring.dir)
 #' @return imputed expression matrix with only marker genes in rows.
 #' @export
 #'
-CID.Impute <- function(E, do.par = FALSE)
+CID.Impute <- function(E, spring.dir = NULL, do.par = TRUE, large = FALSE)
 {
   # SAVER wrapper
-  data(markers)
-  data(cellstate_markers)
-  genes = do.call(rbind, cellstate_markers)
-  genes.ind <- which(rownames(E) %in% unique(c(as.character(markers$`HUGO symbols`), as.character(genes$`HUGO symbols`))))
-  if (do.par)
+  # If imputation was performed already and we want to use it, load imputed matrix
+  flag = FALSE
+  if (!is.null(spring.dir))
   {
-    numCores = parallel::detectCores()
-    SAVER::saver(E, pred.genes = genes.ind, pred.genes.only = T, ncores = numCores / 4, estimates.only = T)
-  } else {
-    SAVER::saver(E, pred.genes = genes.ind, pred.genes.only = T, estimates.only = T)
+    data.dir = dirname(spring.dir)
+    data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
+    fn = paste(data.dir, "matrix_saver_imputed.mtx", sep = "/")
+    flag = file.exists(fn)
   }
-  
+  if (flag) {
+    I = Matrix::readMM(fn)
+    fn <-"genes_saver_imputed.txt"
+    gG <- paste(data.dir,fn, sep = "/")
+    genes <- read.csv(gG, stringsAsFactors = F, sep = "")$x
+    flag = length(genes) %in% c(nrow(I), ncol(I));
+    if (!flag) {
+      cat("ERROR: from CID.Impute:\n");
+      cat("length of genes in genes.txt = ", length(genes), " is not equal to nrow(E) = ", nrow(I), "or ncol(E) = ", ncol(I), "\n", sep = "");
+      stop()
+    }
+    if (nrow(I) != length(genes))
+      I = Matrix::t(I)
+    rownames(I) <- genes
+    return(I)
+  }  else {
+    data(markers)
+    data(cellstate_markers)
+    genes = do.call(rbind, cellstate_markers)
+    genes.ind <- which(rownames(E) %in% unique(c(as.character(markers$`HUGO symbols`), as.character(genes$`HUGO symbols`))))
+  if (do.par)
+  { 
+    numCores = parallel::detectCores()
+    if (!large) {
+      I = SAVER::saver(E, pred.genes = genes.ind, pred.genes.only = T, ncores = numCores / 2, estimates.only = T)
+    } else {
+      q = split(1:nrow(E), ceiling(seq_along(1:nrow(E))/1500))
+      L = lapply(q, function(x) {
+        SAVER::saver(as.matrix(E), pred.genes = x, pred.genes.only = TRUE, ncores = numCores / 2, do.fast = FALSE, estimates.only = T)
+      }
+      )
+      I <- SAVER::combine.saver(L)
+       }
+    if (!is.null(spring.dir))
+    {
+      data.dir = dirname(spring.dir)
+      Matrix::writeMM(Matrix::Matrix(I, sparse = TRUE), file = paste(data.dir, "matrix_saver_imputed.mtx", sep = "/"))
+      write.table(rownames(E)[genes.ind], file = paste(data.dir, "genes_saver_imputed.txt", sep = "/"))
+    }  
+  } else {
+    I = SAVER::saver(E, pred.genes = genes.ind, pred.genes.only = T, estimates.only = T)
+    if (!is.null(spring.dir))
+    {
+      data.dir = dirname(spring.dir)
+      Matrix::writeMM(Matrix::Matrix(I, sparse = TRUE), file = paste(data.dir, "matrix_saver_imputed.mtx", sep = "/"))
+      write.table(rownames(E)[genes.ind], file = paste(data.dir, "genes_saver_imputed.txt", sep = "/"))
+    }  
+  }
+    return(I)
+  }
 }
 
 #' runs CID.CellID in batch mode
@@ -111,13 +159,11 @@ CID.BatchMode <- function(E,f,pval,deep_dive,edges,entropy,sorted,walktrap)
 #' Main function
 #'
 #' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @param f Parameter for classification smoothing. Default is f = NULL if edges = NULL, else default is f = 0.5 automatically.
 #' @param pval p-value cutoff for feature selection, as described in the manuscript + markdown file. Default is pval = 0.1.
 #' @param deep_dive Boolean, T will assign cell types and then cell states, F will only assign cell types. Default is deep_dive = T.
-#' @param edges Data-frame containing the edgelist for graph edges for smoothing, OR a directory where "edges.csv" is located, OR a character vector / list for batch mode. Default is edges = NULL.
 #' @return Filtered markers where each marker must have at least ncells that express at least ncounts
 #' @export
-CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entropy = FALSE, sorted = FALSE, walktrap = FALSE)
+CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy = FALSE, walktrap = FALSE)
 {
   # load markers
   data(markers)
@@ -134,7 +180,7 @@ CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entr
 
   # if list, run batch mode
   if(class(E) == "list")
-    return(CID.BatchMode(E = E,f = f,pval = pval,deep_dive = deep_dive,edges = edges, entropy = entropy, sorted = sorted, walktrap = walktrap))
+    return(CID.BatchMode(E = E,pval = pval,deep_dive = deep_dive,edges = edges, entropy = entropy, sorted = sorted, walktrap = walktrap))
 
   # check inputs
   cat(" ..........  Entry in CID.CellID \n");
@@ -142,32 +188,26 @@ CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entr
   stopifnot(class(E) %in% c("dgCMatrix","dgTMatrix", "matrix", "data.frame"))
   stopifnot(!is.null(rownames(E)));
 
-  if (sorted)  {
-    markers = markers[markers$Polarity == "+",]
-    cellstate_markers = lapply(cellstate_markers, function(x) {x[x$Polarity == "+",]})
-  }
-
   # main function
   cat(" ..........  Computing Signac scores for cell types on input data matrix :\n");
   cat("             nrow = ", nrow(E), "\n", sep = "");
   cat("             ncol = ", ncol(E), "\n", sep = "");
   filtered_features = CID.filter(E, markersG  = markers, pval = pval)
   dfY = CID.append(E,filtered_features)
-
+  
   # assign output classifications
   cat(" ..........  Assigning output classifications \n", sep ="");
   indexMax = apply(dfY, 2, which.max);
   ac = rownames(dfY)[indexMax];
-
+  
   # compute distance matrix
-  if (!is.null(edges) | entropy | walktrap)
-  distMat = CID.DistMatrix(ac, edges)
+  if (!is.null(spring.dir) | entropy | walktrap)
+    distMat = CID.DistMatrix(ac, spring.dir)
 
   # smooth the output classifications
-  if (!is.null(edges))
+  if (!is.null(spring.dir))
   {
-    if (is.null(f))
-      f = 0.5
+    f = 0.5
     cat(" ..........  Smoothing with smoothing parameter f = ", f, "\n", sep ="");
     acOut_knn_smooth = CID.smooth(ac, distMat, f = f) # smooth based on edges in knn graph
     cat(" ..........  Smoothing completed! \n");
@@ -184,7 +224,7 @@ CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entr
   {
     dummy = list("")
     cat(" ..........  Computing CID scores for cell states! \n");
-    if (!is.null(edges))
+    if (!is.null(spring.dir))
     {  ac_dd = acOut_knn_smooth
     } else {
       ac_dd = ac
@@ -205,20 +245,34 @@ CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entr
     dummy = dummy[sapply(dummy, function(x) length(x) != 1)]
     names(dummy) <- paste("L", seq_along(1:length(dummy)), sep = "")
     cat(" ..........  Deep dive completed!\n");
-    if (!is.null(edges))
+    if (!is.null(spring.dir))
     {
       if (is.null(f))
         f = 0.5
       cat(" ..........  Smoothing with smoothing parameter f = ", f, "\n", sep ="");
-      ac_dd_knn = CID.smooth(ac_dd, f = f, distMat)
+      ac_dd_knn = CID.smooth(ac_dd, distMat, f)
     }
   }
 
   if (walktrap)
-    wt = CID.WalkTrap(acOut_knn_smooth, edges)
+  {
+    wt = CID.WalkTrap(acOut_knn_smooth, spring.dir)
+    tt = table(wt)
+    tt_other = table(wt[acOut_knn_smooth == "Other"])
+    idx = na.omit(match(names(tt_other), names(tt)))
+    logik = tt_other == tt[idx];
+    if (sum(logik) > 0)
+    {
+      nms_in <- rep("all", ncol(E))
+      logik = wt %in% names(tt_other)[logik]
+      nms_in[logik] = wt[logik]
+      colnames(E) <-nms_in
+      mrks = CID.PosMarkers(E)
+    }
+  }
   
   # Package output
-  if (deep_dive & !is.null(edges) & walktrap) {
+  if (deep_dive & !is.null(spring.dir) & walktrap) {
     cr = list(scores = dfY,
               ctypes = ac,
               ctypessmoothed = acOut_knn_smooth,
@@ -227,7 +281,7 @@ CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entr
               hierarchylabels = dummy,
               walktrap = wt)
   }
-  else if (deep_dive & !is.null(edges)) {
+  else if (deep_dive & !is.null(spring.dir)) {
     cr = list(scores = dfY,
               ctypes = ac,
               ctypessmoothed = acOut_knn_smooth,
@@ -235,11 +289,11 @@ CID.CellID <- function(E,f = NULL,pval = 0.1,deep_dive = TRUE,edges = NULL, entr
               ddtypessmoothed = ac_dd_knn,
               hierarchylabels = dummy)
   }
-  else if (!is.null(edges)) {
+  else if (!is.null(spring.dir)) {
     cr = list(scores = dfY,
               ctypes = ac,
               ctypessmoothed = acOut_knn_smooth);}
-  else if (deep_dive & is.null(edges)) {
+  else if (deep_dive & is.null(spring.dir)) {
     cr = list(scores = dfY,
               ctypes = ac ,
               ddtypes = ac_dd ,
@@ -358,23 +412,32 @@ CID.deepdive <- function(XX, YY, acOut3 = ac_dd, expression = E, f = f)
 #' @param edges Location where knn edges are stored
 #' @return Smoothed cell type or cell state assignments
 #' @export
-CID.smooth <- function(ac,distMat,f = 0.5)
+CID.smooth <- function(ac,dM,f = 0.5)
 {
   # pre-allocate
-  Y = ac
+  Y   = ac[as.integer(rownames(dM))] # cells we may switch labels
+  acn = ac[as.integer(colnames(dM))] # cells we will use for smoothing
+
   # smooth based on majority vote of direct connections
-  for (i in 1:length(ac))
+  pb = txtProgressBar(min = 0, max = length(Y), initial = 0, style = 3
+                      ) 
+  
+  for (i in 1:length(Y))
   {
-    logik = distMat[,i] == 1;
-    x = data.frame(table(as.character(ac[logik])))
+    logik = dM[i,] == 1;
+    x = data.frame(table(as.character(acn[logik])))
     logik =  (x$Freq/sum(x$Freq) > f)
     y = as.character(x$Var1)
     dummy = y[logik]
     if (length(dummy) > 0)
       Y[i] = dummy[1]
+    setTxtProgressBar(pb,i)
   }
-
-  return(Y)
+  
+  # assign the smoothed labels
+  ac[as.integer(rownames(dM))] = Y
+  
+  return(ac)
 }
 
 #' Distance matrix
@@ -383,38 +446,68 @@ CID.smooth <- function(ac,distMat,f = 0.5)
 #' @param edges A data frame or matrix with edges
 #' @return The entropy for each node in the network
 #' @export
-CID.DistMatrix <- function(ac,edges)
+CID.DistMatrix <- function(ac, spring.dir)
 {
   # load edges
-  edges = CID.LoadEdges(edges)
-  # convert edgelist to adjacency matrix
-  adjmatrix <- Matrix::Matrix(0, length(ac), length(ac), sparse = T)
-  adjmatrix[cbind(edges$V1, edges$V2)] <- 1
+  edges    = CID.LoadEdges(spring.dir)
+  logik    = ac[edges$V1] != ac[edges$V2];
+  idx      = union(edges$V1[logik], edges$V2[logik])
+  
+  # create network that seeds from uncertain calls; go for three generations
+  for (j in 1:3)
+  {
+    edges_n  = data.frame(V1 = c(edges$V1[edges$V1 %in% idx] ,
+                                 edges$V2[edges$V2 %in% idx]),
+                          V2 = c(edges$V2[edges$V1 %in% idx] ,
+                                 edges$V1[edges$V2 %in% idx]))
+    idx = union(edges_n$V1, edges_n$V2)
+  }
+
+  
+  # create reduced graph edgelist
+  idx      = sort(union(edges_n$V1, edges_n$V2))
+  # dim reduce
+  for (j in 1:length(idx))
+  {
+    edges_n$V1[edges_n$V1 == idx[j]] = j
+    edges_n$V2[edges_n$V2 == idx[j]] = j
+  }
   # get distance matrix
-  g = igraph::graph_from_adjacency_matrix(adjmatrix, mode = c("directed", "undirected",
-                                                              "max", "min", "upper", "lower", "plus"), weighted = NULL, diag = TRUE,
-                                          add.colnames = NULL, add.rownames = NA)
-  igraph::shortest.paths(g, v=igraph::V(g), to=igraph::V(g))
+  g = igraph::graph_from_edgelist(as.matrix(edges_n), directed = FALSE)
+  get_distance_matrix <- function(x, edges, idx)
+      {
+      verts = igraph::V(x)[igraph::V(x) %in% edges$V1]
+      dM = Matrix::Matrix(igraph::shortest.paths(x, v=verts, to=igraph::V(x)), sparse = TRUE)
+      colnames(dM) <- idx[sort(unique(edges$V2))]
+      rownames(dM) <- idx[sort(unique(edges$V1))];
+      dM
+      }
+  return(get_distance_matrix(g, edges = edges_n, idx))
 }
 #' Entropy
-#'
-#' @param edges A data frame or matrix with edges
-#' @return The entropy for each node in the network
 #' @export
-CID.entropy <- function(ac,distMat)
+CID.entropy <- function(ac,dM)
 {
+  # Pre-allocate cells for shannon calculation
+  Y   = ac[as.integer(rownames(dM))]
+  acn = ac[as.integer(colnames(dM))]
+  
   # Calculate shannon entropy for each cell j for all connections with shortest path < N
-  shannon = rep(0, length(ac))
+  shannon = rep(0, length(Y))
   N = 4
-  for (j in 1:length(ac))  {
-    logik = distMat[,j] <= N; sum(logik)
-    freqs <- table(ac[logik])/sum(logik)
+  for (j in 1:length(Y))  {
+    logik = dM[j,] <= N; sum(logik)
+    freqs <- table(acn[logik])/sum(logik)
     shannon[j] = -sum(freqs * log2(freqs))
   }
-  #df = data.frame(cells = ac, shannon = shannon)
-  #ggplot(df, aes(x=cells, y=shannon, color = cells)) + geom_boxplot()
+  #df = data.frame(cells = Y, shannon = shannon)
+  #ggplot2::ggplot(df, ggplot2::aes(x=cells, y=shannon, color = cells)) + ggplot2::geom_boxplot()
   logik = shannon > 0.5; sum(logik)
-  ac[logik] = "Other"
+  Y[logik] = "Other"
+  
+  # assign Other labels
+  ac[as.integer(rownames(dM))] = Y
+  
   return(ac)
 }
 
@@ -446,14 +539,14 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", sprin
   if ("walktrap" %in% names(cr))
   {
     Q = as.character(cr$walktrap)
-    json_data$Clusters$label_list = Q
+    json_data$ClustersWT$label_list = Q
     Ntypes = length(unique(Q))
     qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
     col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
     #pie(rep(1,num_col), col=(col_vector[1:num_col]))
     col_palette <- as.list(col_vector[1:Ntypes]); # or sample if you wish
     names(col_palette) <- unique(Q)
-    json_data$Clusters$label_colors = col_palette
+    json_data$ClustersWT$label_colors = col_palette
   }
   if ("ctypessmoothed" %in% names(cr))
   {
@@ -524,11 +617,6 @@ get_colors <- function(P)
                   "#8c933e", "#90c5f4", "#90b771",
                   "#C0C0C0", "#dbd0d0", "#e1f7d5",
                   "#ffbdbd", "#c9c9ff")
-  for (i in 1:length(main_types))
-  {
-    cs[P == main_types[i]] = main_colors[i]
-    cs[P == paste(main_types[i],"-like",sep ="")] = main_colors[i]
-  }
 
   # sub cell types will be consistently labeled:
   sub_types = c( "Dendritic.cells.activated"  ,  "Dendritic.cells.resting"     , "Eosinophils"       ,
@@ -557,18 +645,11 @@ get_colors <- function(P)
   for (i in 1:length(sub_types))
   {
     cs[P == sub_types[i]] = sub_colors[i]
+    cs[P == main_types[i]] = main_colors[i]
   }
 
   cs[P == "None"] = "#808080"
 
-  colfunc <- colorRampPalette(sub_colors)
-
-  coms = apply(expand.grid(sub_types, sub_types), 1, paste, collapse="-")
-  col=colfunc(length(coms))
-  for (i in 1:length(coms))
-  {
-    cs[P == coms[i]] = col[i]
-  }
   outs = list(cs)
 
   names(outs[[1]]) <- P
@@ -609,6 +690,10 @@ CID.VinPlot <- function(E,genes = c("MS4A1", "CD40", "NKG7"), lbls = NULL, do.pr
     colnames(D) = lbls;
     df2 = reshape2::melt(D)
     df$lbls = as.character(df2$Var2)
+  }
+  
+  if (is.null(lbls)) {
+    df$lbls = colnames(D)
   }
   df$Var1<- as.character(df$Var1)
   df = df[order(df$Var2),]
@@ -668,40 +753,185 @@ CID.WalkTrap <- function(ac,edges)
   as.character(igraph::cluster_walktrap(g)$membership)
 }
 
+#' Run DEG analysis with Seurat wrapper
+#'
+#' @param E Expression matrix with genes for rows, samples for columns
+#' @return List where each element contains the DEG tables for the one vs. all comparison
+#' @export
+CID.PosMarkers <- function(E)
+{
+  # get lbls
+  lbls = colnames(E)
+  # set colnames
+  colnames(E) <- seq(1, ncol(E))
+  # make sure row names are not redundant
+  logik = Biobase::isUnique(rownames(E))
+  E = E[logik,]
+  # Set up object
+  ctrl <- Seurat::CreateSeuratObject(counts = E)
+  ctrl <- Seurat::NormalizeData(object = ctrl)
+  #ctrl <- Seurat::FindVariableFeatures(object = ctrl)
+  ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
+  ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
+  outs = list("")
+  cts = unique(lbls);
+  cts = cts[cts != "all"]
+  cts2 = data.frame(ident.1 = sort(cts[grepl("Samples1-2", cts)]), ident.2 = sort(cts[grepl("Samples3-12", cts)]))
+  for (j in 1:length(cts2$ident.1))
+  {
+    #dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 1, min.pct = 0)
+    dd = Seurat::FindMarkers(ctrl, ident.1 = cts2$ident.1[j], ident.2 = cts2$ident.2[j], min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 0, min.pct = 0)
+    dd$GeneSymbol = rownames(dd)
+    dd$celltype = gsub( " .*$", "", cts2$ident.1 )[j]
+    outs[[j]] = dd
+  }
+  names(outs) <- gsub( " .*$", "", cts2$ident.1 )
+  outs = do.call(rbind, outs)
+  #outs = do.call(rbind, lapply(outs, function(x) x[x$p_val_adj < 0.05 & x$avg_logFC > 0.2, ]))
+  geneset = data.frame(genes = outs$GeneSymbol, celltype = outs$celltype, Polarity = "+")
+  colnames(geneset) <- c("HUGO symbols", "Cell population", "Polarity")
+  
+  return(geneset)
+}
+
+#' Visualizations with Seurat wrapper
+#'
+#' @param spring.dir directory where SPRING files are located
+#' @return Visualizations from Seurat
+#' @export
+CID.VisFeatures <- function(spring.dir, features.plot = c("LILRB2"))
+{
+  E = CID.LoadData(spring.dir)
+  # make sure row names are not redundant
+  logik = Biobase::isUnique(rownames(E))
+  E = E[logik,]
+  # get lbls
+  json_data <- rjson::fromJSON(file=paste(spring.dir, "categorical_coloring_data.json", sep = ""))
+  # set unique colnames
+  colnames(E) <- seq(1, ncol(E))
+  # Set up object
+  ctrl <- Seurat::CreateSeuratObject(counts = E)
+  p = list("")
+  q = list("")
+  r = list("")
+  k = 1;
+  if ("CellTypesID" %in% names(json_data) & "Disease" %in% names(json_data))
+  {
+    lbls = paste(json_data$CellTypesID$label_list, json_data$Disease$label_list)
+    ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = 'CellTypesID')
+    ctrl <- Seurat::SetIdent(ctrl, value='CellTypesID')
+    p[[k]]<-Seurat::RidgePlot(object = ctrl, features = features.plot, ncol = length(features.plot))
+    q[[k]]<-Seurat::VlnPlot(object = ctrl, features = features.plot)
+    r[[k]]<-Seurat::DotPlot(object = ctrl, features = features.plot)
+    k = k + 1
+  }
+  if ("CellStatesID" %in% names(json_data) & "Disease" %in% names(json_data))
+  {
+    lbls = paste(json_data$CellStatesID$label_list, json_data$Disease$label_list)
+    ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = 'CellStatesID')
+    ctrl <- Seurat::SetIdent(ctrl, value='CellStatesID')
+    p[[k]]<-Seurat::RidgePlot(object = ctrl, features = features.plot, ncol = length(features.plot))
+    q[[k]]<-Seurat::VlnPlot(object = ctrl, features = features.plot)
+    r[[k]]<-Seurat::DotPlot(object = ctrl, features = features.plot)
+    k = k + 1
+  }
+  if ("CellTypesID" %in% names(json_data))
+  {
+    lbls = json_data$CellTypesID$label_list
+    ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = 'CellTypesID')
+    ctrl <- Seurat::SetIdent(ctrl, value='CellTypesID')
+    p[[k]]<-Seurat::RidgePlot(object = ctrl, features = features.plot, ncol = length(features.plot))
+    q[[k]]<-Seurat::VlnPlot(object = ctrl, features = features.plot)
+    r[[k]]<-Seurat::DotPlot(object = ctrl, features = features.plot)
+    k = k + 1
+  }
+  if ("CellStatesID" %in% names(json_data))
+  {
+    lbls = json_data$CellStatesID$label_list
+    ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = 'CellStatesID')
+    ctrl <- Seurat::SetIdent(ctrl, value='CellStatesID')
+    p[[k]]<-Seurat::RidgePlot(object = ctrl, features = features.plot, ncol = length(features.plot))
+    q[[k]]<-Seurat::VlnPlot(object = ctrl, features = features.plot)
+    r[[k]]<-Seurat::DotPlot(object = ctrl, features = features.plot)
+    k = k + 1
+  }
+  if ("Disease" %in% names(json_data))
+  {
+    lbls = json_data$Disease$label_list
+    ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = 'Disease')
+    ctrl <- Seurat::SetIdent(ctrl, value='Disease')
+    p[[k]]<-Seurat::RidgePlot(object = ctrl, features = features.plot, ncol = length(features.plot))
+    q[[k]]<-Seurat::VlnPlot(object = ctrl, features = features.plot)
+    r[[k]]<-Seurat::DotPlot(object = ctrl, features = features.plot)
+    k = k + 1
+  }
+  if ("Tissue" %in% names(json_data))
+  {
+    lbls = json_data$Tissue$label_list
+    ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = 'Tissue')
+    ctrl <- Seurat::SetIdent(ctrl, value='Tissue')
+    p[[k]]<-Seurat::RidgePlot(object = ctrl, features = features.plot, ncol = length(features.plot))
+    q[[k]]<-Seurat::VlnPlot(object = ctrl, features = features.plot)
+    r[[k]]<-Seurat::DotPlot(object = ctrl, features = features.plot)
+    k = k + 1
+  }
+  if ("CellType" %in% names(json_data))
+  {
+    lbls = json_data$CellType$label_list
+    ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = 'Celltype')
+    ctrl <- Seurat::SetIdent(ctrl, value='Celltype')
+    p[[k]]<-Seurat::RidgePlot(object = ctrl, features = features.plot, ncol = length(features.plot))
+    q[[k]]<-Seurat::VlnPlot(object = ctrl, features = features.plot)
+    r[[k]]<-Seurat::DotPlot(object = ctrl, features = features.plot)
+    k = k + 1
+  }
+  
+  filename = paste(spring.dir, "geneviews_ridge.pdf", sep = "")
+  pdf(filename)
+    for (i in p){
+      print(i)
+    }
+    dev.off()
+    invisible(NULL)
+    
+    filename = paste(spring.dir, "geneviews_violin.pdf", sep = "")
+    pdf(filename)
+    for (i in q){
+      print(i)
+    }
+    dev.off()
+    invisible(NULL)
+    
+    filename = paste(spring.dir, "geneviews_dotplot.pdf", sep = "")
+    pdf(filename)
+    for (i in r){
+      print(i)
+    }
+    dev.off()
+    invisible(NULL)
+}
+
 #' Community substructure by random walk
 #'
 #' @param ac A character vector of cell type labels
 #' @param edges A data frame or matrix with edges
 #' @return The community substructures of the graph
 #' @export
-CID.ViewHierarchy <- function()
+CID.Scatter <- function(spring.dir, features.plot)
 {
-
-df = data.frame(root = c(rep("Non-immune", 4), rep("Immune", 23)),
-                leaf1 = c("Epithelial", "Epithelial.Urinary", "Fibroblasts", "Secretory", rep("Lymphocytes",10), rep("Myeloid",13)),
-                leaf2 = c("Epithelial", "Epithelial.Urinary", "Fibroblasts", "Secretory", c(rep("TNK",7), rep("B.cells",2), "Plasma.Cells", rep("MPH",6), rep("GN",4), "pDCs", "Platelets","Erythro")),
-                leaf3 = c("Epithelial", "Epithelial.Urinary", "Fibroblasts", "Secretory", c(rep("T",6),          "NK", "Memory", "Naive", "Plasma.Cells", rep("DC",2),            rep("Monocytes",  4),              rep("Mast",2),                              rep("Not.Mast",2)             , "pDCs", "Platelets","Erythro")),
-                leaf4 = c("Epithelial", "Epithelial.Urinary", "Fibroblasts", "Secretory", c(rep("CD4",5),         "CD8", "NK", "Memory", "Naive", "Plasma.Cells", "activated", "resting", rep("Macrophages",3), "Monocytes", "Mast.cells.resting", "Mast.cells.activated", "Neutrophils", "Eosinophils", "pDCs", "Platelets","Erythro")),
-                leaf5 = c("Epithelial", "Epithelial.Urinary", "Fibroblasts", "Secretory", c(rep("CD4",4), "Regs", "CD8", "NK", "Memory", "Naive", "Plasma.Cells", "activated", "resting", "M0", "M1", "M2"    , "Monocytes", "Mast.cells.resting", "Mast.cells.activated", "Neutrophils", "Eosinophils", "pDCs", "Platelets","Erythro")),
-                leaf6 = c("Epithelial", "Epithelial.Urinary", "Fibroblasts", "Secretory", "naive", "memory.resting", "memory.activated", "follicular.helpere", "Regs", "CD8", "NK", "Memory", "Naive", "Plasma.Cells", "activated", "resting", "M0", "M1", "M2"    , "Monocytes", "Mast.cells.resting", "Mast.cells.activated", "Neutrophils", "Eosinophils", "pDCs", "Platelets","Erythro")
-                )
-
-setDT(df)
-
-## Loading packages
-library("data.table")
-library("D3partitionR")
-
-##Agregating data to have unique sequence for the 4 variables
-var_names=c(" ","leaf1", "leaf2", "leaf3", "leaf4", "leaf5", "leaf6")
-data_plot=df[,.N,by=var_names]
-data_plot[,(var_names):=lapply(var_names,function(x){data_plot[[x]]=paste0(x,' ',data_plot[[x]])
-})]
-
-## Plotting the chart
-library("magrittr")
-D3partitionR() %>%
-  add_data(data_plot,count = 'N',steps=c("root","leaf1", "leaf2", "leaf3", "leaf4", "leaf5", "leaf6")) %>%
-  add_title('Titanic') %>%
-  plot()
-}
+  E = CID.LoadData(spring.dir)
+  json_data <- rjson::fromJSON(file=paste(spring.dir, "categorical_coloring_data.json", sep = ""))
+  genes.missing = features.plot[!features.plot %in% rownames(E)]
+  if (length(genes.missing) > 0)
+  {
+    cat("WARNING: Gene(s) missing: ", genes.missing, "\n")
+    stop()
+  }
+  # reshape for ggplot
+  df = data.frame(Matrix::t(E[rownames(E) %in% features.plot,]))
+  colnames(df) <- features.plot
+  df$Disease = json_data$Disease$label_list
+  df$CellTypes = json_data$CellTypesID$label_list
+  # Change point shapes, colors and sizes
+  ggplot2::ggplot(df, ggplot2::aes(x=PTPRC, y=ALDOB, color = CellTypes, shape = Disease)) + ggplot2::geom_point()
+  }
