@@ -103,6 +103,10 @@ CID.Impute <- function(E, spring.dir = NULL, do.par = TRUE, large = FALSE)
   }  else {
     data(markers)
     data(cellstate_markers)
+    temp = markers[markers$`Cell population` == "Platelets",]
+    temp = temp[1:3,]
+    markers = markers[markers$`Cell population` != "Platelets",]
+    markers = rbind(markers, temp)
     genes = do.call(rbind, cellstate_markers)
     genes.ind <- which(rownames(E) %in% unique(c(as.character(markers$`HUGO symbols`), as.character(genes$`HUGO symbols`))))
   if (do.par)
@@ -215,7 +219,6 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
 
   if (entropy)
   {
-    ac = CID.entropy(ac, distMat)
     acOut_knn_smooth = CID.entropy(acOut_knn_smooth, distMat)
   }
 
@@ -257,18 +260,6 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
   if (walktrap)
   {
     wt = CID.WalkTrap(acOut_knn_smooth, spring.dir)
-    tt = table(wt)
-    tt_other = table(wt[acOut_knn_smooth == "Other"])
-    idx = na.omit(match(names(tt_other), names(tt)))
-    logik = tt_other == tt[idx];
-    if (sum(logik) > 0)
-    {
-      nms_in <- rep("all", ncol(E))
-      logik = wt %in% names(tt_other)[logik]
-      nms_in[logik] = wt[logik]
-      colnames(E) <-nms_in
-      mrks = CID.PosMarkers(E)
-    }
   }
   
   # Package output
@@ -415,8 +406,7 @@ CID.deepdive <- function(XX, YY, acOut3 = ac_dd, expression = E, f = f)
 CID.smooth <- function(ac,dM,f = 0.5)
 {
   # pre-allocate
-  Y   = ac[as.integer(rownames(dM))] # cells we may switch labels
-  acn = ac[as.integer(colnames(dM))] # cells we will use for smoothing
+  Y   = ac # cells we may switch labels
 
   # smooth based on majority vote of direct connections
   pb = txtProgressBar(min = 0, max = length(Y), initial = 0, style = 3
@@ -425,7 +415,7 @@ CID.smooth <- function(ac,dM,f = 0.5)
   for (i in 1:length(Y))
   {
     logik = dM[i,] == 1;
-    x = data.frame(table(as.character(acn[logik])))
+    x = data.frame(table(as.character(ac[logik])))
     logik =  (x$Freq/sum(x$Freq) > f)
     y = as.character(x$Var1)
     dummy = y[logik]
@@ -435,7 +425,7 @@ CID.smooth <- function(ac,dM,f = 0.5)
   }
   
   # assign the smoothed labels
-  ac[as.integer(rownames(dM))] = Y
+  ac = Y
   
   return(ac)
 }
@@ -450,54 +440,23 @@ CID.DistMatrix <- function(ac, spring.dir)
 {
   # load edges
   edges    = CID.LoadEdges(spring.dir)
-  logik    = ac[edges$V1] != ac[edges$V2];
-  idx      = union(edges$V1[logik], edges$V2[logik])
-  
-  # create network that seeds from uncertain calls; go for three generations
-  for (j in 1:3)
-  {
-    edges_n  = data.frame(V1 = c(edges$V1[edges$V1 %in% idx] ,
-                                 edges$V2[edges$V2 %in% idx]),
-                          V2 = c(edges$V2[edges$V1 %in% idx] ,
-                                 edges$V1[edges$V2 %in% idx]))
-    idx = union(edges_n$V1, edges_n$V2)
-  }
-
-  
-  # create reduced graph edgelist
-  idx      = sort(union(edges_n$V1, edges_n$V2))
-  # dim reduce
-  for (j in 1:length(idx))
-  {
-    edges_n$V1[edges_n$V1 == idx[j]] = j
-    edges_n$V2[edges_n$V2 == idx[j]] = j
-  }
   # get distance matrix
-  g = igraph::graph_from_edgelist(as.matrix(edges_n), directed = FALSE)
-  get_distance_matrix <- function(x, edges, idx)
-      {
-      verts = igraph::V(x)[igraph::V(x) %in% edges$V1]
-      dM = Matrix::Matrix(igraph::shortest.paths(x, v=verts, to=igraph::V(x)), sparse = TRUE)
-      colnames(dM) <- idx[sort(unique(edges$V2))]
-      rownames(dM) <- idx[sort(unique(edges$V1))];
-      dM
-      }
-  return(get_distance_matrix(g, edges = edges_n, idx))
+  g = igraph::graph_from_edgelist(as.matrix(edges), directed = FALSE)
+  igraph::shortest.paths(g, v=igraph::V(g), to=igraph::V(g))
 }
 #' Entropy
 #' @export
 CID.entropy <- function(ac,dM)
 {
   # Pre-allocate cells for shannon calculation
-  Y   = ac[as.integer(rownames(dM))]
-  acn = ac[as.integer(colnames(dM))]
+  Y   = ac
   
   # Calculate shannon entropy for each cell j for all connections with shortest path < N
   shannon = rep(0, length(Y))
   N = 4
   for (j in 1:length(Y))  {
     logik = dM[j,] <= N; sum(logik)
-    freqs <- table(acn[logik])/sum(logik)
+    freqs <- table(ac[logik])/sum(logik)
     shannon[j] = -sum(freqs * log2(freqs))
   }
   #df = data.frame(cells = Y, shannon = shannon)
@@ -506,7 +465,7 @@ CID.entropy <- function(ac,dM)
   Y[logik] = "Other"
   
   # assign Other labels
-  ac[as.integer(rownames(dM))] = Y
+  ac = Y
   
   return(ac)
 }
@@ -634,7 +593,7 @@ get_colors <- function(P)
                  "#F9A602"                    ,  "#f97501"                     , "#d6b171"          ,
                  "#d4e881"                    ,  "#f0ff51"                     , "#f7f2b2"          ,
                  "#ad9bf2"                    ,  "#4ebdbd"                     , "#8c9ee1"          ,
-                 "#4e59bd"                    ,  "#d4e881"                     , "#90c5f4"          ,
+                 "#4e59bd"                    ,  "#d4e881"                     , "#2038b0"          ,
                  "#e2e8c9"                    ,  "#def9f9"                     , "#aa3596"          ,
                  "#edc5e6"                    ,  "#4e59bd"                     , "#8c9ee1"          ,
                  "#90c5f4"                    ,  "#90c5f4"                     , "#D3D3D3"          ,
