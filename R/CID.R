@@ -214,7 +214,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
     f = 0.5
     cat(" ..........  Smoothing with smoothing parameter f = ", f, "\n", sep ="");
     acOut_knn_smooth = CID.smooth(ac, distMat, f = f) # smooth based on edges in knn graph
-    cat(" ..........  Smoothing completed! \n");
+    cat("\n ..........  Smoothing completed! \n");
   }
 
   if (entropy)
@@ -260,6 +260,25 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
   if (walktrap)
   {
     wt = CID.WalkTrap(acOut_knn_smooth, spring.dir)
+    do = data.frame(table(wt[acOut_knn_smooth == "Other"]))
+    df = data.frame(table(wt[wt %in% do$Var1]))
+    logik = 1 - (df$Freq - do$Freq) / df$Freq > 0.9; # logical select all walktrap communites > 90 % labeled "other"
+    if (sum(logik) > 0)
+    {
+      do = do[logik,]
+      logik = do$Freq > 5; # require at least five cell communities
+      if (sum(logik) > 0) 
+      {
+        lbls = rep("All", ncol(E))
+        logik = wt %in% do$Var1[logik]
+        lbls[logik] = wt[logik]
+        colnames(E) <- lbls
+        acOut_knn_smooth_wt = CID.PosMarkers(E, acOut_knn_smooth)
+        ac_dd_knn_wt = ac_dd_knn
+        logik = grepl("+", acOut_knn_smooth_wt)
+        ac_dd_knn_wt[logik] = acOut_knn_smooth_wt[logik]
+      }
+    }
   }
   
   # Package output
@@ -267,8 +286,10 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
     cr = list(scores = dfY,
               ctypes = ac,
               ctypessmoothed = acOut_knn_smooth,
+              ctypessmoothed_dev = acOut_knn_smooth_wt,
               ddtypes = ac_dd,
               ddtypessmoothed = ac_dd_knn,
+              ddtypessmoothed_dev = ac_dd_knn_wt,
               hierarchylabels = dummy,
               walktrap = wt)
   }
@@ -294,7 +315,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
               ctypes = ac)
   }
   tb = proc.time()[3] - ta;
-  cat(" ..........  Exit CID.CellID.\n");
+  cat("\n ..........  Exit CID.CellID.\n");
   cat("             Execution time = ", tb, " s.\n", sep = "");
   return (cr);
 }
@@ -717,7 +738,7 @@ CID.WalkTrap <- function(ac,edges)
 #' @param E Expression matrix with genes for rows, samples for columns
 #' @return List where each element contains the DEG tables for the one vs. all comparison
 #' @export
-CID.PosMarkers <- function(E)
+CID.PosMarkers <- function(E, acn)
 {
   # get lbls
   lbls = colnames(E)
@@ -729,28 +750,34 @@ CID.PosMarkers <- function(E)
   # Set up object
   ctrl <- Seurat::CreateSeuratObject(counts = E)
   ctrl <- Seurat::NormalizeData(object = ctrl)
-  #ctrl <- Seurat::FindVariableFeatures(object = ctrl)
   ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
   ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
-  outs = list("")
+  #outs = list("")
   cts = unique(lbls);
-  cts = cts[cts != "all"]
-  cts2 = data.frame(ident.1 = sort(cts[grepl("Samples1-2", cts)]), ident.2 = sort(cts[grepl("Samples3-12", cts)]))
-  for (j in 1:length(cts2$ident.1))
+  cts = cts[cts != "All"]
+  #cts2 = data.frame(ident.1 = sort(cts[grepl("Samples1-2", cts)]), ident.2 = sort(cts[grepl("Samples3-12", cts)]))
+  for (j in 1:length(cts))
   {
+    dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 1, pseudocount.use = 1, min.pct = 0)
+    dd = dd[dd$p_val_adj < 0.01,]
+    acn[lbls == cts[j]] = rep( paste ("+", rownames(dd)[order(dd$avg_logFC, decreasing = TRUE)][1:3], collapse = " ", sep = ""), sum(lbls == cts[j]))
     #dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 1, min.pct = 0)
-    dd = Seurat::FindMarkers(ctrl, ident.1 = cts2$ident.1[j], ident.2 = cts2$ident.2[j], min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 0, min.pct = 0)
-    dd$GeneSymbol = rownames(dd)
-    dd$celltype = gsub( " .*$", "", cts2$ident.1 )[j]
-    outs[[j]] = dd
+    #dd = Seurat::FindMarkers(ctrl, ident.1 = cts2$ident.1[j], ident.2 = cts2$ident.2[j], min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 0, min.pct = 0)
+  #  dd$GeneSymbol = rownames(dd)
+  #  dd$celltype = gsub( " .*$", "", cts2$ident.1 )[j]
+  #  outs[[j]] = dd
   }
-  names(outs) <- gsub( " .*$", "", cts2$ident.1 )
-  outs = do.call(rbind, outs)
+  #dd = Seurat::FindMarkers(ctrl, ident.1 = "wt", ident.2 = "All", min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 1, min.pct = 0)
+  #dd = dd[dd$p_val_adj < 0.01,]
+  #acn[lbls == "wt"] = rep(paste( paste ("+", rownames(dd)[order(dd$avg_logFC, decreasing = TRUE)][1:2], collapse = " ", sep = ""), "cells", sep = " "), sum(lbls == "wt"))
+  acn
+  #}
+  #names(outs) <- gsub( " .*$", "", cts2$ident.1 )
+  #outs = do.call(rbind, outs)
   #outs = do.call(rbind, lapply(outs, function(x) x[x$p_val_adj < 0.05 & x$avg_logFC > 0.2, ]))
-  geneset = data.frame(genes = outs$GeneSymbol, celltype = outs$celltype, Polarity = "+")
-  colnames(geneset) <- c("HUGO symbols", "Cell population", "Polarity")
-  
-  return(geneset)
+  #geneset = data.frame(genes = outs$GeneSymbol, celltype = outs$celltype, Polarity = "+")
+  #colnames(geneset) <- c("HUGO symbols", "Cell population", "Polarity")
+  #return(geneset)
 }
 
 #' Visualizations with Seurat wrapper
