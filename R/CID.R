@@ -813,7 +813,7 @@ CID.VisFeatures <- function(spring.dir, features.plot = c("LILRB2"))
 {
   E = CID.LoadData(spring.dir)
   # make sure row names are not redundant
-  logik = Biobase::isUnique(rownames(E))
+  logik = CID.IsUnique(rownames(E))
   E = E[logik,]
   # get lbls
   json_data <- rjson::fromJSON(file=paste(spring.dir, "categorical_coloring_data.json", sep = ""))
@@ -944,4 +944,23 @@ CID.Scatter <- function(spring.dir, features.plot)
   df$CellTypes = json_data$CellTypesID$label_list
   # Change point shapes, colors and sizes
   ggplot2::ggplot(df, ggplot2::aes(x=PTPRC, y=ALDOB, color = CellTypes, shape = Disease)) + ggplot2::geom_point()
+}
+
+#' Extract unique elements
+#'
+#' @param x A character vector 
+#' @return boolean, unique elements are TRUE
+#' @export
+
+CID.IsUnique <- function (x) 
+{
+  rv = rep(TRUE, length(x))
+  if (length(x) >= 2) {
+    ord = order(x)
+    ox = x[ord]
+    neq = (ox[-length(ox)] != ox[-1])
+    rv[ord] = c(neq, TRUE) & c(TRUE, neq)
   }
+  return(rv)
+}
+
