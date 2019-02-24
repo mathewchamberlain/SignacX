@@ -542,6 +542,30 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", sprin
     C = get_colors(Q)
     json_data$CellStatesID$label_colors = as.list(C[[1]])
   }
+  if ("ctypessmoothed_dev" %in% names(cr))
+  {
+    Q = cr$ctypessmoothed_dev
+    json_data$CellTypesID_dev$label_list = Q
+    C = get_colors(Q)
+    Ntypes = sum(C[[1]] == "")
+    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
+    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
+    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
+    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
+    json_data$CellTypesID_dev$label_colors = as.list(C[[1]])
+  }
+  if ("ddtypessmoothed_dev" %in% names(cr))
+  {
+    Q = cr$ddtypessmoothed_dev
+    json_data$CellStatesID_dev$label_list = Q
+    C = get_colors(Q)
+    Ntypes = sum(C[[1]] == "")
+    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
+    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
+    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
+    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
+    json_data$CellStatesID_dev$label_colors = as.list(C[[1]])
+  }
   json_data = json_data[order(names(json_data))]
   json_data_backup = json_data;
   if (is.null(spring.dir))
@@ -760,7 +784,7 @@ CID.PosMarkers <- function(E, acn)
   {
     dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 1, pseudocount.use = 1, min.pct = 0)
     dd = dd[dd$p_val_adj < 0.01,]
-    acn[lbls == cts[j]] = rep( paste ("+", rownames(dd)[order(dd$avg_logFC, decreasing = TRUE)][1:3], collapse = " ", sep = ""), sum(lbls == cts[j]))
+    acn[lbls == cts[j]] = rep( paste ("+", rownames(dd)[order(dd$avg_logFC, decreasing = TRUE)][1:2], collapse = " ", sep = ""), sum(lbls == cts[j]))
     #dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 1, min.pct = 0)
     #dd = Seurat::FindMarkers(ctrl, ident.1 = cts2$ident.1[j], ident.2 = cts2$ident.2[j], min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 0, min.pct = 0)
   #  dd$GeneSymbol = rownames(dd)
