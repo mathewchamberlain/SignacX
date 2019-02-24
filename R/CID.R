@@ -184,7 +184,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
 
   # if list, run batch mode
   if(class(E) == "list")
-    return(CID.BatchMode(E = E,pval = pval,deep_dive = deep_dive,edges = edges, entropy = entropy, sorted = sorted, walktrap = walktrap))
+    return(CID.BatchMode(E = E,pval = pval,deep_dive = deep_dive,spring.dir = spring.dir, entropy = entropy, sorted = sorted, walktrap = walktrap))
 
   # check inputs
   cat(" ..........  Entry in CID.CellID \n");
@@ -259,6 +259,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
 
   if (walktrap)
   {
+    cat("\n")
     wt = CID.WalkTrap(acOut_knn_smooth, spring.dir)
     do = data.frame(table(wt[acOut_knn_smooth == "Other"]))
     df = data.frame(table(wt[wt %in% do$Var1]))
@@ -769,7 +770,7 @@ CID.PosMarkers <- function(E, acn)
   # set colnames
   colnames(E) <- seq(1, ncol(E))
   # make sure row names are not redundant
-  logik = Biobase::isUnique(rownames(E))
+  logik = CID.IsUnique(rownames(E))
   E = E[logik,]
   # Set up object
   ctrl <- Seurat::CreateSeuratObject(counts = E)
