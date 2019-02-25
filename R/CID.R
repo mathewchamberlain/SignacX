@@ -610,12 +610,18 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", sprin
     spring.dir = getwd()
     spring.dir = gsub("\\/$", "", spring.dir, perl = TRUE);
   }
+  json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
+  write(json_out,paste(spring.dir,fn,sep="/"))
+  cat(paste(spring.dir,fn,sep="/"), "has been written to directory! \n")
+  new.dirs = list.dirs(dirname(spring.dir))
   if (length(new.dirs) != 1)
   {
     for (j in 1:length(new.dirs))
     {
       txt = list.files(new.dirs[j])
-      if ("cell_filter.txt" %in% txt | "categorical_coloring_data.json" %in% txt)
+      flag = "cell_filter.txt" %in% list.files(new.dirs);
+      new.dirs = new.dirs[flag]
+      if ("cell_filter.txt" %in% txt)
       {
         idx = read.table(paste(new.dirs[j], "cell_filter.txt", sep = "/"), quote="\"", comment.char="", stringsAsFactors=FALSE)$V1 + 1;
         for (k in 1:length(json_data))
@@ -625,13 +631,13 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", sprin
         }
         json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
         write(json_out,paste(new.dirs[j],fn,sep="/"))
-        cat(paste(new.dirs[j],fn,sep="/"), "has been written to directory! \n")
+        #cat(paste(new.dirs[j],fn,sep="/"), "has been written to directory! \n")
         json_data = json_data_backup;
       }        
     }
     json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
     write(json_out,paste(new.dirs[j],fn,sep="/"))
-    cat(paste(new.dirs[j],fn,sep="/"), "has been written to directory! \n")
+    #cat(paste(new.dirs[j],fn,sep="/"), "has been written to directory! \n")
     json_data = json_data_backup;
   }
   return(json_data)
