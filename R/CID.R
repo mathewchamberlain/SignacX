@@ -167,7 +167,7 @@ CID.BatchMode <- function(E,f,pval,deep_dive,edges,entropy,sorted,walktrap)
 #' @param deep_dive Boolean, T will assign cell types and then cell states, F will only assign cell types. Default is deep_dive = T.
 #' @return Filtered markers where each marker must have at least ncells that express at least ncounts
 #' @export
-CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy = FALSE, walktrap = FALSE, omit = NULL)
+CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy = FALSE, walktrap = FALSE, omit = NULL, sorted = FALSE)
 {
   # load markers
   data(markers)
@@ -200,10 +200,14 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
   
   if (!is.null(omit))
   {
-    filtered_features = filtered_features[-which(names(filtered_features) %in% omit)]
+    if (sum(omit %in% names(filtered_features)) > 0)
+    {
+      omit = omit[omit %in% names(filtered_features)]
+      filtered_features = filtered_features[-which(names(filtered_features) %in% omit)]
+    }
   }
   
-  dfY = CID.append(E,filtered_features)
+  dfY = CID.append(E,filtered_features, sorted)
   
   # assign output classifications
   cat(" ..........  Assigning output classifications \n", sep ="");
@@ -247,7 +251,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
       }
       if (!is.null(filtered_features))
       {
-        ac_dd = CID.deepdive(filtered_features, j, acOut3 = ac_dd, expression = E, f = f)
+        ac_dd = CID.deepdive(filtered_features, j, acOut3 = ac_dd, expression = E, f = f, sorted = sorted)
         dummy[[j]] = ac_dd;
       }
     }
@@ -257,7 +261,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
     if (!is.null(spring.dir))
     {
       if (is.null(f))
-        f = 0.5
+      f = 0.5
       cat(" ..........  Smoothing with smoothing parameter f = ", f, "\n", sep ="");
       ac_dd_knn = CID.smooth(ac_dd, distMat, f)
     }
@@ -289,7 +293,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
   }
   
   # Package output
-  if (deep_dive & !is.null(spring.dir) & walktrap) {
+  if (deep_dive & !is.null(spring.dir) & walktrap & sum(logik) != 0) {
     cr = list(scores = dfY,
               ctypes = ac,
               ctypessmoothed = acOut_knn_smooth,
@@ -297,6 +301,15 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
               ddtypes = ac_dd,
               ddtypessmoothed = ac_dd_knn,
               ddtypessmoothed_dev = ac_dd_knn_wt,
+              hierarchylabels = dummy,
+              walktrap = wt)
+  } else if (deep_dive & !is.null(spring.dir) & walktrap)
+  {
+    cr = list(scores = dfY,
+              ctypes = ac,
+              ctypessmoothed = acOut_knn_smooth,
+              ddtypes = ac_dd,
+              ddtypessmoothed = ac_dd_knn,
               hierarchylabels = dummy,
               walktrap = wt)
   }
@@ -379,37 +392,52 @@ CID.filter <- function(expression, markersG, pval = 0.1)
 #' @param featuresG A list of features, where each list entry is a character vector of markers.
 #' @return A matrix of CellID scores; features by cells.
 #' @export
-CID.append=function(expression,featuresG)
+CID.append=function(expression,featuresG, sorted)
 {
-  # subset expression matrix
-  Z = expression[row.names(expression) %in% as.character(unlist(lapply(featuresG, function(x) x = x[,1]))), ]
-  # transform expression -> log base 2 (expression + 1), and then Z-score transform
-  Z = log(Z + 1, 2)
-  Z = Matrix::t(scale(Matrix::t(Z)))
-  # Get CellID scores
-  res = as.data.frame(Matrix::t(do.call(cbind,
-                                lapply(featuresG,function(x){
-                                  if (sum(x$Polarity == "-") > 0)
-                                  {
-                                    apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "+"]),,drop=F],2,function(x) mean(x, na.rm = T)) -
-                                    apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "-"]),,drop=F],2,function(x) mean(x, na.rm = T))
-                                  } else
-                                  {
-                                    apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "+"]),,drop=F],2,function(x) mean(x, na.rm = T))
-                                  }
-                                }))))
-  res = res[order(rownames(res)),]
-  res
+  if (!sorted)
+  {
+    # subset expression matrix
+    Z = expression[row.names(expression) %in% as.character(unlist(lapply(featuresG, function(x) x = x[,1]))), ]
+    # transform expression -> log base 2 (expression + 1), and then Z-score transform
+    Z = log(Z + 1, 2)
+    Z = Matrix::t(scale(Matrix::t(Z)))
+    # Get CellID scores
+    res = as.data.frame(Matrix::t(do.call(cbind,
+                                          lapply(featuresG,function(x){
+                                            if (sum(x$Polarity == "-") > 0)
+                                            {
+                                              apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "+"]),,drop=F],2,function(x) mean(x, na.rm = T)) -
+                                                apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "-"]),,drop=F],2,function(x) mean(x, na.rm = T))
+                                            } else
+                                            {
+                                              apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "+"]),,drop=F],2,function(x) mean(x, na.rm = T))
+                                            }
+                                          }))))
+    res = res[order(rownames(res)),]
+    res
+  } else {
+    # subset expression matrix
+    Z = expression[row.names(expression) %in% as.character(unlist(lapply(featuresG, function(x) x = x[,1]))), ]
+    # transform expression -> log base 2 (expression + 1)
+    Z = log(Z + 1, 2)
+    # Get CellID scores
+    res = as.data.frame(Matrix::t(do.call(cbind,
+                                          lapply(featuresG,function(x){
+                                              apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "+"]),,drop=F],2,function(x) mean(x, na.rm = T))
+                                          }))))
+    res = res[order(rownames(res)),]
+    res
+  }
 }
 
-CID.deepdive <- function(XX, YY, acOut3 = ac_dd, expression = E, f = f)
+CID.deepdive <- function(XX, YY, acOut3 = ac_dd, expression = E, f = f, sorted = sorted)
 {
   cat(" ..........  Assigning cell states :\n");
   logik = acOut3 == YY; sum (logik)
   if (sum(logik) != 0 ){
     cat("             Hierarchy assignment: ", sum(logik), " ", YY, "\n", sep ="");
     ## get CID scores for cell types
-    dfYe = CID.append(expression,XX)
+    dfYe = CID.append(expression,XX, sorted)
     ar = rownames(dfYe)
     dfYe = dfYe[,logik]
     dfYe = na.omit(dfYe)
@@ -575,25 +603,20 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", sprin
   }
   json_data = json_data[order(names(json_data))]
   json_data_backup = json_data;
+  fn = json_new
   if (is.null(spring.dir))
   {
     fn = json_new;
     spring.dir = getwd()
     spring.dir = gsub("\\/$", "", spring.dir, perl = TRUE);
   }
-  fn = json_new
-  new.dirs = list.dirs(dirname(spring.dir))
   if (length(new.dirs) != 1)
   {
     for (j in 1:length(new.dirs))
     {
       txt = list.files(new.dirs[j])
-      flag = "cell_filter.txt" %in% list.files(new.dirs);
-      if (!flag) {
-        cat("ERROR: from CID.writeJSON:\n");
-        cat("cell_filter.txt does not exist anywhere inside",new.dirs, ".\n", sep = "");
-        stop()
-      }
+      flag = "cell_filter.txt" %in% list.files(new.dirs) | "categorical_coloring_data.json" %in% list.files(new.dirs);
+      new.dirs = new.dirs[flag]
       if ("cell_filter.txt" %in% txt)
       {
         idx = read.table(paste(new.dirs[j], "cell_filter.txt", sep = "/"), quote="\"", comment.char="", stringsAsFactors=FALSE)$V1 + 1;
@@ -608,6 +631,10 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", sprin
         json_data = json_data_backup;
       }        
     }
+    json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
+    write(json_out,paste(new.dirs[j],fn,sep="/"))
+    cat(paste(new.dirs[j],fn,sep="/"), "has been written to directory! \n")
+    json_data = json_data_backup;
   }
   return(json_data)
 }
