@@ -167,7 +167,7 @@ CID.BatchMode <- function(E,f,pval,deep_dive,edges,entropy,sorted,walktrap)
 #' @param deep_dive Boolean, T will assign cell types and then cell states, F will only assign cell types. Default is deep_dive = T.
 #' @return Filtered markers where each marker must have at least ncells that express at least ncounts
 #' @export
-CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy = FALSE, walktrap = FALSE)
+CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy = FALSE, walktrap = FALSE, omit = NULL)
 {
   # load markers
   data(markers)
@@ -184,7 +184,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
 
   # if list, run batch mode
   if(class(E) == "list")
-    return(CID.BatchMode(E = E,pval = pval,deep_dive = deep_dive,spring.dir = spring.dir, entropy = entropy, sorted = sorted, walktrap = walktrap))
+    return(CID.BatchMode(E = E,pval = pval,deep_dive = deep_dive,spring.dir = spring.dir, entropy = entropy, sorted = sorted, walktrap = walktrap, omit = omit))
 
   # check inputs
   cat(" ..........  Entry in CID.CellID \n");
@@ -197,6 +197,12 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
   cat("             nrow = ", nrow(E), "\n", sep = "");
   cat("             ncol = ", ncol(E), "\n", sep = "");
   filtered_features = CID.filter(E, markersG  = markers, pval = pval)
+  
+  if (!is.null(omit))
+  {
+    filtered_features = filtered_features[-which(names(filtered_features) %in% omit)]
+  }
+  
   dfY = CID.append(E,filtered_features)
   
   # assign output classifications
@@ -785,6 +791,7 @@ CID.PosMarkers <- function(E, acn)
   {
     dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 1, pseudocount.use = 1, min.pct = 0)
     dd = dd[dd$p_val_adj < 0.01,]
+    if (sum(dd$p_val_adj < 0.01) > 0)
     acn[lbls == cts[j]] = rep( paste ("+", rownames(dd)[order(dd$avg_logFC, decreasing = TRUE)][1:2], collapse = " ", sep = ""), sum(lbls == cts[j]))
     #dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 1, min.pct = 0)
     #dd = Seurat::FindMarkers(ctrl, ident.1 = cts2$ident.1[j], ident.2 = cts2$ident.2[j], min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 0, min.pct = 0)
