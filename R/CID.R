@@ -489,7 +489,7 @@ CID.entropy <- function(ac,dM)
   }
   #df = data.frame(cells = Y, shannon = shannon)
   #ggplot2::ggplot(df, ggplot2::aes(x=cells, y=shannon, color = cells)) + ggplot2::geom_boxplot()
-  logik = shannon > 0.4; sum(logik)
+  logik = shannon > 0.75; sum(logik)
   Y[logik] = "Other"
   
   # assign Other labels
