@@ -273,7 +273,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
     if (sum(logik) > 0)
     {
       do = do[logik,]
-      logik = do$Freq > 5; # require at least five cell communities
+      logik = do$Freq > 20; # require at least 20 cell communities
       if (sum(logik) > 0) 
       {
         lbls = rep("All", ncol(E))
@@ -489,7 +489,7 @@ CID.entropy <- function(ac,dM)
   }
   #df = data.frame(cells = Y, shannon = shannon)
   #ggplot2::ggplot(df, ggplot2::aes(x=cells, y=shannon, color = cells)) + ggplot2::geom_boxplot()
-  logik = shannon > 0.5; sum(logik)
+  logik = shannon > 0.4; sum(logik)
   Y[logik] = "Other"
   
   # assign Other labels
@@ -792,7 +792,17 @@ CID.PosMarkers <- function(E, acn)
     dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 1, pseudocount.use = 1, min.pct = 0)
     dd = dd[dd$p_val_adj < 0.01,]
     if (sum(dd$p_val_adj < 0.01) > 0)
-    acn[lbls == cts[j]] = rep( paste ("+", rownames(dd)[order(dd$avg_logFC, decreasing = TRUE)][1:2], collapse = " ", sep = ""), sum(lbls == cts[j]))
+    {
+      gns = rownames(dd)[order(dd$avg_logFC, decreasing = TRUE)][1:2]
+      gns = gns[!is.na(gns)]
+      if (length(gns == 2))
+      {
+        acn[lbls == cts[j]] = rep( paste ("+", gns, collapse = " ", sep = ""), sum(lbls == cts[j]))
+      } else {
+        acn[lbls == cts[j]] = rep( paste ("+", gns, sep = ""), sum(lbls == cts[j]))
+      }
+    }
+
     #dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 1, min.pct = 0)
     #dd = Seurat::FindMarkers(ctrl, ident.1 = cts2$ident.1[j], ident.2 = cts2$ident.2[j], min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 0, min.pct = 0)
   #  dd$GeneSymbol = rownames(dd)
