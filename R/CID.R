@@ -615,9 +615,7 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", sprin
     for (j in 1:length(new.dirs))
     {
       txt = list.files(new.dirs[j])
-      flag = "cell_filter.txt" %in% list.files(new.dirs) | "categorical_coloring_data.json" %in% list.files(new.dirs);
-      new.dirs = new.dirs[flag]
-      if ("cell_filter.txt" %in% txt)
+      if ("cell_filter.txt" %in% txt | "categorical_coloring_data.json" %in% txt)
       {
         idx = read.table(paste(new.dirs[j], "cell_filter.txt", sep = "/"), quote="\"", comment.char="", stringsAsFactors=FALSE)$V1 + 1;
         for (k in 1:length(json_data))
