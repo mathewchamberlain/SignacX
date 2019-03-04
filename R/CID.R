@@ -40,6 +40,36 @@ CID.LoadData <- function(spring.dir, fn = "matrix.mtx")
   E
 }
 
+#' Load count matrix from an h5 file
+#'
+#' @param filename directory and filename of the h5 file
+#' @return count matrix with genes and barcodes
+#' @export
+
+CID.LoadH5 <- function(filename) 
+{
+  if (!requireNamespace("hdf5r", quietly = TRUE)) {
+    stop("Please install hdf5r to read HDF5 files")
+  }
+  if (!file.exists(filename)) {
+    stop("File not found")
+  }
+  infile <- hdf5r::H5File$new(filename)
+  data.names <- names(infile)
+  
+  counts <- infile[["data"]]
+  indices<- infile[["indices"]]
+  indptr <- infile[["indptr"]]
+  shp    <- infile[["shape"]]
+  genes  <- infile[["genes"]]
+  sparse.mat <- Matrix::t(Matrix::sparseMatrix(i = indices[] + 1, p = indptr[], 
+                                               x = as.numeric(counts[]), dims = shp[], giveCsparse = FALSE))
+  sparse.mat <- as(object = sparse.mat, Class = "dgCMatrix")
+  rownames(sparse.mat) <- genes[]
+  infile$close_all()
+  return(sparse.mat)
+}
+
 #' Load edges from edge list
 #'
 #' @param spring.dir A directory where "edges.csv" is located
@@ -340,7 +370,6 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
   return (cr);
 }
 
-
 #' filters the geneset markers
 #'
 #' @param expression An expression matrix with features (genes) in rows and samples (cells) in columns.
@@ -506,18 +535,19 @@ CID.entropy <- function(ac,dM)
 {
   # Pre-allocate cells for shannon calculation
   Y   = ac
+  N_unique = length(unique(ac))
   
-  # Calculate shannon entropy for each cell j for all connections with shortest path < N
+  # Calculate normalized shannon entropy for each cell j for all connections with shortest path < N
   shannon = rep(0, length(Y))
   N = 4
   for (j in 1:length(Y))  {
     logik = dM[j,] <= N; sum(logik)
     freqs <- table(ac[logik])/sum(logik)
-    shannon[j] = -sum(freqs * log2(freqs))
+    shannon[j] = -sum(freqs * log2(freqs)) / sum(1 / N_unique * log2(1 / N_unique))
   }
   #df = data.frame(cells = Y, shannon = shannon)
   #ggplot2::ggplot(df, ggplot2::aes(x=cells, y=shannon, color = cells)) + ggplot2::geom_boxplot()
-  logik = shannon > 0.75; sum(logik)
+  logik = shannon > 0.5; sum(logik)
   Y[logik] = "Other"
   
   # assign Other labels
@@ -563,12 +593,26 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", sprin
     names(col_palette) <- unique(Q)
     json_data$ClustersWT$label_colors = col_palette
   }
+  if ("ctypes" %in% names(cr))
+  {
+    Q = cr$ctypes
+    json_data$CellTypesID$label_list = Q
+    C = get_colors(Q)
+    json_data$CellTypesID$label_colors = as.list(C[[1]])
+  }
   if ("ctypessmoothed" %in% names(cr))
   {
     Q = cr$ctypessmoothed
     json_data$CellTypesID$label_list = Q
     C = get_colors(Q)
     json_data$CellTypesID$label_colors = as.list(C[[1]])
+  }
+  if ("ddtypes" %in% names(cr))
+  {
+    Q = cr$ddtypes
+    json_data$CellStatesID$label_list = Q
+    C = get_colors(Q)
+    json_data$CellStatesID$label_colors = as.list(C[[1]])
   }
   if ("ddtypessmoothed" %in% names(cr))
   {
