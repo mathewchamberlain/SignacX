@@ -205,14 +205,14 @@ CID.Impute <- function(E, data.dir = NULL, do.par = TRUE)
 #' @param E A list of expression matrices with features (genes) in rows and samples (cells) in columns.
 #' @return A list where each element is a CID.CellID result. (See ?CID.CellID)
 #' @export
-CID.BatchMode <- function(E,f,pval,deep_dive,edges,entropy,sorted,walktrap)
+CID.BatchMode <- function(E,pval,deep_dive,spring.dir, entropy, walktrap, omit, sorted)
 {
   cat(" ..........  Running CID.CellID in batch mode on input matrices: \n");
   cat("             Detected N = ", NROW(E), " matrices \n", sep = "" );
-  if (!is.null(edges))
-    cr = mapply(function(x,y) CID.CellID(E = x, edges = y, deep_dive = deep_dive, f = f, pval = pval), x = E, y = edges, SIMPLIFY = FALSE)
+  if (!is.null(spring.dir))
+    cr = mapply(function(x,y) CID.CellID(E = x, spring.dir = y, deep_dive = deep_dive, pval = pval, omit = omit, sorted = sorted, entropy = entropy), x = E, y = spring.dir, SIMPLIFY = FALSE)
   else
-    cr = lapply(E, function(x) CID.CellID(E = x, edges = edges, deep_dive = deep_dive, f = f, pval = pval))
+    cr = lapply(E, function(x) CID.CellID(E = x, spring.dir = spring.dir, deep_dive = deep_dive, pval = pval, omit = omit, sorted = sorted, entropy = entropy))
   if (is.null(names(E)))
     names(cr) <- paste("x", seq_along(E), sep = "")
   return(cr)
@@ -238,7 +238,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
   
   # if list, run batch mode
   if(class(E) == "list")
-    return(CID.BatchMode(E = E,pval = pval,deep_dive = deep_dive,spring.dir = spring.dir, entropy = entropy, sorted = sorted, walktrap = walktrap, omit = omit))
+    return(CID.BatchMode(E = E,pval = pval,deep_dive = deep_dive,spring.dir = spring.dir, entropy = entropy, walktrap = walktrap, omit = omit, sorted = sorted))
 
   # check inputs
   cat(" ..........  Entry in CID.CellID \n");
