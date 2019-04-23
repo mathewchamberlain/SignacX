@@ -735,7 +735,7 @@ CID.Louvain <- function(edges)
 CID.GetDistMat <- function(data.dir, n = 4)
 {
   "%^%" <- function(A, n) {if(n == 1) A else A %*% (A %^% (n-1)) }
-  if (class(data.dir) == "character"){
+  if (is.character(data.dir)){
     edges = CID.LoadEdges(data.dir)
   } else{
     edges = data.dir
