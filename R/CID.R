@@ -712,10 +712,8 @@ get_colors <- function(P)
 #' @export
 CID.Louvain <- function(edges)
 {
-  if (class(edges) == "character"){
-    edges = CID.LoadEdges(data.dir)
-  } else{
-    edges = data.dir
+  if (is.character(edges)){
+    edges = CID.LoadEdges(edges)
   }
   # convert edgelist to adjacency matrix
   adjmatrix <- methods::new("ngTMatrix", 
