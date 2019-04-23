@@ -4,13 +4,12 @@
 \alias{CID.entropy}
 \title{Entropy}
 \usage{
-CID.entropy(ac, edges)
+CID.entropy(ac, dM)
 }
 \arguments{
-\item{edges}{A data frame or matrix with edges}
-}
-\value{
-The entropy for each node in the network
+\item{ac}{A character vector of cell type labels}
+
+\item{dM}{The distance matrix, see ?CID.GetDistMat}
 }
 \description{
 Entropy

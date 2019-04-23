@@ -4,15 +4,15 @@
 \alias{CID.writeJSON}
 \title{Write JSON file for SPRING visualization}
 \usage{
-CID.writeJSON(cr, json_new = "categorical_coloring_data_new.json",
-  spring.dir = NULL)
+CID.writeJSON(cr, json_new = "categorical_coloring_data.json",
+  data.dir = NULL)
 }
 \arguments{
 \item{cr}{Output from CID.CellID. See ?CID.CellID}
 
 \item{json_new}{Filename for new SPRING visualization. Default is json_new = "categorical_coloring_data_new.json".}
 
-\item{spring.dir}{Directory where file 'categorical_coloring_data.json' is located. If supplied, it will append this file to contain tracks for cell type / state classifications.}
+\item{data.dir}{Directory where file 'categorical_coloring_data.json' is located. If supplied, it will append this file to contain tracks for cell type / state classifications.}
 }
 \value{
 Smoothed cell type or cell state assignments

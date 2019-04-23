@@ -4,14 +4,12 @@
 \alias{CID.smooth}
 \title{Smoothing function}
 \usage{
-CID.smooth(Q, f, edges)
+CID.smooth(ac, dM)
 }
 \arguments{
-\item{Q}{List containing a character vector where each element is a cell type or cell state assignment}
+\item{ac}{List containing a character vector where each element is a cell type or cell state assignment}
 
-\item{f}{Smoothing parameter}
-
-\item{edges}{Location where knn edges are stored}
+\item{dM}{Distance matrix (see ?CID.GetDistMat)}
 }
 \value{
 Smoothed cell type or cell state assignments

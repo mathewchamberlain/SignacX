@@ -192,10 +192,10 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
   }
   
   # check inputs
-  cat(" ..........  Entry in CID.CellID \n");
-  ta = proc.time()[3];
   stopifnot(class(E) %in% c("dgCMatrix","dgTMatrix", "matrix", "data.frame"))
   stopifnot(!is.null(rownames(E)));
+  cat(" ..........  Entry in CID.CellID \n");
+  ta = proc.time()[3];
 
   # main function
   cat(" ..........  Computing Signac scores for cell types on input data matrix :\n");
@@ -224,7 +224,7 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
   
   # if is null data.dir, run PCA + KNN
   if (is.null(data.dir))
-    adj_matrix = CID.GetKNNEdges(E, normalize = F, min_counts = 3, min_cells = 3, min_vscore_pctl = 90, num_pc = 50, k_neigh = 4)
+    data.dir = CID.GetNeighbors(E, normalize = F, min_counts = 3, min_cells = 3, min_vscore_pctl = 90, num_pc = 50, k_neigh = 4)
    
   # compute distance matrix
   if (!is.null(data.dir) | entropy | louvain)
@@ -233,7 +233,6 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
   # smooth the output classifications
   if (!is.null(data.dir))
   {
-    cat(" ..........  Smoothing \n");
     acOut_knn_smooth = CID.smooth(ac, distMat[[1]])
     cat("\n ..........  Smoothing completed! \n");
   }
@@ -242,7 +241,6 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
   {
     cat(" ..........  Assigning Others \n");
     acOut_knn_smooth = CID.entropy(acOut_knn_smooth, distMat)
-    cat("\n ..........  Done! \n");
   }
 
   # cell state deep dive classifications
@@ -277,8 +275,8 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
 
   if (louvain)
   {
-    cat("\n")
-    wt = CID.Louvain(data.dir)
+    cat(" ..........  Running Louvain clustering\n");
+    wt = CID.Louvain(edges = data.dir)
     do = data.frame(table(wt[acOut_knn_smooth == "Other"]))
     df = data.frame(table(wt[wt %in% do$Var1]))
     logik = (1 - phyper(do$Freq, sum(acOut_knn_smooth == "Other") , length(ac) - sum(acOut_knn_smooth == "Other"), df$Freq)) < 0.01;
@@ -288,14 +286,16 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
       logik = do$Freq > 20; # require at least 20 cell communities
       if (sum(logik) > 0) 
       {
+        cat("             Signac detected n = ", sum(logik), "novel cell type populations!\n");
         lbls = rep("All", ncol(E))
         logik = wt %in% do$Var1[logik];
         lbls[logik] = wt[logik]
         lbls[acOut_knn_smooth != "Other"] = "All"
         colnames(E) <- lbls
+        cat(" ..........  Identifying markers for the populations \n");
         acOut_knn_smooth_wt = CID.PosMarkers(E, acOut_knn_smooth)
         ac_dd_knn_wt = ac_dd_knn
-        logik = grepl("+", acOut_knn_smooth_wt)
+        logik = grepl("^[+]", acOut_knn_smooth_wt)
         ac_dd_knn_wt[logik] = acOut_knn_smooth_wt[logik]
       }
     }
@@ -712,7 +712,11 @@ get_colors <- function(P)
 #' @export
 CID.Louvain <- function(edges)
 {
-  edges = CID.LoadEdges(edges)
+  if (class(edges) == "character"){
+    edges = CID.LoadEdges(data.dir)
+  } else{
+    edges = data.dir
+  }
   # convert edgelist to adjacency matrix
   adjmatrix <- methods::new("ngTMatrix", 
                     i = c(as.integer(edges$V1)-1L, as.integer(edges$V2)-1L), 
@@ -731,7 +735,12 @@ CID.Louvain <- function(edges)
 CID.GetDistMat <- function(data.dir, n = 4)
 {
   "%^%" <- function(A, n) {if(n == 1) A else A %*% (A %^% (n-1)) }
-  edges = CID.LoadEdges(data.dir)
+  if (class(data.dir) == "character"){
+    edges = CID.LoadEdges(data.dir)
+  } else{
+    edges = data.dir
+  }
+
   # create adjacency matrix
   m <- methods::new("ngTMatrix", 
            i = c(as.integer(edges$V1)-1L, as.integer(edges$V2)-1L), 
@@ -853,10 +862,11 @@ ta = proc.time()[3];
   
   outs = get_knn_graph2(E[ix,], k=k_neigh, np = num_pc)
   
-  outs = igraph::graph.adjacency(outs, diag = F, mode = "upper")
+  outs = igraph::graph.adjacency(outs, diag = F)
   outs = igraph::get.data.frame(outs)
+  outs = data.frame(apply(outs, 2, as.numeric))
   colnames(outs) <- c("V1", "V2")
-  
+
   tb = proc.time()[3] - ta;
   cat("\n ..........  Exit CID.GetKNNEdges.\n");
   cat("             Execution time = ", tb, " s.\n", sep = "");
@@ -963,7 +973,8 @@ runningquantile <- function(x, y, p, nBins)
 #' @param X Expression matrix with genes for rows, samples for columns, after V score filtering.
 #' @param k KNN parameter. Default is 5.
 #' @param np Number of PCs to build the KNN graph. Default is 50.
-get_knn_graph2 <- function(X, k=5, np)
+#' @param run_force Runs ForceAtlas2. Default is FALSE.
+get_knn_graph2 <- function(X, k=5, np, run_force = F)
 {
   k = k + 1;
   logik = CID.IsUnique(rownames(X))
@@ -973,5 +984,25 @@ get_knn_graph2 <- function(X, k=5, np)
   ctrl <- Seurat::ScaleData(ctrl)
   ctrl <- Seurat::RunPCA(ctrl, features = rownames(X), pcs.compute = np, do.print = F)
   ctrl <- Seurat::FindNeighbors(object = ctrl, reduction = "pca", dims = 1:min(c(np, 50)), k.param = k)
+  if (force)
+    RunForceAtlas(ctrl)
   return(ctrl@graphs$RNA_nn)
+}
+
+#' Run ForceAtlas2
+#'
+#' @param Q Seurat object created by get_knn_graph2
+RunForceAtlas <- function(Q)
+{
+  cat('Running ForceAtlas2 \n')
+  
+  outs = Q@graphs$RNA_nn
+  outs = igraph::graph.adjacency(outs, diag = F)
+  outs = igraph::get.data.frame(outs)
+  outs = data.frame(apply(outs, 2, as.numeric))
+  outs$weights = 1;
+  colnames(outs) <- c("from", "to", "weights")
+  
+  p <- layout.forceatlas2(outs, directed = FALSE, iterations = num_force_iter, plotstep = 100)
+  
 }

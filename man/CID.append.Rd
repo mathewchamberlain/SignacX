@@ -2,18 +2,20 @@
 % Please edit documentation in R/CID.R
 \name{CID.append}
 \alias{CID.append}
-\title{Calculates ICT scores}
+\title{Calculates Signac scores}
 \usage{
-CID.append(expression, featuresG)
+CID.append(expression, featuresG, sorted)
 }
 \arguments{
 \item{expression}{An expression matrix with features (genes) in rows and samples (cells) in columns.}
 
 \item{featuresG}{A list of features, where each list entry is a character vector of markers.}
+
+\item{sorted}{see ?CID.CellID}
 }
 \value{
 A matrix of CellID scores; features by cells.
 }
 \description{
-Calculates ICT scores
+Calculates Signac scores
 }

@@ -4,19 +4,23 @@
 \alias{CID.CellID}
 \title{Main function}
 \usage{
-CID.CellID(E, f = NULL, pval = 0.1, deep_dive = TRUE, edges = NULL,
-  entropy = FALSE)
+CID.CellID(E, pval = 0.1, data.dir = NULL, entropy = T,
+  louvain = T, omit = NULL, sorted = FALSE)
 }
 \arguments{
 \item{E}{A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.}
 
-\item{f}{Parameter for classification smoothing. Default is f = NULL if edges = NULL, else default is f = 0.5 automatically.}
-
 \item{pval}{p-value cutoff for feature selection, as described in the manuscript + markdown file. Default is pval = 0.1.}
 
-\item{deep_dive}{Boolean, T will assign cell types and then cell states, F will only assign cell types. Default is deep_dive = T.}
+\item{data.dir}{directory of SPRING files "edges.csv" and "categorical_coloring_data.json"}
 
-\item{edges}{Data-frame containing the edgelist for graph edges for smoothing, OR a directory where "edges.csv" is located, OR a character vector / list for batch mode. Default is edges = NULL.}
+\item{entropy}{cells amended to high entropy labels with respect to their neighbors in the KNN graph are appended "Other" if entropy = TRUE. Default is TRUE.}
+
+\item{louvain}{Louvain community detection is performed, and then used together with Shannon entropy to detect potential novel cell types / states. Default is TRUE.}
+
+\item{omit}{Force remove specific cell types / states with omit. Default is NULL.}
+
+\item{sorted}{If cells are expected to be pure or mostly homogeneous (e.g., by FACs sorting), set sorted = TRUE. Default is FALSE.}
 }
 \value{
 Filtered markers where each marker must have at least ncells that express at least ncounts
