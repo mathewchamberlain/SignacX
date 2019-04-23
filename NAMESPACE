@@ -1,6 +1,8 @@
 exportPattern("^[[:alpha:]]+")
 importFrom("Matrix", "t")
-importFrom("methods", "as", "new")
 importFrom("stats", "na.omit", "phyper", "sd")
 importFrom("utils", "data", "read.csv", "read.delim", "read.table",
                "write.table")
+importFrom("methods", "new")
+importFrom("graphics", "hist")
+importFrom("stats", "optimize", "quantile")

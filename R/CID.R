@@ -3,12 +3,12 @@
 #' @param data.dir Directory containing matrix.mtx and genes.txt.
 #' @return A sparse matrix with rownames equivalent to the names in genes.txt
 #' @export
-CID.LoadData <- function(spring.dir, fn = "matrix.mtx")
+CID.LoadData <- function(data.dir)
 {
-  data.dir = gsub("\\/$", "", spring.dir, perl = TRUE);
-  if (! (file.exists(paste(spring.dir, "matrix.mtx", sep = "/")) & file.exists(paste(spring.dir, "genes.txt", sep = "/"))))
-  data.dir = dirname(spring.dir)
-  gE <- paste(data.dir,fn,sep="/")
+  data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
+  if (! (file.exists(paste(data.dir, "matrix.mtx", sep = "/")) & file.exists(paste(data.dir, "genes.txt", sep = "/"))))
+  data.dir = dirname(data.dir)
+  gE <- paste(data.dir,"matrix.mtx",sep="/")
   flag = file.exists(gE);
   if (!flag) {
     cat("ERROR: from CID.LoadData:\n");
@@ -40,44 +40,15 @@ CID.LoadData <- function(spring.dir, fn = "matrix.mtx")
   E
 }
 
-#' Load count matrix from an h5 file
-#'
-#' @param filename directory and filename of the h5 file
-#' @return count matrix with genes and barcodes
-#' @export
-CID.LoadH5 <- function(filename) 
-{
-  if (!requireNamespace("hdf5r", quietly = TRUE)) {
-    stop("Please install hdf5r to read HDF5 files")
-  }
-  if (!file.exists(filename)) {
-    stop("File not found")
-  }
-  infile <- hdf5r::H5File$new(filename)
-  data.names <- names(infile)
-  
-  counts <- infile[["data"]]
-  indices<- infile[["indices"]]
-  indptr <- infile[["indptr"]]
-  shp    <- infile[["shape"]]
-  genes  <- infile[["genes"]]
-  sparse.mat <- Matrix::t(Matrix::sparseMatrix(i = indices[] + 1, p = indptr[], 
-                                               x = as.numeric(counts[]), dims = shp[], giveCsparse = FALSE))
-  sparse.mat <- as(object = sparse.mat, Class = "dgCMatrix")
-  rownames(sparse.mat) <- genes[]
-  infile$close_all()
-  return(sparse.mat)
-}
-
 #' Load edges from edge list
 #'
-#' @param spring.dir A directory where "edges.csv" is located
+#' @param data.dir A directory where "edges.csv" is located
 #' @return The edgelist in data frame format
 #' @export
-CID.LoadEdges <- function(spring.dir)
+CID.LoadEdges <- function(data.dir)
 {
-  spring.dir = gsub("\\/$", "", spring.dir, perl = TRUE);
-  edges = paste(spring.dir, "edges.csv", sep = "/")
+  data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
+  edges = paste(data.dir, "edges.csv", sep = "/")
   file.exists(edges)
   flag = file.exists(edges);
   if (!flag) {
@@ -100,7 +71,7 @@ CID.LoadEdges <- function(spring.dir)
 #' @param E Expression matrix
 #' @return Normalized expression matrix to mean of total counts
 #' @export
-ne <- function(E)
+CID.Normalize <- function(E)
 {
 m = Matrix::Matrix(0, ncol(E), ncol(E))
 tots_use = Matrix::colSums(E)
@@ -113,18 +84,15 @@ return(E %*% m)
 #'
 #' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame).
 #' @param chunk.dir A directory where the chunked matrices will be stored. If the directory does not exist, it will be created.
+#' @param number_of_chunks the number of chunks (e.g., the number of sub-sampled matrices after chunking)
 #' @return A directory with chunked matrix
 #' @export
 #'
 CID.Chunk <- function(E, chunk.dir, number_of_chunks = 10)
 {
   chunk.dir = gsub("\\/$", "", chunk.dir, perl = TRUE);
-  data(markers)
-  data(cellstate_markers)
-  temp = markers[markers$`Cell population` == "Platelets",]
-  temp = temp[1:3,]
-  markers = markers[markers$`Cell population` != "Platelets",]
-  markers = rbind(markers, temp)
+  data('markers')
+  data('cellstate_markers')
   genes = do.call(rbind, cellstate_markers)
   genes.ind <- which(rownames(E) %in% unique(c(as.character(markers$`HUGO symbols`), as.character(genes$`HUGO symbols`))))
   E = E[genes.ind,]
@@ -150,11 +118,12 @@ CID.Chunk <- function(E, chunk.dir, number_of_chunks = 10)
 #' Imputation wrapper
 #'
 #' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols.
+#' @param data.dir directory for saving "matrix_saver_imputed.mtx" for future loading.
 #' @param do.par Boolean. If true, imputation is performed in parallel on half of the machines available cores. Default = FALSE.
 #' @return imputed expression matrix with only marker genes in rows.
 #' @export
 #'
-CID.Impute <- function(E, data.dir = NULL, do.par = TRUE)
+CID.Impute <- function(E = NULL, data.dir = NULL, do.par = TRUE)
 {
   # SAVER wrapper
   # If imputation was performed already and we want to use it, load imputed matrix
@@ -180,8 +149,8 @@ CID.Impute <- function(E, data.dir = NULL, do.par = TRUE)
     rownames(I) <- genes
     return(I)
   }  else {
-    data(markers)
-    data(cellstate_markers)
+    data('markers')
+    data('cellstate_markers')
     genes = do.call(rbind, cellstate_markers)
     genes.ind <- which(rownames(E) %in% unique(c(as.character(markers$`HUGO symbols`), as.character(genes$`HUGO symbols`))))
   if (do.par)
@@ -200,46 +169,28 @@ CID.Impute <- function(E, data.dir = NULL, do.par = TRUE)
     return(I)
 }
 
-#' runs CID.CellID in batch mode
-#'
-#' @param E A list of expression matrices with features (genes) in rows and samples (cells) in columns.
-#' @return A list where each element is a CID.CellID result. (See ?CID.CellID)
-#' @export
-CID.BatchMode <- function(E,pval,deep_dive,spring.dir, entropy, walktrap, omit, sorted)
-{
-  cat(" ..........  Running CID.CellID in batch mode on input matrices: \n");
-  cat("             Detected N = ", NROW(E), " matrices \n", sep = "" );
-  if (!is.null(spring.dir))
-    cr = mapply(function(x,y) CID.CellID(E = x, spring.dir = y, deep_dive = deep_dive, pval = pval, omit = omit, sorted = sorted, entropy = entropy), x = E, y = spring.dir, SIMPLIFY = FALSE)
-  else
-    cr = lapply(E, function(x) CID.CellID(E = x, spring.dir = spring.dir, deep_dive = deep_dive, pval = pval, omit = omit, sorted = sorted, entropy = entropy))
-  if (is.null(names(E)))
-    names(cr) <- paste("x", seq_along(E), sep = "")
-  return(cr)
-}
-
 #' Main function
 #'
 #' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
 #' @param pval p-value cutoff for feature selection, as described in the manuscript + markdown file. Default is pval = 0.1.
-#' @param deep_dive Boolean, T will assign cell types and then cell states, F will only assign cell types. Default is deep_dive = T.
+#' @param data.dir directory of SPRING files "edges.csv" and "categorical_coloring_data.json"
+#' @param entropy cells amended to high entropy labels with respect to their neighbors in the KNN graph are appended "Other" if entropy = TRUE. Default is TRUE.
+#' @param louvain Louvain community detection is performed, and then used together with Shannon entropy to detect potential novel cell types / states. Default is TRUE.
+#' @param omit Force remove specific cell types / states with omit. Default is NULL.
+#' @param sorted If cells are expected to be pure or mostly homogeneous (e.g., by FACs sorting), set sorted = TRUE. Default is FALSE.
 #' @return Filtered markers where each marker must have at least ncells that express at least ncounts
 #' @export
-CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy = FALSE, walktrap = FALSE, omit = NULL, sorted = FALSE)
+CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, omit = NULL, sorted = FALSE)
 {
   # load markers
-  data(markers)
-  data(cellstate_markers)
+  data('markers')
+  data('cellstate_markers')
   if (!length(markers) > 0) {
-    cat("ERROR: from CID:\n");
-    cat("required markers failed to load.\n", sep = "");
+    cat("ERROR: from Signac Data:\n");
+    cat("Required markers failed to load.\n", sep = "");
     stop()
   }
   
-  # if list, run batch mode
-  if(class(E) == "list")
-    return(CID.BatchMode(E = E,pval = pval,deep_dive = deep_dive,spring.dir = spring.dir, entropy = entropy, walktrap = walktrap, omit = omit, sorted = sorted))
-
   # check inputs
   cat(" ..........  Entry in CID.CellID \n");
   ta = proc.time()[3];
@@ -258,9 +209,12 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
     {
       omit = omit[omit %in% names(filtered_features)]
       filtered_features = filtered_features[-which(names(filtered_features) %in% omit)]
+      cat(" ..........  Forcibly omitting features :\n");
+      cat("             Omitted = ", omit, "\n", sep = "");
     }
   }
   
+  # compute cell type score data.frame
   dfY = CID.append(E,filtered_features, sorted)
   
   # assign output classifications
@@ -268,15 +222,18 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
   indexMax = apply(dfY, 2, which.max);
   ac = rownames(dfY)[indexMax];
   
+  # if is null data.dir, run PCA + KNN
+  if (is.null(data.dir))
+    adj_matrix = CID.GetKNNEdges(E, normalize = F, min_counts = 3, min_cells = 3, min_vscore_pctl = 90, num_pc = 50, k_neigh = 4)
+   
   # compute distance matrix
-  if (!is.null(spring.dir) | entropy | walktrap)
-    distMat = CID.GetDistMat(spring.dir)
+  if (!is.null(data.dir) | entropy | louvain)
+    distMat = CID.GetDistMat(data.dir)
 
   # smooth the output classifications
-  if (!is.null(spring.dir))
+  if (!is.null(data.dir))
   {
     cat(" ..........  Smoothing \n");
-    # acOut_knn_smooth = CID.smooth(ac, distMat[[1]]) # smooth based on edges in knn graph
     acOut_knn_smooth = CID.smooth(ac, distMat[[1]])
     cat("\n ..........  Smoothing completed! \n");
   }
@@ -289,11 +246,9 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
   }
 
   # cell state deep dive classifications
-  if (deep_dive)
-  {
-    dummy = list("")
-    cat(" ..........  Computing CID scores for cell states! \n");
-    if (!is.null(spring.dir))
+  dummy = list("")
+  cat(" ..........  Computing CID scores for cell states! \n");
+    if (!is.null(data.dir))
     {  ac_dd = acOut_knn_smooth
     } else {
       ac_dd = ac
@@ -307,24 +262,23 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
       }
       if (!is.null(filtered_features))
       {
-        ac_dd = CID.deepdive(filtered_features, j, acOut3 = ac_dd, expression = E, f = f, sorted = sorted)
+        ac_dd = CID.deepdive(filtered_features, j, acOut3 = ac_dd, expression = E, sorted = sorted)
         dummy[[j]] = ac_dd;
       }
     }
     dummy = dummy[sapply(dummy, function(x) length(x) != 1)]
     names(dummy) <- paste("L", seq_along(1:length(dummy)), sep = "")
     cat(" ..........  Deep dive completed!\n");
-    if (!is.null(spring.dir))
+    if (!is.null(data.dir))
     {
       cat(" ..........  Smoothing \n");
       ac_dd_knn = CID.smooth(ac_dd, distMat[[1]])
     }
-  }
 
-  if (walktrap)
+  if (louvain)
   {
     cat("\n")
-    wt = CID.Louvain(spring.dir)
+    wt = CID.Louvain(data.dir)
     do = data.frame(table(wt[acOut_knn_smooth == "Other"]))
     df = data.frame(table(wt[wt %in% do$Var1]))
     logik = (1 - phyper(do$Freq, sum(acOut_knn_smooth == "Other") , length(ac) - sum(acOut_knn_smooth == "Other"), df$Freq)) < 0.01;
@@ -348,7 +302,7 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
   }
   
   # Package output
-  if (deep_dive & !is.null(spring.dir) & walktrap & sum(logik) != 0) {
+  if (!is.null(data.dir) & louvain & sum(logik) != 0) {
     cr = list(scores = dfY,
               ctypes = ac,
               ctypessmoothed = acOut_knn_smooth,
@@ -357,8 +311,8 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
               ddtypessmoothed = ac_dd_knn,
               ddtypessmoothed_dev = ac_dd_knn_wt,
               hierarchylabels = dummy,
-              walktrap = wt)
-  } else if (deep_dive & !is.null(spring.dir) & walktrap)
+              louvain = wt)
+  } else if (!is.null(data.dir) & louvain)
   {
     cr = list(scores = dfY,
               ctypes = ac,
@@ -366,9 +320,9 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
               ddtypes = ac_dd,
               ddtypessmoothed = ac_dd_knn,
               hierarchylabels = dummy,
-              walktrap = wt)
+              louvain = wt)
   }
-  else if (deep_dive & !is.null(spring.dir)) {
+  else if (!is.null(data.dir)) {
     cr = list(scores = dfY,
               ctypes = ac,
               ctypessmoothed = acOut_knn_smooth,
@@ -376,11 +330,11 @@ CID.CellID <- function(E,pval = 0.1,deep_dive = TRUE,spring.dir = NULL, entropy 
               ddtypessmoothed = ac_dd_knn,
               hierarchylabels = dummy)
   }
-  else if (!is.null(spring.dir)) {
+  else if (!is.null(data.dir)) {
     cr = list(scores = dfY,
               ctypes = ac,
               ctypessmoothed = acOut_knn_smooth);}
-  else if (deep_dive & is.null(spring.dir)) {
+  else if (is.null(data.dir)) {
     cr = list(scores = dfY,
               ctypes = ac ,
               ddtypes = ac_dd ,
@@ -444,6 +398,7 @@ CID.filter <- function(expression, markersG, pval = 0.1)
 #'
 #' @param expression An expression matrix with features (genes) in rows and samples (cells) in columns.
 #' @param featuresG A list of features, where each list entry is a character vector of markers.
+#' @param sorted see ?CID.CellID
 #' @return A matrix of CellID scores; features by cells.
 #' @export
 CID.append=function(expression,featuresG, sorted)
@@ -483,8 +438,15 @@ CID.append=function(expression,featuresG, sorted)
     res
   }
 }
-
-CID.deepdive <- function(XX, YY, acOut3 = ac_dd, expression = E, f = f, sorted = sorted)
+#' Deep cell states
+#'
+#' @param XX filtered features for CID.append
+#' @param YY cell type where we are going deeper
+#' @param acOut3 Vector of cell type labels
+#' @param expression the count matrix
+#' @param sorted see ?CID.CellID
+#' @return Vector for the deep cell state labels
+CID.deepdive <- function(XX, YY, acOut3, expression, sorted = sorted)
 {
   cat(" ..........  Assigning cell states :\n");
   logik = acOut3 == YY; sum (logik)
@@ -509,8 +471,7 @@ CID.deepdive <- function(XX, YY, acOut3 = ac_dd, expression = E, f = f, sorted =
 #' Smoothing function
 #'
 #' @param ac List containing a character vector where each element is a cell type or cell state assignment
-#' @param f Smoothing parameter
-#' @param edges Location where knn edges are stored
+#' @param dM Distance matrix (see ?CID.GetDistMat)
 #' @return Smoothed cell type or cell state assignments
 #' @export
 CID.smooth <- function(ac,dM)
@@ -527,22 +488,10 @@ CID.smooth <- function(ac,dM)
   return(Y)
 }
 
-#' Distance matrix
-#'
-#' @param ac A character vector of cell type labels
-#' @param edges A data frame or matrix with edges
-#' @return The entropy for each node in the network
-#' @export
-CID.DistMatrix <- function(ac, spring.dir)
-{
-  # load edges
-  edges    = CID.LoadEdges(spring.dir)
-  # get distance matrix
-  g = igraph::graph_from_edgelist(as.matrix(edges), directed = FALSE)
-  igraph::shortest.paths(g, v=igraph::V(g), to=igraph::V(g))
-}
-
 #' Entropy
+#' 
+#' @param ac A character vector of cell type labels
+#' @param dM The distance matrix, see ?CID.GetDistMat
 #' @export
 CID.entropy <- function(ac,dM)
 {
@@ -570,30 +519,30 @@ CID.entropy <- function(ac,dM)
 #'
 #' @param cr Output from CID.CellID. See ?CID.CellID
 #' @param json_new Filename for new SPRING visualization. Default is json_new = "categorical_coloring_data_new.json".
-#' @param spring.dir Directory where file 'categorical_coloring_data.json' is located. If supplied, it will append this file to contain tracks for cell type / state classifications.
+#' @param data.dir Directory where file 'categorical_coloring_data.json' is located. If supplied, it will append this file to contain tracks for cell type / state classifications.
 #' @return Smoothed cell type or cell state assignments
 #' @export
-CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", spring.dir = NULL)
+CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", data.dir = NULL)
 {
-  if (!is.null(spring.dir))
+  if (!is.null(data.dir))
   {
-    spring.dir = gsub("\\/$", "", spring.dir, perl = TRUE);
-    if (file.exists(paste(spring.dir, 'categorical_coloring_data_old.json', sep = "/")))
+    data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
+    if (file.exists(paste(data.dir, 'categorical_coloring_data_old.json', sep = "/")))
     {
       json_file = 'categorical_coloring_data_old.json'
-      gJ <- paste(spring.dir,json_file,sep = "/")
+      gJ <- paste(data.dir,json_file,sep = "/")
       json_data <- rjson::fromJSON(file=gJ)
     } else {
       json_file = 'categorical_coloring_data.json'
-      gJ <- paste(spring.dir,json_file,sep = "/")
+      gJ <- paste(data.dir,json_file,sep = "/")
       json_data <- rjson::fromJSON(file=gJ)
       json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
-      write(json_out,paste(spring.dir,'categorical_coloring_data_old.json',sep="/"))
+      write(json_out,paste(data.dir,'categorical_coloring_data_old.json',sep="/"))
     }
   }
-  if ("walktrap" %in% names(cr))
+  if ("louvain" %in% names(cr))
   {
-    Q = as.character(cr$walktrap)
+    Q = as.character(cr$louvain)
     json_data$ClustersWT$label_list = Q
     Ntypes = length(unique(Q))
     qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
@@ -658,16 +607,16 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", sprin
   json_data = json_data[order(names(json_data))]
   json_data_backup = json_data;
   fn = json_new
-  if (is.null(spring.dir))
+  if (is.null(data.dir))
   {
     fn = json_new;
-    spring.dir = getwd()
-    spring.dir = gsub("\\/$", "", spring.dir, perl = TRUE);
+    data.dir = getwd()
+    data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
   }
   json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
-  write(json_out,paste(spring.dir,fn,sep="/"))
-  cat(paste(spring.dir,fn,sep="/"), "has been written to directory! \n")
-  new.dirs = list.dirs(dirname(spring.dir))
+  write(json_out,paste(data.dir,fn,sep="/"))
+  cat(paste(data.dir,fn,sep="/"), "has been written to directory! \n")
+  new.dirs = list.dirs(dirname(data.dir))
   if (length(new.dirs) != 1)
   {
     for (j in 1:length(new.dirs))
@@ -697,6 +646,9 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", sprin
   return(json_data)
 }
 
+#' Get HEX colors
+#' 
+#' @param P A character vector of cell type labels
 get_colors <- function(P)
 {
   P <- sort(unique(as.character(P)));
@@ -755,7 +707,6 @@ get_colors <- function(P)
 
 #' Community substructure by Louvain community detection
 #'
-#' @param ac A character vector of cell type labels
 #' @param edges A data frame or matrix with edges
 #' @return The community substructures of the graph
 #' @export
@@ -773,14 +724,14 @@ CID.Louvain <- function(edges)
 
 #' Get distance matrix
 #'
-#' @param spring.dir directory where edges.csv is located
+#' @param data.dir directory where edges.csv is located
 #' @param n maximum network distance to subtend (n neighbors)
 #' @return adjacency matrices for distances < n
 #' @export
-CID.GetDistMat <- function(spring.dir, n = 4)
+CID.GetDistMat <- function(data.dir, n = 4)
 {
   "%^%" <- function(A, n) {if(n == 1) A else A %*% (A %^% (n-1)) }
-  if(class(spring.dir) == "character") edges = CID.LoadEdges(spring.dir) else edges = spring.dir
+  edges = CID.LoadEdges(data.dir)
   # create adjacency matrix
   m <- methods::new("ngTMatrix", 
            i = c(as.integer(edges$V1)-1L, as.integer(edges$V2)-1L), 
@@ -794,7 +745,7 @@ CID.GetDistMat <- function(spring.dir, n = 4)
 
 #' Split large data into smaller chunks
 #'
-#' @param E Count matrix (see ?Read_h5)
+#' @param E Count matrix
 #' @param number_of_chunks Number of chunks to divide the data
 #' @return list where each element is a chunk of the original matrix
 #' @export
@@ -810,7 +761,6 @@ array_split <- function(E, number_of_chunks) {
 #' @param x A character vector 
 #' @return boolean, unique elements are TRUE
 #' @export
-
 CID.IsUnique <- function (x) 
 {
   rv = rep(TRUE, length(x))
@@ -826,6 +776,7 @@ CID.IsUnique <- function (x)
 #' Run DEG analysis with Seurat wrapper
 #'
 #' @param E Expression matrix with genes for rows, samples for columns
+#' @param acn Vector of cell type labels 
 #' @return List where each element contains the DEG tables for the one vs. all comparison
 #' @export
 CID.PosMarkers <- function(E, acn)
@@ -842,7 +793,6 @@ CID.PosMarkers <- function(E, acn)
   ctrl <- Seurat::NormalizeData(object = ctrl)
   ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
   ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
-  #outs = list("")
   cts = unique(lbls);
   cts = cts[cts != "All"]
   for (j in 1:length(cts))
@@ -861,22 +811,167 @@ CID.PosMarkers <- function(E, acn)
       }
     }
   }
-    
-    #dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 1, min.pct = 0)
-    #dd = Seurat::FindMarkers(ctrl, ident.1 = cts2$ident.1[j], ident.2 = cts2$ident.2[j], min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 0, min.pct = 0)
-    #  dd$GeneSymbol = rownames(dd)
-    #  dd$celltype = gs  " .*$", "", cts2$ident.1 )[j]
-    #  outs[[j]] = dd
-    #dd = Seurat::Fin  arkers(ctrl, ident.1 = "wt", ident.2 = "All", min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 0, pseudocount.use = 1, min.pct = 0)
-  #dd = dd[dd$p_val_adj < 0.01,]
-  #acn[lbls == "wt"] = rep(paste( paste ("+", rownames(dd)[order(dd$avg_logFC, decreasing = TRUE)][1:2], collapse = " ", sep = ""), "cells", sep = " "), sum(lbls == "wt"))
   acn
-  #}
-  #names(outs) <- gsub( " .*$", "", cts2$ident.1 )
-  #outs = do.call(rbind, outs)
-  #outs = do.call(rbind, lapply(outs, function(x) x[x$p_val_adj < 0.05 & x$avg_logFC > 0.2, ]))
-  #geneset = data.frame(genes = outs$GeneSymbol, celltype = outs$celltype, Polarity = "+")
-  #colnames(geneset) <- c("HUGO symbols", "Cell population", "Polarity")
-  #return(geneset)
 }
+
+#' Get KNN edges from single cell data
+#'
+#' @param E Expression matrix with genes for rows, samples for columns
+#' @param normalize Normalize expression matrix to mean counts per cell. Default is FALSE.
+#' @param min_counts minimum number of counts per cell. Default is 3.
+#' @param min_cells minimum bumber of cells expressing at least min_counts. Default is 3.
+#' @param min_vscore_pctl Minimum v score percentile for genes to run with PCA. Default is 90.
+#' @param num_pc Number of PCs to build the KNN graph. Default is 50. 
+#' @param k_neigh k parameter in KNN. Default is 4.
+#' @return List where each element contains the DEG tables for the one vs. all comparison
+#' @export
+CID.GetNeighbors <- function(E, normalize = F, min_counts = 3, min_cells = 3, min_vscore_pctl = 90, num_pc = 50, k_neigh = 4)
+{
+cat(" ..........  Entry in CID.GetKNNEdges \n");
+ta = proc.time()[3];
+
+  if (normalize)
+  {
+    cat('             Normalizing \n')
+    E = CID.Normalize(E)
+  }
   
+  cat('             Filtering genes \n')
+  
+  # Get gene stats (above Poisson noise, i.e. V-scores)
+  outs = get_vscores_sparse(E)
+  gene_ix = outs$gene_ix
+  Vscores = outs$v_scores
+  ix2 = Vscores>0
+  gene_ix = gene_ix[ix2]
+  
+  # Filter genes: minimum V-score percentile and at least min_counts in at least min_cells
+  min_log_vscore = quantile(log(Vscores), min_vscore_pctl/100)
+  
+  ix = (Matrix::rowSums(E[gene_ix,] >= min_counts) >= min_cells) & (log(Vscores) >= min_log_vscore)
+  cat('             Using ', sum(ix), "genes \n")
+  
+  outs = get_knn_graph2(E[ix,], k=k_neigh, np = num_pc)
+  
+  outs = igraph::graph.adjacency(outs, diag = F, mode = "upper")
+  outs = igraph::get.data.frame(outs)
+  colnames(outs) <- c("V1", "V2")
+  
+  tb = proc.time()[3] - ta;
+  cat("\n ..........  Exit CID.GetKNNEdges.\n");
+  cat("             Execution time = ", tb, " s.\n", sep = "");
+  
+  return(outs)
+}
+
+#' Get V scores
+#'
+#' @param E Expression matrix with genes for rows, samples for columns
+#' @param min_mean Minimum mean gene expression. Default is zero.
+#' @param nBins Number of bins for histogram binning. Default is 50.
+#' @param fit_percentile Percentile for fitting. Default is 0.1.
+#' @param error_wt Error for convergence of optimization. Default is 1.
+#' @return V scores for each gene in the expression matrix E.
+get_vscores_sparse <- function(E, min_mean=0, nBins=50, fit_percentile=0.1, error_wt=1)
+{ 
+  ncell = ncol(E)
+  
+  mu_gene = Matrix::rowMeans(E)
+  gene_ix = mu_gene > min_mean
+  mu_gene = mu_gene[gene_ix]
+  tmp = E[gene_ix,]
+  var_gene = Matrix::rowMeans(tmp ^ 2) - mu_gene ^ 2
+  FF_gene = var_gene / mu_gene
+  
+  data_x = log(mu_gene)
+  data_y = log(FF_gene / mu_gene)
+  
+  outs = runningquantile(data_x, data_y, fit_percentile, nBins)
+  x = outs$xOut
+  y = outs$yOut
+  x = x[!is.na(x)]
+  y = y[!is.na(y)]
+  
+  gLog <- function(input) {
+    log(input[[2]] * exp(-input[[1]]) + input[[3]])
+  }
+  d = hist(log(FF_gene[mu_gene>0]), breaks=seq(min(log(FF_gene[mu_gene>0])), max(log(FF_gene[mu_gene>0])),length.out = 201), plot = F, warn.unused = F)
+  h = d$counts
+  b = d$breaks
+  b = b[-length(b)] + diff(b)/2
+  max_ix = which.max(h)
+  c = max(exp(b[max_ix]))
+  errFun <- function(b2) {
+    sum(abs(gLog(list(x,c,b2))-y) * error_wt)
+  }
+  b0 = 0.1
+  b = optimize(f = errFun, interval = c(0,1))$minimum
+  a = c / (1 + b) - 1
+  v_scores = FF_gene / ((1+a)*(1+b) + b * mu_gene);
+  outs = list(v_scores = v_scores, gene_ix = gene_ix)
+  return(outs)
+}
+
+#' Compute variance for sparse matrices.
+#'
+#' @param E Expression matrix with genes for rows, samples for columns
+sparse_var <- function(E)
+{
+  mean_gene = Matrix::rowMeans(E)
+  tmp = E;
+  tmp = tmp ^ 2;
+  return(Matrix::rowMeans(tmp) - mean_gene ^ 2)
+}
+
+#' Compute running quantile
+#'
+#' @param x log of mean gene expression.
+#' @param y log of fano factor divided by mean gene expression.
+#' @param p fit_percentile as defined in get_vscores_sparse
+#' @param nBins number of bins for histogram binning
+runningquantile <- function(x, y, p, nBins)
+{
+  ind = order(x)
+  x = x[ind]
+  y = y[ind]
+  
+  dx = (x[length(x)] - x[1]) / nBins
+  xOut = seq(x[1]+dx/2, x[length(x)]-dx/2, length.out = nBins)
+  
+  yOut = matrix(0, 1, length(xOut))
+  
+  for (i in 1:length(xOut))
+  {
+    ind = (x >= xOut[i]-dx/2) & (x < xOut[i]+dx/2)
+    if (sum(ind) > 0)
+    {
+      yOut[i] = quantile(y[ind], p)
+    } else {
+      if (i > 0)
+      {
+        yOut[i] = yOut[i-1]
+      } else {
+        yOut[i] = NA
+      }
+    }
+  }
+  return(list(xOut = xOut, yOut = yOut))
+}
+
+#' Get KNN graph
+#'
+#' @param X Expression matrix with genes for rows, samples for columns, after V score filtering.
+#' @param k KNN parameter. Default is 5.
+#' @param np Number of PCs to build the KNN graph. Default is 50.
+get_knn_graph2 <- function(X, k=5, np)
+{
+  k = k + 1;
+  logik = CID.IsUnique(rownames(X))
+  X = X[logik,]
+  colnames(X) <- 1:ncol(X)
+  ctrl <- Seurat::CreateSeuratObject(X)
+  ctrl <- Seurat::ScaleData(ctrl)
+  ctrl <- Seurat::RunPCA(ctrl, features = rownames(X), pcs.compute = np, do.print = F)
+  ctrl <- Seurat::FindNeighbors(object = ctrl, reduction = "pca", dims = 1:min(c(np, 50)), k.param = k)
+  return(ctrl@graphs$RNA_nn)
+}
