@@ -73,11 +73,20 @@ CID.LoadEdges <- function(data.dir)
 #' @export
 CID.Normalize <- function(E)
 {
-m = Matrix::Matrix(0, ncol(E), ncol(E))
-tots_use = Matrix::colSums(E)
-target_mean = mean(tots_use)
-diag(m) <- target_mean / tots_use
-return(E %*% m)
+  if (class(E) == "matrix")
+  {
+    m = Matrix::Matrix(0, ncol(E), ncol(E))
+    tots_use = Matrix::colSums(E)
+    target_mean = mean(tots_use)
+    diag(m) <- target_mean / tots_use
+    return(as.matrix(E %*% m))
+  } else {
+    m = Matrix::Matrix(0, ncol(E), ncol(E))
+    tots_use = Matrix::colSums(E)
+    target_mean = mean(tots_use)
+    diag(m) <- target_mean / tots_use
+    return(Matrix::Matrix(E %*% m, sparse = TRUE))
+  }
 }
 
 #' Chunk a dataset
@@ -172,15 +181,17 @@ CID.Impute <- function(E = NULL, data.dir = NULL, do.par = TRUE)
 #' Main function
 #'
 #' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @param pval p-value cutoff for feature selection, as described in the manuscript + markdown file. Default is pval = 0.1.
+#' @param normalize Normalizes count matrix to the mean library size. Default is TRUE.
+#' @param pval p-value cutoff for feature selection, as described in the manuscript + markdown file. Default is pval = 0.05.
 #' @param data.dir directory of SPRING files "edges.csv" and "categorical_coloring_data.json"
 #' @param entropy cells amended to high entropy labels with respect to their neighbors in the KNN graph are appended "Other" if entropy = TRUE. Default is TRUE.
 #' @param louvain Louvain community detection is performed, and then used together with Shannon entropy to detect potential novel cell types / states. Default is TRUE.
+#' @param sub.cluster KNN graph construction is performed on cell type-subsets of the expression matrix. Default is TRUE.
 #' @param omit Force remove specific cell types / states with omit. Default is NULL.
 #' @param sorted If cells are expected to be pure or mostly homogeneous (e.g., by FACs sorting), set sorted = TRUE. Default is FALSE.
 #' @return Filtered markers where each marker must have at least ncells that express at least ncounts
 #' @export
-CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, omit = NULL, sorted = FALSE)
+CID.CellID <- function(E,normalize = F,pval = 0.05,data.dir = NULL,entropy = T,louvain = T,omit = NULL,sorted = F)
 {
   # load markers
   data('markers')
@@ -196,12 +207,16 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
   stopifnot(!is.null(rownames(E)));
   cat(" ..........  Entry in CID.CellID \n");
   ta = proc.time()[3];
-
+  
+  # normalize
+  if (normalize)
+    E = CID.Normalize(E)
+  
   # main function
   cat(" ..........  Computing Signac scores for cell types on input data matrix :\n");
   cat("             nrow = ", nrow(E), "\n", sep = "");
   cat("             ncol = ", ncol(E), "\n", sep = "");
-  filtered_features = CID.filter(E, markersG  = markers, pval = pval)
+  filtered_features = CID.filter2(E, markersG  = markers, pval = pval, sorted = T)
   
   if (!is.null(omit))
   {
@@ -210,93 +225,95 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
       omit = omit[omit %in% names(filtered_features)]
       filtered_features = filtered_features[-which(names(filtered_features) %in% omit)]
       cat(" ..........  Forcibly omitting features :\n");
-      cat("             Omitted = ", omit, "\n", sep = "");
+      cat("             Omitted = ", paste(omit, collapse = ", "), "\n", sep = "");
     }
   }
   
-  # compute cell type score data.frame
-  dfY = CID.append(E,filtered_features, sorted)
+  # compute cell type scores data.frame
+  dfY = CID.append(E,filtered_features, sorted = T)
   
   # assign output classifications
   cat(" ..........  Assigning output classifications \n", sep ="");
   indexMax = apply(dfY, 2, which.max);
   ac = rownames(dfY)[indexMax];
   
+  # amend low scoring states to "Other"
+  diff = apply(dfY, 2 ,max) - apply(dfY, 2, min)
+  ac[diff < mean(diff) - 2 * sd(diff)] = "Other"
+  
   # if is null data.dir, run PCA + KNN
   if (is.null(data.dir))
-    data.dir = CID.GetNeighbors(E, normalize = F, min_counts = 3, min_cells = 3, min_vscore_pctl = 90, num_pc = 50, k_neigh = 4)
+    data.dir = CID.GetNeighbors(E, normalize = normalize, min_counts = 3, min_cells = 3, min_vscore_pctl = 90, num_pc = 50, k_neigh = 3)
    
   # compute distance matrix
-  if (!is.null(data.dir) | entropy | louvain)
-    distMat = CID.GetDistMat(data.dir)
-
+    distMat = CID.GetDistMat(data.dir = data.dir)
+    
   # smooth the output classifications
-  if (!is.null(data.dir))
-  {
     acOut_knn_smooth = CID.smooth(ac, distMat[[1]])
-    cat("\n ..........  Smoothing completed! \n");
-  }
-
-  if (entropy)
-  {
-    cat(" ..........  Assigning Others \n");
-    acOut_knn_smooth = CID.entropy(acOut_knn_smooth, distMat)
-  }
-
+    
+  # assign Others (first pass, assign to all non-concordant edges)
+    if (entropy)
+      acOut_knn_smooth = CID.entropy(acOut_knn_smooth, distMat)
+    
   # cell state deep dive classifications
-  dummy = list("")
-  cat(" ..........  Computing CID scores for cell states! \n");
-    if (!is.null(data.dir))
-    {  ac_dd = acOut_knn_smooth
-    } else {
-      ac_dd = ac
-    }
-    for (j in names(cellstate_markers)){
-      logik = ac_dd == j; sum(logik)
-      if (sum(logik) != 0){
-        filtered_features = CID.filter(E, markersG  = cellstate_markers[[which(names(cellstate_markers) == j)]])
-      } else {
-        filtered_features = NULL
-      }
-      if (!is.null(filtered_features))
-      {
-        ac_dd = CID.deepdive(filtered_features, j, acOut3 = ac_dd, expression = E, sorted = sorted)
-        dummy[[j]] = ac_dd;
-      }
-    }
-    dummy = dummy[sapply(dummy, function(x) length(x) != 1)]
-    names(dummy) <- paste("L", seq_along(1:length(dummy)), sep = "")
-    cat(" ..........  Deep dive completed!\n");
-    if (!is.null(data.dir))
-    {
-      cat(" ..........  Smoothing \n");
-      ac_dd_knn = CID.smooth(ac_dd, distMat[[1]])
-    }
+    cat(" ..........  Computing CID scores for cell states! \n");
+    ac_dd = acOut_knn_smooth
+    
+  # get only cell states with cell types in the data
+    logik = names(cellstate_markers) %in% acOut_knn_smooth;
+    if ("TNK" %in% acOut_knn_smooth)
+      logik = logik | grepl("^T.", names(cellstate_markers))
+    if ("MPh" %in% acOut_knn_smooth)
+      logik = logik | grepl("Macrophages", names(cellstate_markers))
+    if ("Granulocytes" %in% acOut_knn_smooth)
+      logik = logik | grepl("^Mast", names(cellstate_markers))
 
+  # get filtered features for cell states
+    state_features = lapply(cellstate_markers[logik], function(x){
+      CID.filter2(E, markersG = x, pval = pval, sorted = F)
+    })
+    
+  # get scores for cell states
+    dfY_states = lapply(state_features, function(x) {
+      CID.append(E, x, sorted = F)})
+    
+    ac_dd = acOut_knn_smooth
+    ac_dd_knn = acOut_knn_smooth
+    
+    for (j in 1:length(dfY_states))
+    {
+      logik = ac_dd_knn == names(dfY_states)[j]; sum(logik)
+      indexMax = apply(dfY_states[[j]][,logik], 2, which.max);
+      ac_dd_knn[logik] = rownames(dfY_states[[j]])[indexMax];
+      qq = lapply(distMat, function(x) x[logik,logik])
+      ac_dd_knn[logik] = CID.entropy(ac_dd_knn[logik], qq)
+      ac_dd_knn[logik] = CID.smooth(rownames(dfY_states[[j]])[indexMax], qq[[1]])
+    }
+  
   if (louvain)
   {
     cat(" ..........  Running Louvain clustering\n");
     wt = CID.Louvain(edges = data.dir)
-    do = data.frame(table(wt[acOut_knn_smooth == "Other"]))
+    do = data.frame(table(wt[ac_dd_knn == "Other"]))
     df = data.frame(table(wt[wt %in% do$Var1]))
-    logik = (1 - phyper(do$Freq, sum(acOut_knn_smooth == "Other") , length(ac) - sum(acOut_knn_smooth == "Other"), df$Freq)) < 0.01;
+    logik = (1 - phyper(do$Freq, sum(ac_dd_knn == "Other") , length(ac) - sum(ac_dd_knn == "Other"), df$Freq)) < 0.001;
     if (sum(logik) > 0)
     {
       do = do[logik,]
       logik = do$Freq > 20; # require at least 20 cell communities
       if (sum(logik) > 0) 
       {
-        cat("             Signac detected n = ", sum(logik), "novel cell type populations!\n");
+        cat("             Signac found", sum(logik), "novel celltypes!\n");
         lbls = rep("All", ncol(E))
         logik = wt %in% do$Var1[logik];
         lbls[logik] = wt[logik]
-        lbls[acOut_knn_smooth != "Other"] = "All"
+        lbls[!logik] = "All"
         colnames(E) <- lbls
-        cat(" ..........  Identifying markers for the populations \n");
-        acOut_knn_smooth_wt = CID.PosMarkers(E, acOut_knn_smooth)
+        new_lbls = CID.PosMarkers(E, ac_dd_knn)
         ac_dd_knn_wt = ac_dd_knn
-        logik = grepl("^[+]", acOut_knn_smooth_wt)
-        ac_dd_knn_wt[logik] = acOut_knn_smooth_wt[logik]
+        acOut_knn_smooth_wt = acOut_knn_smooth
+        acOut_knn_smooth_wt = new_lbls$lbls
+        ac_dd_knn_wt[lbls != "All"] = new_lbls$lbls[grepl("^[+]", acOut_knn_smooth_wt)]
       }
     }
   }
@@ -306,11 +323,10 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
     cr = list(scores = dfY,
               ctypes = ac,
               ctypessmoothed = acOut_knn_smooth,
-              ctypessmoothed_dev = acOut_knn_smooth_wt,
+              ctypessmoothed_dev = ac_dd_knn,
               ddtypes = ac_dd,
               ddtypessmoothed = ac_dd_knn,
               ddtypessmoothed_dev = ac_dd_knn_wt,
-              hierarchylabels = dummy,
               louvain = wt)
   } else if (!is.null(data.dir) & louvain)
   {
@@ -319,7 +335,6 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
               ctypessmoothed = acOut_knn_smooth,
               ddtypes = ac_dd,
               ddtypessmoothed = ac_dd_knn,
-              hierarchylabels = dummy,
               louvain = wt)
   }
   else if (!is.null(data.dir)) {
@@ -327,8 +342,7 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
               ctypes = ac,
               ctypessmoothed = acOut_knn_smooth,
               ddtypes = ac_dd,
-              ddtypessmoothed = ac_dd_knn,
-              hierarchylabels = dummy)
+              ddtypessmoothed = ac_dd_knn)
   }
   else if (!is.null(data.dir)) {
     cr = list(scores = dfY,
@@ -353,10 +367,93 @@ CID.CellID <- function(E,pval = 0.1,data.dir = NULL, entropy = T, louvain = T, o
 #'
 #' @param expression An expression matrix with features (genes) in rows and samples (cells) in columns.
 #' @param markersG A data frame with four columns ('HUGO Symbol', 'Cell Population', 'ENTREZ ID', 'Polarity'). Default is internally set to data(markers_v4).
+#' @param pval p-value cutoff, as described in the manuscript. Default is 0.01.
+#' @return A list of markers and features.
+#' @export
+CID.filter2 <- function(expression, markersG, pval = pval, sorted = sorted)
+{
+  if (sorted)
+    markersG = markersG[markersG$Polarity == "+", ]
+  expression = expression[intersect(row.names(expression),markersG$"HUGO symbols"),,drop=F]
+  expression = log(expression + 1, 2)
+  markers.names = unique(markersG$`Cell population`)
+  cat(" ..........  Filtering markers for features: \n","           ",paste(markers.names,collapse = ", ", sep = ""))
+  features=subset(markersG,get("HUGO symbols")%in%rownames(expression))
+  features=split(features[,c("HUGO symbols", "Cell population" ,"Polarity")], features[,"Cell population"])
+  features=features[intersect(markers.names,names(features))]
+  features=features[sapply(features,function(x)nrow(x)>0)]
+  missing.populations=setdiff(markers.names,names(features))
+  features23=features[sapply(features,function(x)nrow(x)<3)]
+  features=features[sapply(features,function(x)nrow(x)>=3)]
+  if (NROW(features) > 5)
+  {
+    L = lapply(features,function(x){na.omit(expression[intersect(row.names(expression),x$"HUGO symbols"[x$Polarity == "+"]),,drop=F])})
+    set.seed("42")
+    
+    # get pairwise combinations of markers with the top five markers
+    # downsampling does not seem to affect results; done for speed.
+    cols = lapply(L, function(x){
+      dummy <- t( combn(1:nrow(x), 2))
+      dummy = dummy[dummy[,1] %in% 1:5, ]
+      if (nrow(dummy) > 300)
+        dummy = dummy[sample(nrow(dummy), 300),]
+      dummy
+    })
+    
+    # run pairwise correlation test
+    Q = mapply(function(x, y){
+        apply( x , 1 , function(z) cor.test( y[z[1], ] , y[  z[2], ] )$p.value )
+    }, x = cols, y = L)
+    
+    # remove features with weak overall correlation; median had the best sensitivity
+    QC = sapply(Q, median)
+    logik = QC > pval & sapply(L, nrow) > 2;
+    features = features[!logik]
+    if(!length(features))
+      return(NULL)
+
+  } else {
+    L = lapply(features,function(x){na.omit(expression[intersect(row.names(expression),x$"HUGO symbols"[x$Polarity == "+"]),,drop=F])})
+    
+    # remove markers that do not cluster with maximal group
+    M = do.call(rbind, L)
+    
+    # generate correlation matrix, cluster and cut into three groups
+    cor_mat = qlcMatrix::cosSparse(Matrix::t(M))
+    ix = hclust(dist(cor_mat))
+    grps = cutree(ix, k = (length(L) + 1))
+    vec = as.character(unlist(sapply(features, function(x) x$`Cell population`[x$Polarity == "+"])))
+    q = table(data.frame(from = vec, to = grps))
+    
+    # find the maximal group
+    idx = apply(q,1,which.max)
+    genes_keep = names(grps)[grps %in% idx]
+    
+    # remove markers from features
+    features = lapply(features, function(x){
+      x = x[x$`HUGO symbols` %in% genes_keep,]
+    })
+  }
+  features = features[sapply(features, function(x) sum(x$Polarity == "+") != 0)]
+  features = c(features, features23)
+  filtered.populations=setdiff(markers.names,setdiff(names(features),missing.populations))
+  if(length(missing.populations)>0)
+    warning(paste("No markers exist for this feature(s):",paste(missing.populations,collapse=", ")), ".\n")
+  if(length(filtered.populations) > 0)
+    cat(paste("\nNo markers exist for this feature(s) due to filtering:",paste(filtered.populations,collapse=", ")), "\n")
+  if(length(filtered.populations)  == 0 & length(missing.populations) == 0)
+    cat("\n ..........  Markers exist for all features! \n")
+  features
+}
+
+#' filters the geneset markers
+#'
+#' @param expression An expression matrix with features (genes) in rows and samples (cells) in columns.
+#' @param markersG A data frame with four columns ('HUGO Symbol', 'Cell Population', 'ENTREZ ID', 'Polarity'). Default is internally set to data(markers_v4).
 #' @param pval p-value cutoff, as described in the manuscript. Default is 0.1.
 #' @return A list of markers and features.
 #' @export
-CID.filter <- function(expression, markersG, pval = 0.1)
+CID.filter <- function(expression, markersG, pval = pval)
 {
   expression = expression[intersect(row.names(expression),markersG$"HUGO symbols"),,drop=F]
   expression = log(expression + 1, 2)
@@ -379,7 +476,8 @@ CID.filter <- function(expression, markersG, pval = 0.1)
     QC = mapply(function(x,y) { 1 - phyper(x - 1, sum(unlist(Q) < filter), length(unlist(Q)) - sum(unlist(Q) < filter), length(y)) }, x = QC, y = Q)
     logik = QC < pval;
     features = features[!logik]
-    filter = summary(unlist(Q))[2]
+    #filter = summary(unlist(Q))[1]
+    filter = -1;
     nms = unlist(lapply(Q, function(x) names(x)[x > filter]))
     features = lapply(features, function(x) rbind(x[x[,1] %in% nms,], x[x$Polarity == "-",]))
   }
@@ -416,7 +514,7 @@ CID.append=function(expression,featuresG, sorted)
                                             if (sum(x$Polarity == "-") > 0)
                                             {
                                               apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "+"]),,drop=F],2,function(x) mean(x, na.rm = T)) -
-                                                apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "-"]),,drop=F],2,function(x) mean(x, na.rm = T))
+                                              apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "-"]),,drop=F],2,function(x) mean(x, na.rm = T))
                                             } else
                                             {
                                               apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "+"]),,drop=F],2,function(x) mean(x, na.rm = T))
@@ -438,35 +536,6 @@ CID.append=function(expression,featuresG, sorted)
     res
   }
 }
-#' Deep cell states
-#'
-#' @param XX filtered features for CID.append
-#' @param YY cell type where we are going deeper
-#' @param acOut3 Vector of cell type labels
-#' @param expression the count matrix
-#' @param sorted see ?CID.CellID
-#' @return Vector for the deep cell state labels
-CID.deepdive <- function(XX, YY, acOut3, expression, sorted = sorted)
-{
-  cat(" ..........  Assigning cell states :\n");
-  logik = acOut3 == YY; sum (logik)
-  if (sum(logik) != 0 ){
-    cat("             Hierarchy assignment: ", sum(logik), " ", YY, "\n", sep ="");
-    ## get CID scores for cell types
-    dfYe = CID.append(expression,XX, sorted)
-    ar = rownames(dfYe)
-    dfYe = dfYe[,logik]
-    dfYe = na.omit(dfYe)
-    if (!is.null(dfYe) & length(dfYe) > 1){
-      indexMax = apply(as.matrix(dfYe), 2, which.max);
-      dummy = ar[indexMax];
-      acOut3[logik] = dummy;}
-  } else
-  {
-    return(acOut3)
-  }
-  acOut3
-}
 
 #' Smoothing function
 #'
@@ -476,41 +545,69 @@ CID.deepdive <- function(XX, YY, acOut3, expression, sorted = sorted)
 #' @export
 CID.smooth <- function(ac,dM)
 {
-  # pre-allocate
-  Y   = ac # cells we may switch labels
-  m = Matrix::Matrix(0, nrow = length(ac), ncol = length(unique(ac)), sparse = T)
-  m[cbind(1:nrow(m), as.numeric(factor(ac)))] <- 1
-  res = dM %*% m
-  res = res / Matrix::rowSums(res)
-  mx.idx = apply(res, 1, which.max)
-  mx = apply(res, 1, max)
-  Y[mx > 0.5] = levels(factor(ac))[mx.idx[mx > 0.5]]
-  return(Y)
+    Y = ac;
+    # remove any unconnected cells from consideration
+    logik = Matrix::rowSums(dM) != 0
+    if(any(!logik)){
+      dM = dM[logik,logik]
+      Y = Y[logik]
+    }
+    m = Matrix::Matrix(0, nrow = length(Y), ncol = length(unique(Y)), sparse = T)
+    m[cbind(1:nrow(m), as.numeric(factor(Y)))] <- 1
+    res = dM %*% m
+    res = res / Matrix::rowSums(res)
+    mx.idx = apply(res, 1, function(x) which.max(x))
+    mx = apply(res, 1, max)
+    Y[mx > 0.5] = levels(factor(Y))[mx.idx[mx > 0.5]]
+    ac[logik] = Y
+    return(ac)
 }
 
 #' Entropy
 #' 
 #' @param ac A character vector of cell type labels
-#' @param dM The distance matrix, see ?CID.GetDistMat
+#' @param distM The distance matrix, see ?CID.GetDistMat
 #' @export
-CID.entropy <- function(ac,dM)
+CID.entropy <- function(ac,distM)
 {
-  # Pre-allocate cells for shannon calculation
+  # "Y" labels will be ac but with some "Others"
   Y   = ac
-  N_unique = length(unique(Y))
   
   # Calculate normalized shannon entropy for each cell j for all connections with shortest path < N
   shannon = rep(0, length(Y))
-  dM = Reduce('+', dM) > 0;
-
+  if (class(distM) == "list")
+  {
+    dM = Reduce('+', distM) > 0;
+    # create identity matrix to subtract off self
+    I <- methods::new("ngTMatrix", 
+                      i = as.integer(1:nrow(dM) - 1L), 
+                      j = as.integer(1:nrow(dM) - 1L),
+                      Dim = as.integer(c(nrow(dM), nrow(dM))))
+    dM = dM - I
+  } else {
+    dM = distM
+  }
+  
+  # create matrix for cell labels 
   m = Matrix::Matrix(0, nrow = length(ac), ncol = length(unique(ac)), sparse = T)
   m[cbind(1:nrow(m), as.numeric(factor(ac)))] <- 1
   
   res = dM %*% m
   res = res / Matrix::rowSums(res)
+  N_unique = length(unique(Y))
   shannon = apply(res, 1, function(freqs) {-sum(freqs[freqs != 0] * log(freqs[freqs != 0])) / log(2) / log2(N_unique)})
-
-  Y[shannon > (mean(shannon) + 3 * sd(shannon))] = "Other"
+  
+  #df = data.frame(cells = Y, entropy = shannon)
+  #ggplot(df, aes(x=cells, y=entropy, fill = cells)) + geom_boxplot()
+   q = c(shannon, -shannon)
+  # note symmetry
+  # hist(q)
+  # use Gaussian
+  
+  Y[shannon > 2 * sd(q)] = "Other"
+  
+  #df = data.frame(cells = Y, entropy = shannon)
+  #ggplot(df, aes(x=cells, y=entropy, fill = cells)) + geom_boxplot()
   
   return(Y)
 }
@@ -705,6 +802,17 @@ get_colors <- function(P)
   return(outs)
 }
 
+#' K-core calculation on second degree connections
+#'
+#' @param dM2 Adjacency matrix of second degree interactions
+#' @return vector of the k-core of each node
+#' @export
+CID.KCore <- function(dM2)
+{
+  g = igraph::graph_from_adjacency_matrix(dM2 * 1, mode = c("undirected"), weighted = NULL, diag = TRUE, add.colnames = NULL, add.rownames = NA)
+  igraph::coreness(graph = g)
+}
+
 #' Community substructure by Louvain community detection
 #'
 #' @param edges A data frame or matrix with edges
@@ -786,39 +894,115 @@ CID.IsUnique <- function (x)
 #' @param acn Vector of cell type labels 
 #' @return List where each element contains the DEG tables for the one vs. all comparison
 #' @export
-CID.PosMarkers <- function(E, acn)
+CID.PosMarkers <- function(D, acn)
 {
+  # manually downsample to prevent Seurat errors (e.g., manually set max.cells.per.ident)
+  flag = sum(colnames(D) == "All") > 200;
+  lbls_in = colnames(D)
+  if (flag)
+  {
+    nms = names(flag)
+    set.seed('42')
+    idx = which(colnames(D) )
+    D = D[,idx]
+  }
   # get lbls
-  lbls = colnames(E)
+  lbls = colnames(D)
+  lbls = paste("Cluster", lbls)
+  # manually set ; Seurat has issues with large datasets;
   # set colnames
-  colnames(E) <- seq(1, ncol(E))
+  colnames(D) <- seq(1, ncol(D))
   # make sure row names are not redundant
-  logik = CID.IsUnique(rownames(E))
-  E = E[logik,]
+  logik = CID.IsUnique(rownames(D))
+  D = D[logik,]
   # Set up object
-  ctrl <- Seurat::CreateSeuratObject(counts = E)
-  ctrl <- Seurat::NormalizeData(object = ctrl)
+  ctrl <- suppressWarnings(Seurat::CreateSeuratObject(counts = D))
+  ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
   ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
   ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
   cts = unique(lbls);
-  cts = cts[cts != "All"]
+  cts = cts[cts != "Cluster All"]
+  mrks = list("")
+  new_lbls = list("")
   for (j in 1:length(cts))
   {
-    dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = 1, pseudocount.use = 1, min.pct = 0)
-    dd = dd[dd$p_val_adj < 0.01,]
+    dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, logfc.threshold = 1)
+    dd = dd[dd$p_val_adj < 0.01 & dd$avg_logFC > 0,]
+    dd = dd[order(dd$avg_logFC, decreasing = T), ]
+    dd = na.omit(dd)
+    dd$GeneSymbol = rownames(dd)
     if (sum(dd$p_val_adj < 0.01) > 0)
     {
-      gns = rownames(dd)[order(dd$avg_logFC, decreasing = TRUE)][1:2]
-      gns = gns[!is.na(gns)]
-      if (length(gns == 2))
-      {
-        acn[lbls == cts[j]] = rep( paste ("+", gns, collapse = " ", sep = ""), sum(lbls == cts[j]))
-      } else {
-        acn[lbls == cts[j]] = rep( paste ("+", gns, sep = ""), sum(lbls == cts[j]))
-      }
+      gns = rownames(dd)[1:2]
+      gns = gns[!is.na(gns)] 
+      new_lbls[[j]] = paste ("+", gns, collapse = " ")
+      mrks[[j]] = dd[order(dd$avg_logFC, decreasing = T),];
+      names(mrks)[j] <- paste ("+", gns, collapse = " ")
     }
   }
-  acn
+  names(new_lbls) <- cts
+  names(mrks) <- cts
+  
+  in_dat = lapply(mrks, function(x){
+    markers[markers$`HUGO symbols` %in% x$GeneSymbol,]
+  })
+  
+  new_labs = lbls_in;
+  new_labs = paste("Cluster", new_labs)
+  
+  for (j in 1:length(cts))
+  {
+    new_labs[new_labs == cts[j]] = new_lbls[[j]] 
+  }
+  
+  Y = acn
+  Y[new_labs != "Cluster All"] = new_labs[new_labs != "Cluster All"]
+  
+  return(list(lbls = acn_in, genes = gns_of_int, mrks = mrks))
+}
+
+#' Run DEG analysis with Seurat
+#'
+#' @param E Expression matrix with genes for rows, samples for columns
+#' @param lbls Vector of cell type labels 
+#' @return List where each element contains the DEG tables for the one vs. all comparison
+#' @export
+CID.CheckMarkers <- function(D, lbls, fils)
+{
+  # manually downsample to prevent Seurat errors (e.g., manually set max.cells.per.ident)
+  flag = table(lbls) > 200
+  if (any(flag))
+  {
+    acn_in = lbls;
+    set.seed(42)
+    nms = names(table(lbls))[flag]
+    idx = which(!lbls %in% nms);
+    idx_2 = sapply(nms, function(x) which(lbls == x)[sample(sum(lbls == x),200)])
+    D = D[,c(idx, idx_2)]
+    lbls = lbls[c(idx, idx_2)]
+  }
+  # set colnames to unique values
+  colnames(D) <- seq(1, ncol(D))
+  # make sure row names are not redundant
+  logik = CID.IsUnique(rownames(D))
+  D = D[logik,]
+  # Set up object
+  ctrl <- suppressWarnings(Seurat::CreateSeuratObject(counts = D))
+  ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
+  ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
+  ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
+  cts = unique(lbls);
+  gns_of_int = list("")
+  for (j in 1:length(cts))
+  {
+    dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, min.pct = 0, verbose = F, test.use = "MAST")
+    dd$celltype = cts[j]
+    dd$GeneSymbol = rownames(dd)
+    gns_of_int[[j]] = dd
+  }
+  S = do.call(rbind, gns_of_int)
+  S = S[S$avg_logFC > 0 & S$p_val_adj < 0.05, ]
+  return(S)
 }
 
 #' Get KNN edges from single cell data
@@ -830,11 +1014,12 @@ CID.PosMarkers <- function(E, acn)
 #' @param min_vscore_pctl Minimum v score percentile for genes to run with PCA. Default is 90.
 #' @param num_pc Number of PCs to build the KNN graph. Default is 50. 
 #' @param k_neigh k parameter in KNN. Default is 4.
+#' @param genes_use if desired, manually set the genes for PCA
 #' @return List where each element contains the DEG tables for the one vs. all comparison
 #' @export
-CID.GetNeighbors <- function(E, normalize = F, min_counts = 3, min_cells = 3, min_vscore_pctl = 90, num_pc = 50, k_neigh = 4)
+CID.GetNeighbors <- function(E, normalize = F, min_counts = 3, min_cells = 3, min_vscore_pctl = 90, num_pc = 50, k_neigh = 4, genes_use = NULL)
 {
-cat(" ..........  Entry in CID.GetKNNEdges \n");
+cat(" ..........  Entry in CID.GetNeighbors \n");
 ta = proc.time()[3];
 
   if (normalize)
@@ -843,22 +1028,27 @@ ta = proc.time()[3];
     E = CID.Normalize(E)
   }
   
-  cat('             Filtering genes \n')
+  if (is.null(genes_use))
+  {
+    cat('             Filtering genes \n')
+    
+    # Get gene stats (above Poisson noise, i.e. V-scores)
+    outs = get_vscores_sparse(E)
+    gene_ix = outs$gene_ix
+    Vscores = outs$v_scores
+    ix2 = Vscores>0
+    gene_ix = gene_ix[ix2]
+    
+    # Filter genes: minimum V-score percentile and at least min_counts in at least min_cells
+    min_log_vscore = quantile(log(Vscores), min_vscore_pctl/100)
+    
+    ix = (Matrix::rowSums(E[gene_ix,] >= min_counts) >= min_cells) & (log(Vscores) >= min_log_vscore)
+    cat('             Using ', sum(ix), "genes \n")
+    
+    genes_use = rownames(E)[ix]
+  }
   
-  # Get gene stats (above Poisson noise, i.e. V-scores)
-  outs = get_vscores_sparse(E)
-  gene_ix = outs$gene_ix
-  Vscores = outs$v_scores
-  ix2 = Vscores>0
-  gene_ix = gene_ix[ix2]
-  
-  # Filter genes: minimum V-score percentile and at least min_counts in at least min_cells
-  min_log_vscore = quantile(log(Vscores), min_vscore_pctl/100)
-  
-  ix = (Matrix::rowSums(E[gene_ix,] >= min_counts) >= min_cells) & (log(Vscores) >= min_log_vscore)
-  cat('             Using ', sum(ix), "genes \n")
-  
-  outs = get_knn_graph2(E[ix,], k=k_neigh, np = num_pc)
+  outs = get_knn_graph2(E, k=k_neigh, np=num_pc,genes_to_use=genes_use)
   
   outs = igraph::graph.adjacency(outs, diag = F)
   outs = igraph::get.data.frame(outs)
@@ -866,7 +1056,7 @@ ta = proc.time()[3];
   colnames(outs) <- c("V1", "V2")
 
   tb = proc.time()[3] - ta;
-  cat("\n ..........  Exit CID.GetKNNEdges.\n");
+  cat("\n ..........  Exit CID.GetNeighbors.\n");
   cat("             Execution time = ", tb, " s.\n", sep = "");
   
   return(outs)
@@ -972,18 +1162,19 @@ runningquantile <- function(x, y, p, nBins)
 #' @param k KNN parameter. Default is 5.
 #' @param np Number of PCs to build the KNN graph. Default is 50.
 #' @param run_force Runs ForceAtlas2. Default is FALSE.
-get_knn_graph2 <- function(X, k=5, np, run_force = F)
+#' @param genes_to_use gene list for KNN graph building
+get_knn_graph2 <- function(X, k=5, np, run_force = F, genes_to_use)
 {
   k = k + 1;
   logik = CID.IsUnique(rownames(X))
   X = X[logik,]
   colnames(X) <- 1:ncol(X)
-  ctrl <- Seurat::CreateSeuratObject(X)
-  ctrl <- Seurat::ScaleData(ctrl)
-  ctrl <- Seurat::RunPCA(ctrl, features = rownames(X), pcs.compute = np, do.print = F)
+  ctrl <- suppressWarnings(Seurat::CreateSeuratObject(X))
+  ctrl <- Seurat::ScaleData(ctrl, verbose = F)
+  ctrl <- Seurat::RunPCA(ctrl, features = genes_to_use, pcs.compute = np, do.print = F)
   ctrl <- Seurat::FindNeighbors(object = ctrl, reduction = "pca", dims = 1:min(c(np, 50)), k.param = k)
-  if (force)
-    RunForceAtlas(ctrl)
+  if (run_force)
+    P <- RunForceAtlas(ctrl)
   return(ctrl@graphs$RNA_nn)
 }
 
@@ -1003,4 +1194,24 @@ RunForceAtlas <- function(Q)
   
   p <- layout.forceatlas2(outs, directed = FALSE, iterations = num_force_iter, plotstep = 100)
   
+  return(p)
+}
+
+#' Run PCA based filtering
+#'
+#' @param X Expression matrix with genes for rows, samples for columns, after V score filtering.
+#' @param np Number of PCs to build the KNN graph. Default is 50.
+#' @param genes_to_use gene list for KNN graph building
+CID.PCAFilter <- function(X, np = 50, genes_to_use)
+{
+  logik = CID.IsUnique(rownames(X))
+  X = X[logik,]
+  colnames(X) <- 1:ncol(X)
+  ctrl <- Seurat::CreateSeuratObject(X)
+  ctrl <- Seurat::ScaleData(ctrl)
+  ctrl <- Seurat::RunPCA(ctrl, features = genes_to_use, pcs.compute = np, do.print = F)
+  ctrl <- Seurat::JackStraw(object = ctrl, dims = np)
+  Q <- JS(object = ctrl[['pca']], slot = 'empirical')
+  q <- apply(Q, 1, min)
+  return(names(q)[q < 0.01])
 }

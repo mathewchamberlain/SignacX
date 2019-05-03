@@ -10,7 +10,7 @@ Description: Signac is an algorithm that addresses the classification problem in
 Depends: R (>= 3.1.0)
 License: GPL-3 | file LICENSE
 Encoding: UTF-8
-LazyData: true
+LazyData: false
 RoxygenNote: 6.1.1
 biocViews: biomaRt(>= 2.36.0), Biobase(>= 2.40.0), edgeR(>= 3.22.1), limma(>= 3.36.1)
 URL: http://github.com/m137/Signac
