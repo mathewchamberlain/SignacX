@@ -1,7 +1,7 @@
 Package: Signac
 Type: Package
 Title: Cell type and state identification based on gene expression patterns
-Version: 0.1.0
+Version: 0.1.1
 Author: Mathew Chamberlain, Virginia Savova
 Maintainer: Mathew Chamberlain <mathew.chamberlain@sanofi.com>
 Imports: Matrix(>= 1.2-14), qlcMatrix(>= 0.9.7), Seurat(>= 2.3.1), rjson (>= 0.2.18), igraph (>= 1.2.1), jsonlite (>= 1.5), SAVER (>= 1.1.1), RColorBrewer (>= 1.1.2), methods, stats, graphics

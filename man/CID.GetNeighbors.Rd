@@ -5,7 +5,7 @@
 \title{Get KNN edges from single cell data}
 \usage{
 CID.GetNeighbors(E, normalize = F, min_counts = 3, min_cells = 3,
-  min_vscore_pctl = 90, num_pc = 50, k_neigh = 4)
+  min_vscore_pctl = 90, num_pc = 50, k_neigh = 4, genes_use = NULL)
 }
 \arguments{
 \item{E}{Expression matrix with genes for rows, samples for columns}
@@ -21,6 +21,8 @@ CID.GetNeighbors(E, normalize = F, min_counts = 3, min_cells = 3,
 \item{num_pc}{Number of PCs to build the KNN graph. Default is 50.}
 
 \item{k_neigh}{k parameter in KNN. Default is 4.}
+
+\item{genes_use}{if desired, manually set the genes for PCA}
 }
 \value{
 List where each element contains the DEG tables for the one vs. all comparison

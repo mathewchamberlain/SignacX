@@ -4,7 +4,7 @@
 \alias{get_knn_graph2}
 \title{Get KNN graph}
 \usage{
-get_knn_graph2(X, k = 5, np)
+get_knn_graph2(X, k = 5, np, run_force = F, genes_to_use)
 }
 \arguments{
 \item{X}{Expression matrix with genes for rows, samples for columns, after V score filtering.}
@@ -12,6 +12,10 @@ get_knn_graph2(X, k = 5, np)
 \item{k}{KNN parameter. Default is 5.}
 
 \item{np}{Number of PCs to build the KNN graph. Default is 50.}
+
+\item{run_force}{Runs ForceAtlas2. Default is FALSE.}
+
+\item{genes_to_use}{gene list for KNN graph building}
 }
 \description{
 Get KNN graph

@@ -17,7 +17,7 @@ genesig_wrapper_v2 <- function()
                       Not.Mast      =   c("Eosinophils","Neutrophils"),
                       MPh           =   list(Monocytes      = c("Monocytes"),
                                              Macrophages    = c("Macrophages.M0","Macrophages.M1","Macrophages M1","Macrophages.M2","Macrophages M2"),
-                                             Dendritic      = c("Dendritic.cells.resting","Dendritic.cells.activated")),
+                                             Dendritic      = c("Dendritic.cells.resting","Dendritic.cells.activated", "DC")),
                       Macrophages   =   list(Macrophages.M0 = c("Macrophages.M0"),
                                              Macrophages.M1 = c("Macrophages.M1","Macrophages M1"),
                                              Macrophages.M2 = c("Macrophages.M2","Macrophages M2")),
@@ -83,6 +83,7 @@ genesig_wrapper_v2 <- function()
   names(outs) <- names(master_list)
   cellstate_markers = outs
   usethis::use_data(cellstate_markers, overwrite = TRUE)
+  usethis::use_data(markers, cellstate_markers, overwrite = TRUE, internal = TRUE)
 }
 
 #' Run DEG analysis with Seurat wrapper

@@ -4,10 +4,10 @@
 \alias{CID.PosMarkers}
 \title{Run DEG analysis with Seurat wrapper}
 \usage{
-CID.PosMarkers(E, acn)
+CID.PosMarkers(D, acn)
 }
 \arguments{
-\item{E}{Expression matrix with genes for rows, samples for columns}
+\item{D}{Expression matrix with genes for rows, samples for columns}
 
 \item{acn}{Vector of cell type labels}
 }

@@ -4,12 +4,12 @@
 \alias{CID.entropy}
 \title{Entropy}
 \usage{
-CID.entropy(ac, dM)
+CID.entropy(ac, distM)
 }
 \arguments{
 \item{ac}{A character vector of cell type labels}
 
-\item{dM}{The distance matrix, see ?CID.GetDistMat}
+\item{distM}{The distance matrix, see ?CID.GetDistMat}
 }
 \description{
 Entropy

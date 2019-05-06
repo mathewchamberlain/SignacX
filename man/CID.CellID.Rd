@@ -4,13 +4,15 @@
 \alias{CID.CellID}
 \title{Main function}
 \usage{
-CID.CellID(E, pval = 0.1, data.dir = NULL, entropy = T,
-  louvain = T, omit = NULL, sorted = FALSE)
+CID.CellID(E, normalize = F, pval = 0.05, data.dir = NULL,
+  entropy = T, louvain = T, omit = NULL, sorted = F)
 }
 \arguments{
 \item{E}{A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.}
 
-\item{pval}{p-value cutoff for feature selection, as described in the manuscript + markdown file. Default is pval = 0.1.}
+\item{normalize}{Normalizes count matrix to the mean library size. Default is TRUE.}
+
+\item{pval}{p-value cutoff for feature selection, as described in the manuscript + markdown file. Default is pval = 0.05.}
 
 \item{data.dir}{directory of SPRING files "edges.csv" and "categorical_coloring_data.json"}
 

@@ -100,8 +100,8 @@ CID.Normalize <- function(E)
 CID.Chunk <- function(E, chunk.dir, number_of_chunks = 10)
 {
   chunk.dir = gsub("\\/$", "", chunk.dir, perl = TRUE);
-  data('markers')
-  data('cellstate_markers')
+  markers = Signac::markers
+  cellstate_markers = Signac::cellstate_markers
   genes = do.call(rbind, cellstate_markers)
   genes.ind <- which(rownames(E) %in% unique(c(as.character(markers$`HUGO symbols`), as.character(genes$`HUGO symbols`))))
   E = E[genes.ind,]
@@ -158,8 +158,8 @@ CID.Impute <- function(E = NULL, data.dir = NULL, do.par = TRUE)
     rownames(I) <- genes
     return(I)
   }  else {
-    data('markers')
-    data('cellstate_markers')
+    markers = Signac::markers
+    cellstate_markers = Signac::cellstate_markers
     genes = do.call(rbind, cellstate_markers)
     genes.ind <- which(rownames(E) %in% unique(c(as.character(markers$`HUGO symbols`), as.character(genes$`HUGO symbols`))))
   if (do.par)
@@ -186,7 +186,6 @@ CID.Impute <- function(E = NULL, data.dir = NULL, do.par = TRUE)
 #' @param data.dir directory of SPRING files "edges.csv" and "categorical_coloring_data.json"
 #' @param entropy cells amended to high entropy labels with respect to their neighbors in the KNN graph are appended "Other" if entropy = TRUE. Default is TRUE.
 #' @param louvain Louvain community detection is performed, and then used together with Shannon entropy to detect potential novel cell types / states. Default is TRUE.
-#' @param sub.cluster KNN graph construction is performed on cell type-subsets of the expression matrix. Default is TRUE.
 #' @param omit Force remove specific cell types / states with omit. Default is NULL.
 #' @param sorted If cells are expected to be pure or mostly homogeneous (e.g., by FACs sorting), set sorted = TRUE. Default is FALSE.
 #' @return Filtered markers where each marker must have at least ncells that express at least ncounts
@@ -194,8 +193,8 @@ CID.Impute <- function(E = NULL, data.dir = NULL, do.par = TRUE)
 CID.CellID <- function(E,normalize = F,pval = 0.05,data.dir = NULL,entropy = T,louvain = T,omit = NULL,sorted = F)
 {
   # load markers
-  data('markers')
-  data('cellstate_markers')
+  markers = Signac::markers
+  cellstate_markers = Signac::cellstate_markers
   if (!length(markers) > 0) {
     cat("ERROR: from Signac Data:\n");
     cat("Required markers failed to load.\n", sep = "");
@@ -368,6 +367,7 @@ CID.CellID <- function(E,normalize = F,pval = 0.05,data.dir = NULL,entropy = T,l
 #' @param expression An expression matrix with features (genes) in rows and samples (cells) in columns.
 #' @param markersG A data frame with four columns ('HUGO Symbol', 'Cell Population', 'ENTREZ ID', 'Polarity'). Default is internally set to data(markers_v4).
 #' @param pval p-value cutoff, as described in the manuscript. Default is 0.01.
+#' @param sorted see ?CID.CellID
 #' @return A list of markers and features.
 #' @export
 CID.filter2 <- function(expression, markersG, pval = pval, sorted = sorted)
@@ -890,7 +890,7 @@ CID.IsUnique <- function (x)
 
 #' Run DEG analysis with Seurat wrapper
 #'
-#' @param E Expression matrix with genes for rows, samples for columns
+#' @param D Expression matrix with genes for rows, samples for columns
 #' @param acn Vector of cell type labels 
 #' @return List where each element contains the DEG tables for the one vs. all comparison
 #' @export
@@ -959,50 +959,6 @@ CID.PosMarkers <- function(D, acn)
   Y[new_labs != "Cluster All"] = new_labs[new_labs != "Cluster All"]
   
   return(list(lbls = acn_in, genes = gns_of_int, mrks = mrks))
-}
-
-#' Run DEG analysis with Seurat
-#'
-#' @param E Expression matrix with genes for rows, samples for columns
-#' @param lbls Vector of cell type labels 
-#' @return List where each element contains the DEG tables for the one vs. all comparison
-#' @export
-CID.CheckMarkers <- function(D, lbls, fils)
-{
-  # manually downsample to prevent Seurat errors (e.g., manually set max.cells.per.ident)
-  flag = table(lbls) > 200
-  if (any(flag))
-  {
-    acn_in = lbls;
-    set.seed(42)
-    nms = names(table(lbls))[flag]
-    idx = which(!lbls %in% nms);
-    idx_2 = sapply(nms, function(x) which(lbls == x)[sample(sum(lbls == x),200)])
-    D = D[,c(idx, idx_2)]
-    lbls = lbls[c(idx, idx_2)]
-  }
-  # set colnames to unique values
-  colnames(D) <- seq(1, ncol(D))
-  # make sure row names are not redundant
-  logik = CID.IsUnique(rownames(D))
-  D = D[logik,]
-  # Set up object
-  ctrl <- suppressWarnings(Seurat::CreateSeuratObject(counts = D))
-  ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
-  ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
-  ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
-  cts = unique(lbls);
-  gns_of_int = list("")
-  for (j in 1:length(cts))
-  {
-    dd = Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, min.cells.group = 0, max.cells.per.ident = 200, min.pct = 0, verbose = F, test.use = "MAST")
-    dd$celltype = cts[j]
-    dd$GeneSymbol = rownames(dd)
-    gns_of_int[[j]] = dd
-  }
-  S = do.call(rbind, gns_of_int)
-  S = S[S$avg_logFC > 0 & S$p_val_adj < 0.05, ]
-  return(S)
 }
 
 #' Get KNN edges from single cell data
@@ -1183,6 +1139,7 @@ get_knn_graph2 <- function(X, k=5, np, run_force = F, genes_to_use)
 #' @param Q Seurat object created by get_knn_graph2
 RunForceAtlas <- function(Q)
 {
+
   cat('Running ForceAtlas2 \n')
   
   outs = Q@graphs$RNA_nn
@@ -1191,27 +1148,6 @@ RunForceAtlas <- function(Q)
   outs = data.frame(apply(outs, 2, as.numeric))
   outs$weights = 1;
   colnames(outs) <- c("from", "to", "weights")
-  
-  p <- layout.forceatlas2(outs, directed = FALSE, iterations = num_force_iter, plotstep = 100)
-  
+  p <- ForceAtlas2::layout.forceatlas2(outs, directed = FALSE, iterations = 1000, plotstep = 100)
   return(p)
-}
-
-#' Run PCA based filtering
-#'
-#' @param X Expression matrix with genes for rows, samples for columns, after V score filtering.
-#' @param np Number of PCs to build the KNN graph. Default is 50.
-#' @param genes_to_use gene list for KNN graph building
-CID.PCAFilter <- function(X, np = 50, genes_to_use)
-{
-  logik = CID.IsUnique(rownames(X))
-  X = X[logik,]
-  colnames(X) <- 1:ncol(X)
-  ctrl <- Seurat::CreateSeuratObject(X)
-  ctrl <- Seurat::ScaleData(ctrl)
-  ctrl <- Seurat::RunPCA(ctrl, features = genes_to_use, pcs.compute = np, do.print = F)
-  ctrl <- Seurat::JackStraw(object = ctrl, dims = np)
-  Q <- JS(object = ctrl[['pca']], slot = 'empirical')
-  q <- apply(Q, 1, min)
-  return(names(q)[q < 0.01])
 }
