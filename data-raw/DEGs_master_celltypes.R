@@ -67,7 +67,7 @@ GetPosMarkers <- function(E)
     outs[[j]] = dd
   }
   names(outs) <- cts
-  DD = do.call(rbind, outs)
+  # DD = do.call(rbind, outs)
   
   # first remove anything with p_val_adj > 0.05
   res = lapply(outs, function(x) x[x$p_val_adj < 0.05,])

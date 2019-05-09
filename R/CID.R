@@ -44,32 +44,32 @@ CID.LoadData <- function(data.dir)
 
 #' Load imputed data file from directory
 #'
-#' @param data.dir Directory containing matrix.mtx and genes.txt.
+#' @param imputed.data.dir Directory containing matrix.mtx and genes.txt.
 #' @return A sparse matrix with rownames equivalent to the names in genes.txt
 #' @export
-CID.LoadImputedData <- function(data.dir)
+CID.LoadImputedData <- function(imputed.data.dir)
 {
-  data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
-  if (! (file.exists(paste(data.dir, "matrix_saver_imputed.mtx", sep = "/")) & file.exists(paste(data.dir, "genes_saver_imputed.txt", sep = "/"))))
-    data.dir = dirname(data.dir)
-  gE <- paste(data.dir,"matrix_saver_imputed.mtx",sep="/")
+  imputed.data.dir = gsub("\\/$", "", imputed.data.dir, perl = TRUE);
+  if (! (file.exists(paste(imputed.data.dir, "matrix_saver_imputed.mtx", sep = "/")) & file.exists(paste(imputed.data.dir, "genes_saver_imputed.txt", sep = "/"))))
+    imputed.data.dir = dirname(imputed.data.dir)
+  gE <- paste(imputed.data.dir,"matrix_saver_imputed.mtx",sep="/")
   flag = file.exists(gE);
   if (!flag) {
-    cat("ERROR: from CID.LoadData:\n");
+    cat("ERROR: from CID.LoadImputedData:\n");
     cat("file = ", gE, " does not exist.\n", sep = "");
     stop()
   }
   E <- Matrix::readMM(gE)
   # read genes
   fn <-"genes_saver_imputed.txt"
-  gG <- paste(data.dir,fn, sep = "/")
+  gG <- paste(imputed.data.dir,fn, sep = "/")
   flag = file.exists(gG);
   if (!flag) {
     cat("ERROR: from CID.LoadData:\n");
     cat("file = ", gG, " does not exist.\n", sep = "");
     stop()
   }
-  genes <- read.delim(gG, stringsAsFactors = F, header = F)$V1
+  genes <- read.delim(gG, stringsAsFactors = F, header = T)$x
   if (genes[1] != gsub( "_.*$", "", genes[1] ))
     genes = gsub( "_.*$", "", genes )
   if (grepl("^1", genes[1]))
@@ -91,9 +91,13 @@ CID.LoadImputedData <- function(data.dir)
 #' @param chunk.dir As defined in ?CID.chunk
 #' @return A sparse matrix with rownames equivalent to the names in genes.txt
 #' @export
-CID.LoadImputedData <- function(chunk.dir)
+CID.LoadImputedDataFolder <- function(chunk.dir)
 {
-  E = lapply(chunk.dir, CID.LoadImputedData)
+  chunk.dir = gsub("\\/$", "", chunk.dir, perl = TRUE)
+  fls = list.files(chunk.dir, full.names = TRUE)
+  idx = as.integer(do.call(rbind, strsplit(fls, split = "Chunk"))[,2])
+  fls = fls[order(idx)]
+  E = lapply(fls, CID.LoadImputedData)
   E = do.call(cbind,E)
   return(E)
 }

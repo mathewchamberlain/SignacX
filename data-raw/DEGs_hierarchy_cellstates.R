@@ -83,7 +83,11 @@ genesig_wrapper_v2 <- function()
   names(outs) <- names(master_list)
   cellstate_markers = outs
   usethis::use_data(cellstate_markers, overwrite = TRUE)
+  
+  data
+  
   usethis::use_data(markers, cellstate_markers, overwrite = TRUE, internal = TRUE)
+  
 }
 
 #' Run DEG analysis with Seurat wrapper
