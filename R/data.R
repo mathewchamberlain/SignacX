@@ -35,3 +35,16 @@
 #'   ...
 #' }
 "markers"
+
+#' The gene signatures used for immune cell type identification.
+#'
+#' A group of 2058 markers used for immune cell type identification.
+#'
+#' @format A data.frame with 2058 rows and three columns.
+#' \describe{
+#'   \item{HUGO symbols}{genes, identified by HUGO symbols}
+#'   \item{Cell population}{identified by common nomenclature}
+#'   \item{Polarity}{+ for positive markers, - for negative markers}
+#'   ...
+#' }
+"immune_markers"

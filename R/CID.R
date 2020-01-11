@@ -1365,7 +1365,7 @@ get_knn_graph2 <- function(X, k=5, np, run_force = F, genes_to_use)
   ctrl <- Seurat::ScaleData(ctrl, verbose = F)
   ctrl <- Seurat::RunPCA(ctrl, features = genes_to_use, pcs.compute = np, do.print = F)
   ctrl <- Seurat::FindNeighbors(object = ctrl, reduction = "pca", dims = 1:min(c(np, 50)), k.param = k)
-  if (run_force)
+   if (run_force)
     P <- RunForceAtlas(ctrl)
   return(ctrl@graphs$RNA_nn)
 }
@@ -1382,6 +1382,6 @@ RunForceAtlas <- function(Q)
   outs = data.frame(apply(outs, 2, as.numeric))
   outs$weights = 1;
   colnames(outs) <- c("from", "to", "weights")
-  p <- ForceAtlas2::layout.forceatlas2(outs, directed = FALSE, iterations = 1000, plotstep = 100)
+  #p <- ForceAtlas2::layout.forceatlas2(outs, directed = FALSE, iterations = 1000, plotstep = 100)
   return(p)
 }

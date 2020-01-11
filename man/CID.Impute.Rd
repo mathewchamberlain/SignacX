@@ -4,7 +4,7 @@
 \alias{CID.Impute}
 \title{Imputation wrapper}
 \usage{
-CID.Impute(E = NULL, data.dir = NULL, do.par = TRUE)
+CID.Impute(E, data.dir = NULL, do.par = TRUE)
 }
 \arguments{
 \item{E}{A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols.}

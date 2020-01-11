@@ -4,7 +4,7 @@
 \alias{CID.Chunk}
 \title{Chunk a dataset}
 \usage{
-CID.Chunk(E, chunk.dir, number_of_chunks = 10)
+CID.Chunk(E, chunk.dir, number_of_chunks = 30)
 }
 \arguments{
 \item{E}{A gene-by-sample count matrix (sparse matrix, matrix, or data.frame).}

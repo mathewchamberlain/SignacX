@@ -38,7 +38,7 @@ geneset_preprocessing <- function()
   library(Matrix)
   
   # load candidate genes
-  candidate_genes <- read.csv("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data-raw/candidate_genes.txt", sep="", stringsAsFactors=FALSE)$x
+  candidate_genes <- read.csv("./data-raw/candidate_genes.txt", sep="", stringsAsFactors=FALSE)$x
 
   ## Load LM22 expression data
   data_dir = "./data-raw/"
@@ -103,13 +103,13 @@ geneset_preprocessing <- function()
   ## load expression matrix for epithelial, epithelial urinary, secretory cell types
   data.dir = "../Data_Signac/AMP_Phase1_SLE/"
   spring.dir = "../Data_Signac/AMP_Phase1_SLE/FullDataset_v1/"
-  E <- CID.LoadData(data.dir = data.dir)
+  E <- Signac::CID.LoadData(data.dir = data.dir)
 
   # remove all non-candidate genes
   E = E[rownames(E) %in% candidate_genes,]
   
   # normalize to these genes
-  E = CID.Normalize(E)
+  E = Signac::CID.Normalize(E)
   
   # read the JSON from SPRING
   json_file = 'categorical_coloring_data.json'
@@ -128,7 +128,7 @@ geneset_preprocessing <- function()
   ## load expression matrix for Fibroblast cell types
   data.dir = "../Data_Signac/AMP_Phase1_RA/"
   spring.dir = "../Data_Signac/AMP_Phase1_RA/FullDataset_v1/"
-  E <- CID.LoadData(data.dir = data.dir)
+  E <- Signac::CID.LoadData(data.dir = data.dir)
 
   # read the JSON from SPRING
   json_file = 'categorical_coloring_data.json'
@@ -139,7 +139,7 @@ geneset_preprocessing <- function()
   E = E[rownames(E) %in% candidate_genes,]
 
   # normalize to these genes
-  E = CID.Normalize(E)
+  E = Signac::CID.Normalize(E)
   
   # create a subsetted expression matrix for imputation
   logik = json_data$CellTypeFACS$label_list == "Fibroblast"; sum(logik)
@@ -159,7 +159,7 @@ geneset_preprocessing <- function()
 
   ## load expression matrix for T1D
   data.dir = "../Data_Signac/TS_T1D_Pilot/"
-  E <- CID.LoadData(data.dir = data.dir)
+  E <- Signac::CID.LoadData(data.dir = data.dir)
   
   # remove all non-candidate genes
   E = E[rownames(E) %in% candidate_genes,]
@@ -182,13 +182,13 @@ geneset_preprocessing <- function()
   MCP_indx <-read.csv(paste(data_dir,"selected_cells_MastCellProgenitors.txt"    ,sep=""), stringsAsFactors=FALSE, header = F)$V1 + 1 # cell idxs
   
   data.dir = "../Data_Signac/TS_Fresh_v_FrozenPBMC/"
-  E <- CID.LoadData(data.dir = data.dir)
+  E <- Signac::CID.LoadData(data.dir = data.dir)
   
   # remove all non-candidate genes
   E = E[rownames(E) %in% candidate_genes,]
   
   # normalize to these genes
-  E = CID.Normalize(E)
+  E = Signac::CID.Normalize(E)
   
   CytoT = Matrix::rowMeans(E[,CytoT_indx])
   NKcells = Matrix::rowMeans(E[,NKcells_indx])
@@ -219,7 +219,7 @@ geneset_preprocessing <- function()
   #  LM22[,logik] = normalizeQuantiles(LM22[,logik])
   #}
 
-  S = CID.Normalize(LM22)
+  S = Signac::CID.Normalize(LM22)
   
   colnames(S) <- colnames(LM22)
   

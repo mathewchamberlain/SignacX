@@ -4,10 +4,10 @@
 \alias{CID.filter2}
 \title{filters the geneset markers}
 \usage{
-CID.filter2(expression, markersG, pval = pval, sorted = sorted)
+CID.filter2(D, markersG, pval = pval, sorted = sorted)
 }
 \arguments{
-\item{expression}{An expression matrix with features (genes) in rows and samples (cells) in columns.}
+\item{D}{An expression matrix with features (genes) in rows and samples (cells) in columns.}
 
 \item{markersG}{A data frame with four columns ('HUGO Symbol', 'Cell Population', 'ENTREZ ID', 'Polarity'). Default is internally set to data(markers_v4).}
 
