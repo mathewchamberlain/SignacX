@@ -5,7 +5,7 @@
 \title{Get KNN edges from single cell data}
 \usage{
 CID.GetNeighbors(E, normalize = F, min_counts = 3, min_cells = 3,
-  min_vscore_pctl = 90, num_pc = 50, k_neigh = 4, genes_use = NULL)
+  min_vscore_pctl = 85, num_pc = 30, k_neigh = 4, genes_use = NULL)
 }
 \arguments{
 \item{E}{Expression matrix with genes for rows, samples for columns}

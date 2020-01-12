@@ -4,10 +4,10 @@
 \alias{CID.GetDistMat}
 \title{Get distance matrix}
 \usage{
-CID.GetDistMat(data.dir, n = 4)
+CID.GetDistMat(edges, n = 4)
 }
 \arguments{
-\item{data.dir}{directory where edges.csv is located}
+\item{edges}{a data frame with two columns; V1 and V2, specifying the cell-cell edge list for the network}
 
 \item{n}{maximum network distance to subtend (n neighbors)}
 }

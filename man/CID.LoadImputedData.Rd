@@ -4,10 +4,12 @@
 \alias{CID.LoadImputedData}
 \title{Load imputed data file from directory}
 \usage{
-CID.LoadImputedData(imputed.data.dir)
+CID.LoadImputedData(imputed.data.dir, type = "ksoft")
 }
 \arguments{
 \item{imputed.data.dir}{Directory containing matrix.mtx and genes.txt.}
+
+\item{type}{indicates the imputation method used. Default is "ksoft", the other option is "saver".}
 }
 \value{
 A sparse matrix with rownames equivalent to the names in genes.txt

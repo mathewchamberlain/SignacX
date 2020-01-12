@@ -4,7 +4,7 @@
 \alias{get_knn_graph2}
 \title{Get KNN graph}
 \usage{
-get_knn_graph2(X, k = 5, np, run_force = F, genes_to_use)
+get_knn_graph2(X, k = 4, np, run_force = F, genes_to_use)
 }
 \arguments{
 \item{X}{Expression matrix with genes for rows, samples for columns, after V score filtering.}

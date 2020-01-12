@@ -4,16 +4,17 @@
 \alias{CID.CellID}
 \title{Main function}
 \usage{
-CID.CellID(E, full.dataset = NULL, normalize = F, pval = 0.05,
-  data.dir = NULL, entropy = T, louvain = T, omit = NULL,
-  sorted = F)
+CID.CellID(E, reference = "default", full.dataset = NULL,
+  pval = 0.05, data.dir = NULL, entropy = T, omit = NULL,
+  force.keep = NULL, sorted = F, do.impute = T, do.log = T,
+  min.cells = 30, nonimmune = F, thold)
 }
 \arguments{
 \item{E}{A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.}
 
-\item{full.dataset}{If E was subsetted or imputed, full.dataset is the full expression matrix, which is loaded for the detection of novel cell types. Default is NULL.}
+\item{reference}{if default, uses the standard Signac markers (see ?CID.SeeMarkers).}
 
-\item{normalize}{Normalizes count matrix to the mean library size. Default is TRUE.}
+\item{full.dataset}{If E was subsetted or imputed, full.dataset is the full expression matrix, which is loaded for the detection of novel cell types. Default is NULL.}
 
 \item{pval}{p-value cutoff for feature selection, as described in the manuscript + markdown file. Default is pval = 0.05.}
 
@@ -21,11 +22,19 @@ CID.CellID(E, full.dataset = NULL, normalize = F, pval = 0.05,
 
 \item{entropy}{cells amended to high entropy labels with respect to their neighbors in the KNN graph are appended "Other" if entropy = TRUE. Default is TRUE.}
 
-\item{louvain}{Louvain community detection is performed, and then used together with Shannon entropy to detect potential novel cell types / states. Default is TRUE.}
+\item{omit}{Force remove specific cell types / states. Default is NULL.}
 
-\item{omit}{Force remove specific cell types / states with omit. Default is NULL.}
+\item{force.keep}{Force keep specific cell types / states. Default is NULL.}
 
 \item{sorted}{If cells are expected to be pure or mostly homogeneous (e.g., by FACs sorting), set sorted = TRUE. Default is FALSE.}
+
+\item{do.impute}{Run SAVER or Ksoft imputation. Default is TRUE.}
+
+\item{do.log}{log2 transform counts + 1. Default is TRUE.}
+
+\item{min.cells}{minimum number of cells to call a discrete population. Default is 30.}
+
+\item{nonimmune}{flag for whether we expect to see nonimmune cells in the tissue. Default is FALSE.}
 }
 \value{
 Filtered markers where each marker must have at least ncells that express at least ncounts

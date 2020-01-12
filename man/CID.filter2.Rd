@@ -4,7 +4,7 @@
 \alias{CID.filter2}
 \title{filters the geneset markers}
 \usage{
-CID.filter2(D, markersG, pval = pval, sorted = sorted)
+CID.filter2(l, m, n, o)
 }
 \arguments{
 \item{D}{An expression matrix with features (genes) in rows and samples (cells) in columns.}

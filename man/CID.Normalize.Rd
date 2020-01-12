@@ -4,7 +4,7 @@
 \alias{CID.Normalize}
 \title{Library size normalize}
 \usage{
-CID.Normalize(E)
+CID.Normalize(E, method.use = c("mean", "scran")[1])
 }
 \arguments{
 \item{E}{Expression matrix}
