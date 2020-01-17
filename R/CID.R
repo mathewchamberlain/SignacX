@@ -66,16 +66,10 @@ CID.Read10Xh5 <- function (filename, use.names = TRUE)
     indptr <- infile[[paste0(genome, "/indptr")]]
     shp <- infile[[paste0(genome, "/shape")]]
     features <- infile[[paste0(genome, "/", feature_slot)]][]
-    #if (genome != "matrix")
-    #  features2 <- infile[[paste0(genome, "/", feature_slot2)]][]
     barcodes <- infile[[paste0(genome, "/barcodes")]]
     sparse.mat <- Matrix::sparseMatrix(i = indices[] + 1, p = indptr[],
                                        x = as.numeric(counts[]), dims = shp[], giveCsparse = FALSE)
-    #if (genome != "matrix") {
-    #  rownames(sparse.mat) <- paste(features, features2, sep = "_")
-    #} else {
     rownames(sparse.mat) <- features
-    #}
     colnames(sparse.mat) <- barcodes[]
     sparse.mat <- as(object = sparse.mat, Class = "dgCMatrix")
     output[[genome]] <- sparse.mat
@@ -217,10 +211,8 @@ CID.LoadEdges <- function(data.dir)
 #' @param E Expression matrix
 #' @return Normalized expression matrix to mean of total counts
 #' @export
-CID.Normalize <- function(E, method.use = c("mean", "scran")[1])
+CID.Normalize <- function(E)
 {
-  if (method.use == "mean")
-  {
     xx = NULL
     if (!is.null(colnames(E)))
       xx <- colnames(E)
@@ -243,18 +235,6 @@ CID.Normalize <- function(E, method.use = c("mean", "scran")[1])
         colnames(E) <- xx
     }
     return(E)
-  }
-  
-  if (method.use == "scran")
-  {
-    sce <- SingleCellExperiment(assays = list(counts = E))
-    clusters <- scran::quickCluster(sce, min.size = 100)
-    sce <- scran::computeSumFactors(sce, clusters = clusters)
-    #summary(sizeFactors(sce))
-    sce <- scater::logNormCounts(sce)
-    return(sce@assays$data$counts)
-  }
-  
 }
 
 #' Chunk a dataset
@@ -454,8 +434,10 @@ CID.CellID <- function(E, reference = 'default', pval = 0.05, data.dir = NULL, e
   cat("             nrow = ", nrow(E), "\n", sep = "");
   cat("             ncol = ", ncol(E), "\n", sep = "");
   
+  # normalize to the mean library size
   E = CID.Normalize(E)
   
+  # user can omit any cell type or cell state
   if (!is.null(omit))
   {
     cat(" ..........  Forcibly omitting features :\n");
@@ -475,21 +457,21 @@ CID.CellID <- function(E, reference = 'default', pval = 0.05, data.dir = NULL, e
   # get Louvain clusters
   louvain = CID.Louvain(edges = edges)
   
+  # we keep the full.dataset and segment the rest for efficiency
   full.dataset = E
   
-  if (nonimmune)
-    flag = TRUE 
-  
+  # user can let Signac auto-detect the presence of nonimmune cells
   if (nonimmune == "auto")
   {
     filtered_features=subset(immune_markers,get("HUGO symbols")%in%rownames(E))
     filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
     # compute cell type scores data.frame
     scores = CID.append(E,filtered_features, sorted = F)
-    flag = diptest::dip.test(c(as.numeric(scores[1,]), as.numeric(scores[2,])))$p.value < 0.2
+    nonimmune = diptest::dip.test(c(as.numeric(scores[1,]), as.numeric(scores[2,])))$p.value < 0.2
   }
 
-  if (flag){
+  # user can assert the presence of nonimmune cells
+  if (nonimmune){
     all_markers = rbind(all_markers, nonimmune_markers)
     E = E[intersect(row.names(E), union(immune_markers$`HUGO symbols`, all_markers$`HUGO symbols`)),,drop=F]
   } else {
@@ -500,11 +482,11 @@ CID.CellID <- function(E, reference = 'default', pval = 0.05, data.dir = NULL, e
   if (do.log)
     E = Matrix::Matrix(log2(E + 1), sparse = T)
   
-  # run imputation
+  # run KSoft imputation
   if (do.impute)
     E = KSoftImpute(E, dM = distMat)
   
-  if (flag)
+  if (nonimmune)
   {
     filtered_features=subset(immune_markers,get("HUGO symbols")%in%rownames(E))
     filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
@@ -528,7 +510,6 @@ CID.CellID <- function(E, reference = 'default', pval = 0.05, data.dir = NULL, e
       celltypes = immunetypes
       celltypes[immunetypes == "NonImmune"] <- rownames(scores)[indexMax][immunetypes == "NonImmune"];
     }
-    
   } else {
     immunetypes = rep("Immune", ncol(E))
     immunestates = rep("Immune", ncol(E))
