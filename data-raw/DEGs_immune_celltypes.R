@@ -1,6 +1,6 @@
 genesig_wrapper <- function()
 {
-  source('./data-raw/get_celltype_markers_legacy.R')
+  source('./data-raw/get_celltype_markers.R')
   ## differential expression analysis with MAST
   load("./data/blueprint_encode.rda")
   load("./data/hpca.rda")

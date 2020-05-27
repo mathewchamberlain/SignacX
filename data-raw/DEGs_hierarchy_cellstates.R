@@ -11,10 +11,10 @@ genesig_wrapper_v2 <- function()
 
   master_list = list( B.cells       =   list(B.cells.naive  = c("B.cells.naive", "naive B-cells"),
                                              B.cells.memory = c("B.cells.memory","Memory B-cells","Class-switched memory B-cells")) ,
-                      Granulocytes  =   list(Not.Mast       = c("Eosinophils","Neutrophils"),
+                      Granulocytes  =   list(Not.Mast       = c("Neutrophils"),
                                              Mast           = c("Mast.cells.resting","Mast.cells.activated", "Mast.Progenitors")),
                       Mast          =   c("Mast.cells.resting","Mast.cells.activated", "Mast.Progenitors"),
-                      Not.Mast      =   c("Eosinophils","Neutrophils"),
+                      Neutrophils      =   c("Neutrophils"),
                       MPh           =   list(Monocytes      = c("Monocytes"),
                                              Macrophages    = c("Macrophages.M0","Macrophages.M1","Macrophages M1","Macrophages.M2","Macrophages M2"),
                                              Dendritic      = c("Dendritic.cells.resting","Dendritic.cells.activated", "DC")),
@@ -74,7 +74,7 @@ genesig_wrapper_v2 <- function()
         }
       }
     }
-    neg = CID.NegMarkers(D)
+    #neg = CID.NegMarkers(D)
     markers = rbind(pos, neg)
     markers = markers[order(markers$`Cell population`), ]
     outs[[k]] = markers
@@ -83,8 +83,6 @@ genesig_wrapper_v2 <- function()
   names(outs) <- names(master_list)
   cellstate_markers = outs
   usethis::use_data(cellstate_markers, overwrite = TRUE)
-  
-  data
   
   usethis::use_data(markers, cellstate_markers, overwrite = TRUE, internal = TRUE)
   

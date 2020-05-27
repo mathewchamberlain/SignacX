@@ -88,12 +88,12 @@ CID.Read10Xh5 <- function (filename, use.names = TRUE)
 #' @param data.dir Directory containing matrix.mtx and genes.txt.
 #' @return A sparse matrix with rownames equivalent to the names in genes.txt
 #' @export
-CID.LoadData <- function(data.dir)
+CID.LoadData <- function(data.dir, mfn = "matrix.mtx")
 {
   data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
-  if (! (file.exists(paste(data.dir, "matrix.mtx", sep = "/")) & file.exists(paste(data.dir, "genes.txt", sep = "/"))))
+  if (! (file.exists(paste(data.dir, mfn, sep = "/")) & file.exists(paste(data.dir, "genes.txt", sep = "/"))))
     data.dir = dirname(data.dir)
-  gE <- paste(data.dir,"matrix.mtx",sep="/")
+  gE <- paste(data.dir,mfn,sep="/")
   flag = file.exists(gE);
   if (!flag) {
     cat("ERROR: from CID.LoadData:\n");
@@ -112,7 +112,17 @@ CID.LoadData <- function(data.dir)
   }
   genes <- read.delim(gG, stringsAsFactors = F, header = F)$V1
   if (genes[1] != gsub( "_.*$", "", genes[1] ))
-    genes = gsub( "_.*$", "", genes )
+  {
+    genes[!grepl("Total", genes)] = gsub( "_.*$", "", genes [!grepl("Total", genes)])
+    genes[grepl("Total", genes)]  = gsub( "_", "-",   genes [grepl("Total", genes)])
+  }
+  if (any(grepl(pattern = "-ENSG00", x = genes)))
+  {
+    genes <-gsub(pattern = "-ENSG00", replacement = "_ENSG00",x = genes, fixed = T)
+    genes[!grepl("Total", genes)] = gsub( "_.*$", "", genes [!grepl("Total", genes)])
+    genes[grepl("Total", genes)]  = gsub( "_", "-",   genes [grepl("Total", genes)])
+  }
+
   if (grepl("^1", genes[1]))
     genes = do.call(rbind, strsplit(genes, " "))[,2]
   flag = length(genes) %in% c(nrow(E), ncol(E));
@@ -235,6 +245,27 @@ CID.Normalize <- function(E)
         colnames(E) <- xx
     }
     return(E)
+}
+
+#' Library size UN-normalize
+#'
+#' @param E Expression matrix
+#' @return Normalized expression matrix to mean of total counts
+#' @export
+CID.UnNormalize <- function(E, total_counts)
+{
+  xx = NULL
+  if (!is.null(colnames(E)))
+  xx <- colnames(E)
+  
+  m = Matrix::Matrix(0, ncol(E), ncol(E))
+  target_mean = sum(total_counts)
+  diag(m) <- total_counts / target_mean
+
+  E2 = Matrix::Matrix(E %*% m, sparse = TRUE)
+    if (!is.null(xx))
+      colnames(E) <- xx
+  return(E)
 }
 
 #' Chunk a dataset
@@ -364,7 +395,7 @@ KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F)
 #' @export
 RunChecks <- function(...)
 {
-  stopifnot(class(E) %in% c("dgCMatrix","dgTMatrix", "matrix", "data.frame"))
+  stopifnot(class(E) %in% c("dgCMatrix","dgTMatrix", "matrix", "data.frame", "Seurat"))
   stopifnot(!is.null(rownames(E)))
 }
 
@@ -400,23 +431,29 @@ CID.GetEdges <- function(...)
 #' @param nonimmune flag for whether we expect to see nonimmune cells in the tissue. Default is FALSE.
 #' @return Filtered markers where each marker must have at least ncells that express at least ncounts
 #' @export
-CID.CellID <- function(E, reference = 'default', pval = 0.05, data.dir = NULL, entropy = T, omit = NULL, force.keep = NULL, sorted = F, do.impute = T, do.log = T, min.cells = 30, nonimmune = F, thold)
+CID.CellID <- function(E, pval = 0.05, data.dir = NULL, entropy = T, omit = NULL, force.keep = NULL, sorted = F, do.impute = T, do.log = T, min.cells = 30, nonimmune = "auto", thold, learned = F)
 {
   # load markers
-  if (class(reference) == 'character')
+  if (learned == F)
   {
     load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/markers.rda")
     load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/cellstate_markers.rda")
     load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/immune_markers.rda")
+    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/nonimmune_markers.rda")
     all_markers = rbind(markers, do.call(rbind, cellstate_markers))
-    nonimmune_markers = NULL
+    all_markers = rbind(all_markers, nonimmune_markers)
     reference = list("")
   } else {
-    immune_markers = reference[[1]];
-    markers = reference[[2]];
-    cellstate_markers = reference[[3]];
-    nonimmune_markers = reference[[4]];
+    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/markers_learned.rda")
+    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/cellstate_markers_learned.rda")
+    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/immune_markers.rda")
+    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/nonimmune_markers_learned.rda")
+    markers = markers_learned;
+    cellstate_markers = cellstate_markers_learned;
+    nonimmune_markers = nonimmune_markers_learned;
     all_markers = rbind(markers, do.call(rbind, cellstate_markers))
+    all_markers = rbind(all_markers, nonimmune_markers)
+    reference = list("")
   }
   
   # check inputs
@@ -443,22 +480,35 @@ CID.CellID <- function(E, reference = 'default', pval = 0.05, data.dir = NULL, e
     cat(" ..........  Forcibly omitting features :\n");
     all_markers = all_markers[! all_markers$`Cell population` %in% omit, ]
     markers = markers[! markers$`Cell population` %in% omit, ]
+    nonimmune_markers = nonimmune_markers[! nonimmune_markers$`Cell population` %in% omit, ]
     cellstate_markers = cellstate_markers[! names(cellstate_markers) %in% omit]
     cellstate_markers = lapply(cellstate_markers, function(x){ x[! x$`Cell population` %in% omit,] })
     cat("             Omitted = ", paste0(omit, collapse = ", "), "\n");
   }
   
-  # get edges for cell-cell similarity network
-  edges = CID.GetEdges(inputs)
-  
-  # compute distance matrix
-  distMat = CID.GetDistMat(edges = edges)
-  
-  # get Louvain clusters
-  louvain = CID.Louvain(edges = edges)
-  
+  if (class(E) != "Seurat")
+  {
+    # get edges for cell-cell similarity network
+    edges = CID.GetEdges(inputs)
+    
+    # compute distance matrix
+    distMat = CID.GetDistMat(edges = edges)
+    
+    # get Louvain clusters
+    louvain = CID.Louvain(edges = edges)
+  } else {
+    # compute distance matrix
+    distMat = CID.GetDistMat(edges = pbmc@graphs$RNA_nn)
+    
+    # get louvain clusters
+    louvain = as.character(pbmc@meta.data$seurat_clusters)
+    
+    # keep scale data
+    E <- Matrix::Matrix(pbmc@assays$RNA@scale.data, sparse = T)
+  }
+
   # we keep the full.dataset and segment the rest for efficiency
-  full.dataset = E
+   full.dataset = E
   
   # user can let Signac auto-detect the presence of nonimmune cells
   if (nonimmune == "auto")
@@ -500,15 +550,19 @@ CID.CellID <- function(E, reference = 'default', pval = 0.05, data.dir = NULL, e
     df = data.frame(lbls = colnames(df), type = rownames(df)[indexMax])
     immunetypes = as.character(df$type[match(louvain, df$lbls)])
     celltypes = immunetypes
-    if ("nonimmune_markers" %in% names(reference)) {
-      # get features
+    if (learned){
       filtered_features = CID.filter2(l = E, m  = nonimmune_markers, n = pval, o = FALSE)
-      
       # compute cell type scores data.frame
       scores = CID.append(E, filtered_features, sorted = T)
       indexMax = apply(scores, 2, which.max);
-      celltypes = immunetypes
       celltypes[immunetypes == "NonImmune"] <- rownames(scores)[indexMax][immunetypes == "NonImmune"];
+      # amend low scoring states to "NonImmune"
+      kmax = apply(scores, 2 ,max)
+      diff = kmax - apply(scores, 2, min)
+      diff = diff[immunetypes == "NonImmune"]
+      kmax = kmax[immunetypes == "NonImmune"]
+      celltypes[immunetypes == "NonImmune"][diff < (mean(diff) - 2 * sd(diff))] = "NonImmune"
+      celltypes = CID.smooth(celltypes, distMat[[1]])
     }
   } else {
     immunetypes = rep("Immune", ncol(E))
@@ -619,24 +673,24 @@ CID.CellID <- function(E, reference = 'default', pval = 0.05, data.dir = NULL, e
         if (entropy)
           cellstates[logik] = CID.entropy(cellstates[logik], qq)
         
-        if (length(unique(cellstates[logik])) > 1 & names(scores)[j] %in% cellstates_merged)
-        {
-          # do DEG testing
-          dummy = full.dataset[,logik]
-          colnames(dummy) <- cellstates[logik]
-          pos = CID.PosMarkers3(dummy, threshold = thold)
-          q = lapply(pos, function(p){do.call(rbind, p)})
-          pre = unique(colnames(dummy))
+        #if (length(unique(cellstates[logik])) > 1 & names(scores)[j] %in% cellstates_merged)
+        #{
+        #  # do DEG testing
+        #  dummy = full.dataset[,logik]
+        #  colnames(dummy) <- cellstates[logik]
+        #  pos = CID.PosMarkers3(dummy, threshold = thold)
+        #  q = lapply(pos, function(p){do.call(rbind, p)})
+        #  pre = unique(colnames(dummy))
           
           # any categories with no differentially expressed genes are merged
-          logik2 = sapply(q, function(x) {x$ident.1[1] == "NONE"})
+        #  logik2 = sapply(q, function(x) {x$ident.1[1] == "NONE"})
           
-          if (any(logik2)){
-            cellstates_merged[cellstates %in% names(logik2)[logik2]] = names(scores)[j]
-          } else {
-            cellstates_merged[logik] = cellstates[logik]
-          }
-        }
+         # if (any(logik2)){
+        #    cellstates_merged[cellstates %in% names(logik2)[logik2]] = names(scores)[j]
+        #  } else {
+        #    cellstates_merged[logik] = cellstates[logik]
+        #  }
+        #}
         
         k = k + 1
         outs[[k]] = cellstates[logik]
@@ -645,6 +699,7 @@ CID.CellID <- function(E, reference = 'default', pval = 0.05, data.dir = NULL, e
     }
     logik = names(cellstate_markers) %in% cellstates;
   }
+  cellstates_merged = cellstates
   
   do = data.frame(table(louvain[cellstates == "Other"]))
   df = data.frame(table(louvain[louvain %in% do$Var1]))
@@ -1549,7 +1604,7 @@ CID.GetTrainingSet <- function(E, data.dir = NULL, method.use = "max.genes.detec
     df = data.frame(cells = ac, entropy = shannon)
     
     q = lapply(unique(df$cells), function(x){
-      which(df$cells == x)[order(df$entropy[df$cells == x])[1:round(sum(df$cells == x) * 0.1)]]
+      which(df$cells == x)[order(df$entropy[df$cells == x])[1:round(sum(df$cells == x) * 0.5)]]
     })
     names(q) <- unique(df$cells)
     
@@ -1565,11 +1620,12 @@ CID.GetTrainingSet <- function(E, data.dir = NULL, method.use = "max.genes.detec
     df = data.frame(cells = ac, entropy = total_counts)
     
     q = lapply(unique(df$cells), function(x){
-      which(df$cells == x)[order(df$entropy[df$cells == x], decreasing = TRUE)[1:round(0.1 * sum(df$cells == x))]]
+      which(df$cells == x)[order(df$entropy[df$cells == x], decreasing = TRUE)[1:round(0.5 * sum(df$cells == x))]]
     })
     names(q) <- unique(df$cells)
     
   }
+  
   return(q)
   
 }
@@ -2172,7 +2228,7 @@ get_colors <- function(P)
                  "Mast.Progenitors"           ,  "Monocytes"                   , "Neutrophils"       ,
                  "NK"                         ,  "T.cells.CD4.memory.activated", "T.cells.CD4.naive" ,
                  "T.cells.CD8"                ,  "T.cells.FH"                  , "T.regs"            ,
-                 "Mast.cells.activated"       ,  "T.cells.CD4.memory.resting"  , "B.cells.memory"    ,
+                 "Mast.cells.activated"       ,  "T.cells.CD4.CD8"             , "B.cells.memory"    ,
                  "B.cells.naive"              ,  "T.cells"                     , "T.cells.CD4"       ,
                  "T.cells.CD8"                ,  "T.cells.CD4.FH.regs"         , "Not.Mast"          , 
                  "Mast"                       ,  "Mast.cells.activated"        , "Mast.cells.resting",
@@ -2180,8 +2236,10 @@ get_colors <- function(P)
                  "NK.cells"                   ,  "Mon.NonClass"                , "Mon.Classical"    ,
                  "DCs.Resting"                ,  "DCs.Activated"               , "T.cells.CD4n"     ,
                  "T.cells.CD4m"               ,  "Mon.NonClass"                , "Neutro.inflam"    ,
-                 "T.cells"                    ,  "T.CD4.FH"                    , "T.CD4.FH.regs"   ,
-                 "Neutrophil")
+                 "T.cells"                    ,  "T.CD4.FH"                    , "T.cells.gd"       ,
+                 "Neutrophil"                 ,  "T.cells.cyto"                ,  "T.cells.CD8n"    ,
+                 "T.cells.CD8m"               ,  "T.cells.CD8.CD4"             ,  "NK.CD56.bright"  ,
+                 "NK.CD56.dim")
   sub_colors =c( "#a3b300"                    ,  "#f9d801"                     , "#d0e4e5"          ,
                  "#F9A602"                    ,  "#f97501"                     , "#d6b171"          ,
                  "#d4e881"                    ,  "#f0ff51"                     , "#f7f2b2"          ,
@@ -2196,7 +2254,9 @@ get_colors <- function(P)
                  "#d4e881"                    , "#ad9bf2"                      , "#db1bbe"          ,
                  "#bb7fc7"                    , "#e68181"                      , "#ebbf8a"          ,
                  "#f7f2b2"                    , "#c75e4c"                      , "#92c74c"          , 
-                 "#f7f2b2")
+                 "#f7f2b2"                    , "#f9d801"                      , "#d0e4e5"          ,
+                 "#d4e881"                    , "#d4e881"                      , "#F9A602"          ,
+                 "#d4e881") 
   
   for (i in 1:length(sub_types))
   {
@@ -2244,10 +2304,16 @@ CID.GetDistMat <- function(edges, n = 4)
 {
   "%^%" <- function(A, n) {if(n == 1) A else A %*% (A %^% (n-1)) }
   # create adjacency matrix
-  m <- methods::new("ngTMatrix", 
-                    i = c(as.integer(edges$V1)-1L, as.integer(edges$V2)-1L), 
-                    j = c(as.integer(edges$V2)-1L, as.integer(edges$V1)-1L),
-                    Dim = as.integer(c(max(edges), max(edges))))
+  if (nrow(edges) != ncol(edges))
+  {
+    m <- methods::new("ngTMatrix", 
+                      i = c(as.integer(edges$V1)-1L, as.integer(edges$V2)-1L), 
+                      j = c(as.integer(edges$V2)-1L, as.integer(edges$V1)-1L),
+                      Dim = as.integer(c(max(edges), max(edges))))
+  } else {
+    m = edges
+  }
+
   dm = list("") # initialize distance matrix
   for (j in 1:n)
     if(j == 1) dm[[j]] = m else dm[[j]] = m %^% j
