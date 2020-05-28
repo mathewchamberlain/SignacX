@@ -122,7 +122,7 @@ CID.LoadData <- function(data.dir, mfn = "matrix.mtx")
     genes[!grepl("Total", genes)] = gsub( "_.*$", "", genes [!grepl("Total", genes)])
     genes[grepl("Total", genes)]  = gsub( "_", "-",   genes [grepl("Total", genes)])
   }
-
+  
   if (grepl("^1", genes[1]))
     genes = do.call(rbind, strsplit(genes, " "))[,2]
   flag = length(genes) %in% c(nrow(E), ncol(E));
@@ -223,28 +223,28 @@ CID.LoadEdges <- function(data.dir)
 #' @export
 CID.Normalize <- function(E)
 {
-    xx = NULL
-    if (!is.null(colnames(E)))
-      xx <- colnames(E)
-    if (class(E) == "matrix")
-    {
-      m = Matrix::Matrix(0, ncol(E), ncol(E))
-      tots_use = Matrix::colSums(E)
-      target_mean = mean(tots_use)
-      diag(m) <- target_mean / tots_use
-      E = as.matrix(E %*% m)
-      if (!is.null(xx))
-        colnames(E) <- xx
-    } else {
-      m = Matrix::Matrix(0, ncol(E), ncol(E))
-      tots_use = Matrix::colSums(E)
-      target_mean = mean(tots_use)
-      diag(m) <- target_mean / tots_use
-      E = Matrix::Matrix(E %*% m, sparse = TRUE)
-      if (!is.null(xx))
-        colnames(E) <- xx
-    }
-    return(E)
+  xx = NULL
+  if (!is.null(colnames(E)))
+    xx <- colnames(E)
+  if (class(E) == "matrix")
+  {
+    m = Matrix::Matrix(0, ncol(E), ncol(E))
+    tots_use = Matrix::colSums(E)
+    target_mean = mean(tots_use)
+    diag(m) <- target_mean / tots_use
+    E = as.matrix(E %*% m)
+    if (!is.null(xx))
+      colnames(E) <- xx
+  } else {
+    m = Matrix::Matrix(0, ncol(E), ncol(E))
+    tots_use = Matrix::colSums(E)
+    target_mean = mean(tots_use)
+    diag(m) <- target_mean / tots_use
+    E = Matrix::Matrix(E %*% m, sparse = TRUE)
+    if (!is.null(xx))
+      colnames(E) <- xx
+  }
+  return(E)
 }
 
 #' Library size UN-normalize
@@ -256,15 +256,15 @@ CID.UnNormalize <- function(E, total_counts)
 {
   xx = NULL
   if (!is.null(colnames(E)))
-  xx <- colnames(E)
+    xx <- colnames(E)
   
   m = Matrix::Matrix(0, ncol(E), ncol(E))
   target_mean = sum(total_counts)
   diag(m) <- total_counts / target_mean
-
+  
   E2 = Matrix::Matrix(E %*% m, sparse = TRUE)
-    if (!is.null(xx))
-      colnames(E) <- xx
+  if (!is.null(xx))
+    colnames(E) <- xx
   return(E)
 }
 
@@ -436,18 +436,18 @@ CID.CellID <- function(E, pval = 0.05, data.dir = NULL, entropy = T, omit = NULL
   # load markers
   if (learned == F)
   {
-    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/markers.rda")
-    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/cellstate_markers.rda")
-    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/immune_markers.rda")
-    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/nonimmune_markers.rda")
+    data("markers")
+    data("cellstate_markers")
+    data("immune_markers")
+    data("nonimmune_markers")
     all_markers = rbind(markers, do.call(rbind, cellstate_markers))
     all_markers = rbind(all_markers, nonimmune_markers)
     reference = list("")
   } else {
-    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/markers_learned.rda")
-    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/cellstate_markers_learned.rda")
-    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/immune_markers.rda")
-    load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/nonimmune_markers_learned.rda")
+    data("markers_learned.rda")
+    data("cellstate_markers_learned.rda")
+    data("immune_markers.rda")
+    data("nonimmune_markers_learned.rda")
     markers = markers_learned;
     cellstate_markers = cellstate_markers_learned;
     nonimmune_markers = nonimmune_markers_learned;
@@ -506,9 +506,9 @@ CID.CellID <- function(E, pval = 0.05, data.dir = NULL, entropy = T, omit = NULL
     # keep scale data
     E <- Matrix::Matrix(pbmc@assays$RNA@scale.data, sparse = T)
   }
-
+  
   # we keep the full.dataset and segment the rest for efficiency
-   full.dataset = E
+  full.dataset = E
   
   # user can let Signac auto-detect the presence of nonimmune cells
   if (nonimmune == "auto")
@@ -519,7 +519,7 @@ CID.CellID <- function(E, pval = 0.05, data.dir = NULL, entropy = T, omit = NULL
     scores = CID.append(E,filtered_features, sorted = F)
     nonimmune = diptest::dip.test(c(as.numeric(scores[1,]), as.numeric(scores[2,])))$p.value < 0.2
   }
-
+  
   # user can assert the presence of nonimmune cells
   if (nonimmune){
     all_markers = rbind(all_markers, nonimmune_markers)
@@ -681,11 +681,11 @@ CID.CellID <- function(E, pval = 0.05, data.dir = NULL, entropy = T, omit = NULL
         #  pos = CID.PosMarkers3(dummy, threshold = thold)
         #  q = lapply(pos, function(p){do.call(rbind, p)})
         #  pre = unique(colnames(dummy))
-          
-          # any categories with no differentially expressed genes are merged
+        
+        # any categories with no differentially expressed genes are merged
         #  logik2 = sapply(q, function(x) {x$ident.1[1] == "NONE"})
-          
-         # if (any(logik2)){
+        
+        # if (any(logik2)){
         #    cellstates_merged[cellstates %in% names(logik2)[logik2]] = names(scores)[j]
         #  } else {
         #    cellstates_merged[logik] = cellstates[logik]
@@ -2313,7 +2313,7 @@ CID.GetDistMat <- function(edges, n = 4)
   } else {
     m = edges
   }
-
+  
   dm = list("") # initialize distance matrix
   for (j in 1:n)
     if(j == 1) dm[[j]] = m else dm[[j]] = m %^% j
