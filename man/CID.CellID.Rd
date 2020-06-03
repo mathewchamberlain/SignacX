@@ -4,15 +4,24 @@
 \alias{CID.CellID}
 \title{Main function}
 \usage{
-CID.CellID(E, reference = "default", pval = 0.05, data.dir = NULL,
-  entropy = T, omit = NULL, force.keep = NULL, sorted = F,
-  do.impute = T, do.log = T, min.cells = 30, nonimmune = "auto",
-  thold, learned = F)
+CID.CellID(
+  E,
+  pval = 0.05,
+  data.dir = NULL,
+  entropy = T,
+  omit = NULL,
+  force.keep = NULL,
+  sorted = F,
+  do.impute = T,
+  do.log = T,
+  min.cells = 30,
+  nonimmune = "auto",
+  thold,
+  learned = F
+)
 }
 \arguments{
 \item{E}{A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.}
-
-\item{reference}{if default, uses the standard Signac markers (see ?CID.SeeMarkers).}
 
 \item{pval}{p-value cutoff for feature selection, as described in the manuscript + markdown file. Default is pval = 0.05.}
 
@@ -33,6 +42,8 @@ CID.CellID(E, reference = "default", pval = 0.05, data.dir = NULL,
 \item{min.cells}{minimum number of cells to call a discrete population. Default is 30.}
 
 \item{nonimmune}{flag for whether we expect to see nonimmune cells in the tissue. Default is FALSE.}
+
+\item{reference}{if default, uses the standard Signac markers (see ?CID.SeeMarkers).}
 
 \item{full.dataset}{If E was subsetted or imputed, full.dataset is the full expression matrix, which is loaded for the detection of novel cell types. Default is NULL.}
 }

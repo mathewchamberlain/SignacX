@@ -4,8 +4,13 @@
 \alias{get_vscores_sparse}
 \title{Get V scores}
 \usage{
-get_vscores_sparse(E, min_mean = 0, nBins = 50, fit_percentile = 0.1,
-  error_wt = 1)
+get_vscores_sparse(
+  E,
+  min_mean = 0,
+  nBins = 50,
+  fit_percentile = 0.1,
+  error_wt = 1
+)
 }
 \arguments{
 \item{E}{Expression matrix with genes for rows, samples for columns}

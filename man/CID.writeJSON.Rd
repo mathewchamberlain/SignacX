@@ -4,8 +4,7 @@
 \alias{CID.writeJSON}
 \title{Write JSON file for SPRING visualization}
 \usage{
-CID.writeJSON(cr, json_new = "categorical_coloring_data.json",
-  data.dir = NULL)
+CID.writeJSON(cr, json_new = "categorical_coloring_data.json", data.dir = NULL)
 }
 \arguments{
 \item{cr}{Output from CID.CellID. See ?CID.CellID}

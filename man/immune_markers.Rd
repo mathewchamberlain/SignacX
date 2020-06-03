@@ -4,13 +4,15 @@
 \name{immune_markers}
 \alias{immune_markers}
 \title{The gene signatures used for immune cell type identification.}
-\format{A data.frame with 2058 rows and three columns.
+\format{
+A data.frame with 2058 rows and three columns.
 \describe{
   \item{HUGO symbols}{genes, identified by HUGO symbols}
   \item{Cell population}{identified by common nomenclature}
   \item{Polarity}{+ for positive markers, - for negative markers}
   ...
-}}
+}
+}
 \usage{
 immune_markers
 }

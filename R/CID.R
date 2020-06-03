@@ -2936,3 +2936,42 @@ cor.test.p <- function(x){
   dimnames(z) <- list(colnames(x), colnames(x))
   z
 }
+
+#' Run DEG analysis with Seurat wrapper
+#'
+#' @param spring.dir Path to "categorical_coloring_data.json" from SPRING pipeline.
+#' @param fn Filename, default is 'categorical_coloring_data.json'.
+#' @return An additional list element called "Manual_Annotation" added to the file "fn" in spring.dir
+#' @export
+CID.AddManualTrack <- function(spring.dir, fn = 'categorical_coloring_data.json')
+{
+  # load JSON
+  json_data <- rjson::fromJSON(file=paste(spring.dir,fn,sep = ""))
+  
+  myls <- vector("list", length = length(json_data$Sample$label_list))
+  
+  for(i in 1:length(myls)) { myls[[i]] <- "None" } ;
+  
+  # create tracks for annotation
+  P = create_tracks(json_data, list(Manual_Annotation = myls))
+  
+  # write JSON
+  json_out = jsonlite::toJSON(P, auto_unbox = TRUE)
+  write(json_out,paste0(spring.dir, 'categorical_coloring_data_new.json'))
+}
+
+create_tracks <- function(x, y)
+{
+  qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
+  col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
+  L = lapply(y, function(z)
+  {
+    Ntypes = length(unique(z))
+    label_colors = as.list(col_vector[1:Ntypes])
+    names(label_colors) <- unique(z)
+    list(label_list = z, label_colors = label_colors)
+  })
+  Z = c(L, x)
+  Z[order(names(Z))]
+  # pie(rep(1,Ntypes), col=(col_vector[1:Ntypes]))
+}

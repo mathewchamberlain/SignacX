@@ -4,13 +4,15 @@
 \name{markers}
 \alias{markers}
 \title{The gene signatures used for cell type identification.}
-\format{A data.frame with 2715 rows and three columns.
+\format{
+A data.frame with 2715 rows and three columns.
 \describe{
   \item{HUGO symbols}{genes, identified by HUGO symbols}
   \item{Cell population}{identified by common nomenclature}
   \item{Polarity}{+ for positive markers, - for negative markers}
   ...
-}}
+}
+}
 \usage{
 markers
 }

@@ -4,8 +4,7 @@
 \alias{CID.GetTrainingSet}
 \title{Get indices of training markers}
 \usage{
-CID.GetTrainingSet(E, data.dir = NULL,
-  method.use = "max.genes.detected")
+CID.GetTrainingSet(E, data.dir = NULL, method.use = "max.genes.detected")
 }
 \arguments{
 \item{E}{A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.}

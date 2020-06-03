@@ -4,7 +4,7 @@
 \alias{CID.LoadData}
 \title{Load data file from directory}
 \usage{
-CID.LoadData(data.dir)
+CID.LoadData(data.dir, mfn = "matrix.mtx")
 }
 \arguments{
 \item{data.dir}{Directory containing matrix.mtx and genes.txt.}

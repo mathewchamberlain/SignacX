@@ -4,8 +4,12 @@
 \alias{CID.GetLearningMarkers}
 \title{Run DEG analysis with Seurat wrapper}
 \usage{
-CID.GetLearningMarkers(E, full.dataset, logfc.threshold = 1,
-  pseudocount.use = 1)
+CID.GetLearningMarkers(
+  E,
+  full.dataset,
+  logfc.threshold = 1,
+  pseudocount.use = 1
+)
 }
 \arguments{
 \item{E}{Expression matrix with genes for rows, samples for columns}

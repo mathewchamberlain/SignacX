@@ -4,12 +4,14 @@
 \name{S}
 \alias{S}
 \title{Reference expression matrix for cell type / cell state signatures.}
-\format{A matrix with 9555 rows and 224 columns
+\format{
+A matrix with 9555 rows and 224 columns
 \describe{
   \item{genes}{genes, identified by HUGO symbols}
   \item{sorted cells}{identified by common nomenclature}
   ...
-}}
+}
+}
 \usage{
 S
 }

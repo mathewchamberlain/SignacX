@@ -4,13 +4,15 @@
 \name{cellstate_markers}
 \alias{cellstate_markers}
 \title{The gene signatures used for cell state identification.}
-\format{A named list (length 10), each containing a dataframe with three columns and N rows.
+\format{
+A named list (length 10), each containing a dataframe with three columns and N rows.
 \describe{
   \item{HUGO symbols}{N genes, each identified by a HUGO symbol}
   \item{Cell population}{identified by common nomenclature}
   \item{Polarity}{+ for positive markers, - for negative markers}
   ...
-}}
+}
+}
 \usage{
 cellstate_markers
 }
