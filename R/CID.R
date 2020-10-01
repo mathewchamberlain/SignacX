@@ -1,3 +1,1231 @@
+#' Main function for classification
+#'
+#' @param filename Directory and filename of the h5 file
+#' @return annotations
+#' @export
+Signac <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T)
+{
+  
+  flag = class(E) == "Seurat"
+
+    if (flag & impute)
+      edges = E@graphs$RNA_nn
+    
+    if (verbose)
+    {
+      cat(" ..........  Entry in Signac \n");
+      ta = proc.time()[3];
+      
+      # main function
+      if (!flag)
+      {
+        cat(" ..........  Running Signac on input data matrix :\n");
+      } else {
+        cat(" ..........  Running Signac on Seurat object :\n");
+      }
+      cat("             nrow = ", nrow(E), "\n", sep = "");
+      cat("             ncol = ", ncol(E), "\n", sep = "");
+    }
+    
+    # keep only unique row names
+    logik = CID.IsUnique(rownames(E))
+    E = E[logik,]
+    
+    # intersect genes with reference set
+    gns = intersect(rownames(E), colnames(R))
+    V = E[rownames(E) %in% gns, ]
+    
+    # make sure data are in the same order
+    V = V[order(rownames(V)),]
+    
+    if (class(V) %in% "data.frame")
+      V = Matrix::Matrix(as.matrix(V), sparse = T)
+    
+    # normalize to the mean library size
+    if (!flag)
+    {
+      V = CID.Normalize(V)
+    } else {
+     V = CID.Normalize(V@assays$RNA@counts)
+    }
+    
+    # normalization function for gene expression scaling
+    normalize <- function(x) {
+      return ((x - min(x)) / (max(x) - min(x)))
+    }
+    # normalize V
+    V = t(apply(V, 1, function(x){
+      normalize(x)
+    }))
+    logik = apply(V, 1, function(x) {any(is.na(x))})
+    V = V[!logik,]
+    
+    # set up imputation matrices
+    if (impute){
+      if (flag) {
+        dM = CID.GetDistMat(edges)
+        louvain = CID.Louvain(edges = edges)
+      } else {
+        edges = CID.LoadEdges(data.dir = spring.dir)
+        dM = CID.GetDistMat(edges)
+        louvain = CID.Louvain(edges = edges)
+      }
+    }
+    
+    # keep same gene names
+    gns = sort(intersect(rownames(V), colnames(R)))
+    Z = V[rownames(V) %in% gns, ]
+    dat = R[,colnames(R) %in% gns]
+    Z = Z[order(rownames(Z)), ]
+    dat = dat[, order(colnames(dat))]
+    
+    # remove any low variance genes
+    kmu = apply(Z, 1, function(x){sum(x != 0)})
+    logik = kmu > 0;
+    Z = Z[logik,]
+    dat = dat[,logik]
+    
+    # run imputation (if desired)
+    if (impute){
+      Z = KSoftImpute(E = Z, dM = dM, verbose = F)
+      Z = t(apply(Z, 1, function(x){
+        normalize(x)
+      }))
+    }
+    
+    # build training set
+    df = data.frame(dat, celltypes = R$celltypes)
+    
+    # train a neural network (N times)
+    if (model.use == "nn"){
+      res = parallel::mclapply(1:N, function(x) {
+        nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F)
+        Predict = predict(nn, Matrix::t(Z))
+        colnames(Predict) <- sort(nn$model.list$response)
+        return(Predict)
+      }, mc.cores = num.cores)
+      
+      res = Reduce(res, f = '+') / N
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Other"
+    }
+    # if desired, run svm
+    if (model.use == "svm") {
+      model = e1071::svm(celltypes ~ ., data = df, probability=TRUE)
+      xx = predict(model, t(Z), probability=TRUE)
+      res = attr(xx, "probabilities")
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Other"
+    }
+    # if desired, run RF
+    if (model.use == "rf") {
+      res = parallel::mclapply(1:N, function(x) {
+        model = randomForest::randomForest(celltypes ~ ., data=df, keep.forest = TRUE)
+        predict(model,newdata=Matrix::t(Z),type="prob")
+      }, mc.cores = num.cores)
+      res = Reduce(res, f = '+') / N
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Other"
+    }
+    
+    # smooth the output classifications
+    if (smooth)
+      celltypes = CID.smooth(celltypes, dM[[1]])
+    
+    if (flag){
+      E <- Seurat::AddMetaData(E, metadata=celltypes, col.name = "celltypes")
+      E <- Seurat::SetIdent(E, value='celltypes')
+    }
+    
+    if (verbose) {
+      tb = proc.time()[3] - ta;
+      cat("\n ..........  Exit Signac.\n");
+      cat("             Execution time = ", tb, " s.\n", sep = "");
+    }
+    if (flag){
+      return(E)
+    } else {
+      return(celltypes)
+    }
+}
+
+#' Main function for classification
+#'
+#' @param filename Directory and filename of the h5 file
+#' @return annotations
+#' @export
+Signac_batch <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T, do.normalize = T, probability = F)
+{
+  
+  flag = class(E) == "Seurat"
+  
+  if (flag & impute)
+    edges = E@graphs$RNA_nn
+  
+  if (verbose)
+  {
+    cat(" ..........  Entry in Signac batch \n");
+    ta = proc.time()[3];
+    
+    # main function
+    if (!flag)
+    {
+      cat(" ..........  Running Signac on input data matrix :\n");
+    } else {
+      cat(" ..........  Running Signac on Seurat object :\n");
+    }
+    cat("             nrow = ", nrow(E), "\n", sep = "");
+    cat("             ncol = ", ncol(E), "\n", sep = "");
+  }
+  
+  # keep only unique row names
+  logik = CID.IsUnique(rownames(E))
+  E = E[logik,]
+  
+  # intersect genes with reference set
+  gns = intersect(rownames(E), R$genes)
+  V = E[rownames(E) %in% gns, ]
+  
+  # make sure data are in the same order
+  V = V[order(rownames(V)),]
+  
+  if (class(V) %in% "data.frame")
+    V = Matrix::Matrix(as.matrix(V), sparse = T)
+  
+  # normalize to the mean library size
+  if (do.normalize)
+  {
+    if (!flag)
+    {
+      V = CID.Normalize(V)
+    } else {
+      V = CID.Normalize(V@assays$RNA@counts)
+    }
+  }
+
+  # normalization function for gene expression scaling
+  normalize <- function(x) {
+    return ((x - min(x)) / (max(x) - min(x)))
+  }
+  # normalize V
+  V = t(apply(V, 1, function(x){
+    normalize(x)
+  }))
+  logik = apply(V, 1, function(x) {any(is.na(x))})
+  V = V[!logik,]
+  
+  # set up imputation matrices
+    if (flag) {
+      dM = CID.GetDistMat(edges)
+      louvain = CID.Louvain(edges = edges)
+    } else {
+      edges = CID.LoadEdges(data.dir = spring.dir)
+      dM = CID.GetDistMat(edges)
+      louvain = CID.Louvain(edges = edges)
+    }
+  
+  res = lapply(R$Reference, function(x){
+    # keep same gene names
+    gns = sort(intersect(rownames(V), colnames(x)))
+    Z = V[rownames(V) %in% gns, ]
+    dat = x[,colnames(x) %in% gns]
+    Z = Z[order(rownames(Z)), ]
+    dat = dat[, order(colnames(dat))]
+    
+    # remove any low variance genes
+    kmu = apply(Z, 1, function(x){sum(x != 0)})
+    logik = kmu > 0;
+    Z = Z[logik,]
+    dat = dat[,logik]
+    
+    # run imputation (if desired)
+    if (impute){
+      Z = KSoftImpute(E = Z, dM = dM, verbose = F)
+      Z = t(apply(Z, 1, function(x){
+        normalize(x)
+      }))
+    }
+    
+    # build training set
+    df = data.frame(dat, celltypes = x$celltypes)
+    
+    # train a neural network (N times)
+    if (model.use == "nn"){
+      res = parallel::mclapply(1:N, function(x) {
+        nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F)
+        Predict = predict(nn, Matrix::t(Z))
+        colnames(Predict) <- sort(nn$model.list$response)
+        return(Predict)
+      }, mc.cores = num.cores)
+      res = Reduce(res, f = '+') / N
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Other"
+      df = data.frame(celltypes = celltypes, probability = kmax)
+    }
+    # if desired, run svm
+    if (model.use == "svm") {
+      model = e1071::svm(celltypes ~ ., data = df, probability=TRUE)
+      xx = predict(model, t(Z), probability=TRUE)
+      res = attr(xx, "probabilities")
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Other"
+    }
+    # if desired, run RF
+    if (model.use == "rf") {
+      res = parallel::mclapply(1:N, function(x) {
+        model = randomForest::randomForest(celltypes ~ ., data=df, keep.forest = TRUE)
+        predict(model,newdata=Matrix::t(Z),type="prob")
+      }, mc.cores = num.cores)
+      res = Reduce(res, f = '+') / N
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Other"
+    }
+      # smooth the output classifications
+      if (smooth)
+        df$celltypes = CID.smooth(df$celltypes, dM[[1]])
+    
+    if (probability){
+      return(df)
+    } else {
+      return(df$celltypes)
+    }
+    })
+  
+  if (verbose) {
+    tb = proc.time()[3] - ta;
+    cat("\n ..........  Exit Signac.\n");
+    cat("             Execution time = ", tb, " s.\n", sep = "");
+  }
+    return(res)
+}
+
+Generate_lbls = function(cr, spring.dir = NULL, full.dataset = NULL, smooth = T)
+{
+  # impute genes
+  if (!is.null(spring.dir)){
+    edges = CID.LoadEdges(data.dir = spring.dir)
+    dM = CID.GetDistMat(edges)
+    louvain = CID.Louvain(edges = edges)
+  }
+  
+  res = list("")
+  
+  for (j in 1:length(cr))
+  {
+    if (names(cr)[j] == "All"){
+      res[[j]] = cr[[j]]
+    } else {
+      qq = res[[j - 1]]
+      logik = qq == names(cr)[j]
+      qq[logik] = cr[[j]][logik]
+      res[[j]] = qq
+    }
+  }
+  
+  cellstates = res[[length(res)]]
+  celltypes = cellstates
+  celltypes[celltypes %in% c("B.cells.memory", "B.cells.naive")] = "B.cells"
+  celltypes[celltypes %in% c("DC", "Mon.Classical", "Mon.NonClassical", "Neutrophils", "Monocytes", "Macrophages")] = "MPh"
+  celltypes[celltypes %in% c("NK", "T.cells.CD4.naive", "T.cells.CD4.memory", "T.cells.CD8", "T.regs", "T.cells.CD8.naive", "T.cells.CD8.memory", "T.cells.CD8.cm","T.cells.CD8.em" , "T.cells.cyto")] = "TNK"
+  celltypes[celltypes %in% c("Endothelial.cells", "Fibroblasts", "HSC", "Epithelial.cells")] = "NonImmune"
+  immune = res[[1]]  
+
+  # assign Others
+  if (!is.null(spring.dir)){
+  celltypes = CID.entropy(celltypes, dM)
+  immune = CID.entropy(immune, dM)
+  cellstates = CID.entropy(cellstates, dM)
+  # smooth 
+  if (smooth) {
+    celltypes= CID.smooth(celltypes, dM[[1]])
+    cellstates = CID.smooth(cellstates, dM[[1]])
+    immune = CID.smooth(immune, dM[[1]])
+  }
+  }
+  #logik = immune == "Other" | celltypes == "Other" | cellstates == "Other"
+  #cellstates[logik] = "Other"
+  #celltypes[logik] = "Other"
+  #immune[logik] = "Other"
+  
+  res$Immune_Vidi = immune
+  if (!is.null(spring.dir))
+  {
+  do = data.frame(table(louvain[cellstates == "Other"]))
+  df = data.frame(table(louvain[louvain %in% do$Var1]))
+  logik = (1 - phyper(do$Freq, df$Freq , length(cellstates) - do$Freq, sum(cellstates == "Other"))) < 0.01;
+  #logik = F
+  if (any(logik)){
+    do = do[logik,]
+    logik = do$Freq > 3; # require at least 3 cell communities
+    if (any(logik)){
+      celltypes_novel  = celltypes;
+      cellstates_novel = cellstates;
+      cat("             Signac found", sum(logik), "novel celltypes!\n");
+      lbls = rep("All", ncol(E))
+      logik = louvain %in% do$Var1[logik] & cellstates == "Other";
+      lbls[logik] = louvain[logik]
+      colnames(full.dataset) <- lbls
+      # FF = apply(full.dataset, 1, sd)^2 / Matrix::rowMeans(full.dataset)
+      # full.dataset = full.dataset[FF > median(FF), ]
+      new_lbls = CID.PosMarkers2(full.dataset, cellstates)
+      cellstates_novel = new_lbls$lbls
+      celltypes_novel[grepl("^[+]", cellstates_novel)] = new_lbls$lbls[grepl("^[+]", cellstates_novel)]
+    } else {
+      res$CellTypes_Vidi_novel = celltypes
+      res$CellStates_Vidi_novel = cellstates
+    }
+  } else {
+    res$CellTypes_Vidi_novel = celltypes_novel
+    res$CellStates_Vidi_novel = cellstates_novel
+  }
+  }
+  res = res[-1]
+  res$CellTypes_Vidi = celltypes
+  res$CellStates_Vidi = cellstates
+  
+  return(res)
+}
+
+#' Main function neural network
+#'
+#' @param filename Directory and filename of the h5 file
+#' @return annotations
+#' @export
+Vidi_v5 <- function (E, R, spring.dir = NULL, model.use = "nn")
+{
+  # keep only unique row names
+  logik = CID.IsUnique(rownames(E))
+  E = E[logik,]
+  
+  # intersect genes with reference set
+  gns = intersect(rownames(E), R$genes)
+  V = E[rownames(E) %in% gns, ]
+  
+  # make sure data are in the same order
+  V = V[order(rownames(V)),]
+  
+  # normalize to the mean library size
+  V = CID.Normalize(V)
+  
+  # normalize
+  normalize <- function(x) {
+    return ((x - min(x)) / (max(x) - min(x)))
+  }
+  V = t(apply(V, 1, function(x){
+    normalize(x)
+  }))
+
+  logik = apply(V, 1, function(x) {any(is.na(x))})
+  V = V[!logik,]
+  
+  # impute genes
+  if (!is.null(spring.dir)){
+    edges = CID.LoadEdges(data.dir = spring.dir)
+    dM = CID.GetDistMat(edges)
+  }
+  
+  res = lapply(1:length(R$Reference), function(i) {  
+    # make sure order is the same
+    celltypes = R$Reference[[i]]$celltypes
+    gns = sort(intersect(rownames(V), colnames(R$Reference[[i]])))
+    Z = V[rownames(V) %in% gns, ]
+    dat = R$Reference[[i]][,colnames(R$Reference[[i]]) %in% gns]
+    Z = Z[order(rownames(Z)), ]
+    dat = dat[, order(colnames(dat))]
+    
+    # remove any low variance genes
+    kmu = apply(Z, 1, function(x){sum(x != 0)})
+    logik = kmu > 0;
+    Z = Z[logik,]
+    dat = dat[,logik]
+    
+    if (!is.null(spring.dir)){
+    Z = KSoftImpute(E = Z, dM = dM)
+    Z = t(apply(Z, 1, function(x){
+      normalize(x)
+    }))
+    }
+    
+    # build training set
+    df = data.frame(dat, celltypes = celltypes)
+    
+    # train a neural network
+    if (model.use == "nn"){
+      nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F, rep = 2)
+      Predict = predict(nn, Matrix::t(Z))
+      return(apply(Predict, 1, function(z) {sort(nn$model.list$response)[which.max(z)]}))
+    }
+    # if desired, run svm NOTE: very unstable results compared to neural network and much slower
+    if (model.use == "svm") {
+      model <- e1071::svm(celltypes ~ ., data = df, probability=TRUE)
+      xx = predict(model, t(Z), probability=TRUE)
+      xx = attr(xx, "probabilities")
+      # assign cells based on probability
+      return(colnames(xx)[apply(xx, 1, which.max)])
+    }
+  })
+  
+  return(res)
+}
+
+#' Main function neural network
+#'
+#' @param filename Directory and filename of the h5 file
+#' @return annotations
+#' @export
+Vidi_v4 <- function (E, R, clusters = NULL, fine.tune = F, spring.dir = NULL)
+{
+  # keep only unique row names
+  logik = CID.IsUnique(rownames(E))
+  E = E[logik,]
+  
+  # intersect genes with reference set
+  gns = unlist(sapply(R$features, function(x){ as.character(x$gene)}))
+  gns = unique(gns)
+  gns = sort(gns)
+  gns = intersect(rownames(E), gns)
+  V = E[rownames(E) %in% gns, ]
+  dat = R$data[rownames(R$data) %in% gns,]
+  
+  # make sure data are in the same order
+  V = V[order(rownames(V)),]
+  dat = dat[order(rownames(dat)),]
+  
+  # normalize to the mean library size
+  V = CID.Normalize(V)
+  dat = CID.Normalize(dat)
+  
+  # impute genes
+  edges = CID.LoadEdges(data.dir = spring.dir)
+  dM = CID.GetDistMat(edges)
+  V = KSoftImpute(E = V, dM = dM)
+  
+  # normalize
+  normalize <- function(x) {
+    return ((x - min(x)) / (max(x) - min(x)))
+  }
+  
+  # save before normalization
+  V_Delta = V
+  dat_Delta = dat
+  
+  V = t(apply(V, 1, function(x){
+    normalize(x)
+  }))
+  dat = t(apply(dat, 1, function(x){
+    normalize(x)
+  }))
+  
+  logik = apply(V, 1, function(x) {any(is.na(x))})
+  V = V[!logik,]
+  dat = dat[!logik,]
+  
+  res = list("")
+  # classify data
+  for (i in 1:10)
+  {  
+    w = clusters
+    # limit to predictive features
+    gns = sort(R$features[[i]]$gene)
+    gns = sort(intersect(intersect(rownames(V), rownames(dat)), gns))
+    Z = V[rownames(V) %in% gns, ]
+    dat_small = dat[rownames(dat) %in% gns,]
+    
+    # make sure order is the same
+    Z = Z[order(rownames(Z)), ]
+    dat_small = dat_small[order(rownames(dat_small)),]
+    
+    # subset cells
+    if (i == 2) {
+      l = res[[1]] == "Immune"
+      Z = Z[,l]
+      w = w[l]
+    }
+    if (i == 3) {
+      l = res[[2]] == "Not.HSC"
+      Z = Z[,l]
+      w = w[l]
+    } 
+    if (i == 4) {
+      l = res[[3]] == "Lymphocytes"
+      Z = Z[,l]
+      w = w[l]
+    }
+    if (i == 5) {
+      l = res[[3]] == "Myeloid"
+      Z = Z[,l]
+      w = w[l]
+    }
+    if (i == 6) {
+      l = res[[4]] == "B.cells"
+      Z = Z[,l]
+      w = w[l]
+    }
+    if (i == 7) {
+      l = res[[6]] == "B.cells.NoPlasma"
+      Z = Z[,l]
+      w = w[l]
+    }
+    if (i == 8) {
+      l = res[[4]] == "TNK"
+      Z = Z[,l]
+      w = w[l]
+    }
+    if (i == 9) {
+      l = res[[8]] == "T.cells"
+      Z = Z[,l]
+      w = w[l]
+    }
+    if (i == 10) {
+      l = res[[9]] == "T.cells.CD4.regs.gd"
+      Z = Z[,l]
+      w = w[l]
+    }
+    
+    # limit training set to hierarchy
+    xx = as.character(R$celltypes[,i])
+    logik = R$celltypes[,i] %in% as.character(unique(R$features[[i]]$cluster))
+    dat_small = dat_small[,logik]
+    xx = xx[logik]
+    
+    # establish reference samples
+    if (fine.tune) {
+      subs = round(sqrt(table(w)))
+      subsample = unlist(sapply(unique(w), function(x){
+        idx = match(x, names(subs))
+        paste(w[w == x], sample(letters[1:subs[idx]], size = sum(w == x), replace = T), sep = "_")
+      }))
+      tt = aggregate(Matrix::t(Z),by=list(subsample),mean)
+      tt = as.matrix(tt[,-1])
+      z = sort(unique(as.vector(apply(tt, 1, function(x){
+        dd = cor(dat_small, x, method = "spearman")
+        order(dd, decreasing = T)[1:100]
+      }))))
+      dat_small = dat_small[,z]
+      xx = xx[z]
+    }
+    
+    if (length(unique(xx)) == 1) {
+      
+      if (i > 1)
+      {
+        res[[i]] = res[[i - 1]]
+        res[[i]][l] = rep(xx[1], sum(l))
+      } else {
+        res[[i]] = rep(xx[1], ncol(Z))
+      }
+      
+    } else {
+    
+    # remove any low variance genes
+    kmu = apply(Z, 1, function(x){sum(x != 0)})
+    logik = kmu > 0;
+    Z = Z[logik,]
+    dat_small = dat_small[logik,]
+    
+    # add cell labels
+    df = data.frame(t(dat_small), celltypes = xx)
+    # autoplot(pca, data = df2, colour = 'celltypes')
+    
+    # train a neural network
+    nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F)
+    
+    Z = t(Z)
+    
+    # scale factor normalize
+    #SF = sapply(1:ncol(Z), function(x){
+    #abs(max(Z[,x]) / max(df[,x]))
+    #  })
+    #diag_SF = Matrix::Matrix(data = 0, nrow = ncol(Z), ncol = ncol(Z), sparse = T)
+    #diag(diag_SF) <- 1 / SF
+    #Z = as.matrix(Z) %*% diag_SF
+    
+    #Predict=neuralnet::compute(nn, Z2)
+    Predict = predict(nn, Z)
+    # prob <- Predict$net.result
+    if (i > 1)
+    {
+      res[[i]] = res[[i - 1]]
+      res[[i]][l] = apply(Predict, 1, function(z) {sort(nn$model.list$response)[which.max(z)]})
+    } else {
+      res[[i]] = apply(Predict, 1, function(z) {sort(nn$model.list$response)[which.max(z)]})
+    }
+    # table(res[[i]], json_data$CellTypesID)
+    # if desired, run svm instead
+    #model <- e1071::svm(celltypes ~ ., data = df, probability=TRUE)
+    #xx = predict(model, as.matrix(Z), probability=TRUE)
+    #xx = attr(xx, "probabilities")
+    # assign cells based on probability
+    #colnames(xx)[apply(xx, 1, which.max)]
+    }
+  }
+  
+  # write results
+  cr = list("")
+  cr$Immune_Vidi = res[[1]]
+  xx = res[[2]]
+  xx[res[[1]] == "Immune"] = xx[res[[1]] == "Immune"]
+  xx[res[[1]] != "Immune"] = res[[1]][res[[1]] != "Immune"]
+  xx[xx == "Not.HSC"] = res[[3]][xx == "Not.HSC"]
+  xx[xx == "Lymphocytes"] = res[[4]][xx == "Lymphocytes"]
+  xx[xx == "Myeloid"] = res[[5]][xx == "Myeloid"]
+  xx[xx == "B.cells"] = res[[6]][xx == "B.cells"]
+  xx[xx == "B.cells.NoPlasma"] = res[[7]][xx == "B.cells.NoPlasma"]
+  xx[xx == "TNK"] = res[[8]][xx == "TNK"]
+  cr$CellTypes_Vidi = xx
+  cr = cr[-1]
+  return(cr)
+  
+}
+
+#' Main function transfer learning
+#'
+#' @param filename Directory and filename of the h5 file
+#' @return annotations
+#' @export
+SignacLearn <- function (E, learned_types, labels, size = 1000, impute = T, spring.dir = NULL, logfc.threshold = 0.25)
+{
+  # keep only unique row names
+  logik = CID.IsUnique(rownames(E))
+  E = E[logik,]
+  colnames(E) <- 1:ncol(E)
+  
+  # run differential expression to find features
+  logik = grepl("TotalSeq", rownames(E))
+  E = E[!logik,]
+
+  # run feature selection  
+  ctrl <- Seurat::CreateSeuratObject(counts = E, project = "CID", min.cells = 0)
+  ctrl <- Seurat::NormalizeData(ctrl)
+  ctrl <- Seurat::AddMetaData(ctrl, metadata=labels, col.name = "celltypes")
+  ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
+  mrks = Seurat::FindMarkers(ctrl, ident.1 = learned_types[1], ident.2 = learned_types[2], only.pos = F, logfc.threshold = logfc.threshold)
+  # E = E[rownames(E) %in% rownames(mrks),]
+  
+  # down sample the cells
+  #subs = round(sqrt(table(labels)))
+  #subsample = unlist(sapply(unique(labels), function(x){
+  #      idx = match(x, names(subs))
+  #      paste(labels[labels == x], sample(letters[1:subs[idx]], size = sum(labels == x), replace = T), sep = "_")
+  #    }))
+  #tt = aggregate(Matrix::t(E),by=list(subsample),mean)
+  #xx = tt[,1]
+  #tt = as.matrix(tt[,-1])
+  xx = labels
+  
+  # set up imputation matrices
+  if (impute){
+      edges = CID.LoadEdges(data.dir = spring.dir)
+      dM = CID.GetDistMat(edges)
+      louvain = CID.Louvain(edges = edges)
+  }
+  
+  # bootstrap data
+  #mrks2 = mrks[mrks$pct.1 > 0.5 | mrks$pct.2 > 0.5,]
+  dat = E[rownames(E) %in% rownames(mrks),]
+  mrks$cluster = learned_types[1]
+  mrks$cluster[mrks$avg_logFC < 0] = learned_types[2]
+  mrks$gene = rownames(mrks)
+  
+  # run imputation (if desired)
+  if (impute)
+    Z = KSoftImpute(E = dat, dM = dM, verbose = F)
+  
+  cts = split.data.frame(mrks, f = mrks$cluster)
+    N = lapply(cts, function(x){
+      # first sample from cells in cluster 1, size cells
+      logik = rownames(dat) %in% x$gene
+      dummy = dat[logik,]
+      logik = grepl(as.character(x$cluster[1]), labels)
+      dummy = dummy[,logik]
+      dd = t(apply(dummy, 1, function(z) {
+        sample(z, size = size, replace = T)}))
+      dd = t(apply(dd, 1, function(z){
+        rnorm(n = length(z), mean = mean(z), sd = sd(z))
+      }))
+      # now sample from cells in cluster 2, size cells with True Negative Expr.
+      logik = !rownames(dat) %in% x$gene
+      dummy = dat[logik,]
+      logik = grepl(as.character(x$cluster[1]), labels)
+      dummy = dummy[,logik]
+      dd2 = t(apply(dummy, 1, function(z) {
+        sample(z, size = size, replace = T)}))
+      dd2 = t(apply(dd2, 1, function(z){
+        rnorm(n = length(z), mean = mean(z), sd = sd(z))
+      }))
+      rbind(dd, dd2)
+    })
+    N2 = merge(N[[1]],N[[2]],by="row.names")
+    rownames(N2) <- N2$Row.names
+    N2 = t(N2[,-1])
+    # normalize
+    normalize <- function(x) {
+      return ((x - min(x)) / (max(x) - min(x)))
+    }
+    N2 = apply(N2, 2, function(x){
+      normalize(x)
+    })
+  boot = data.frame(N2, celltypes = c(rep(names(cts)[1], size), rep(names(cts)[2], size)))
+   # pca <- prcomp(x = boot[,-ncol(boot)], center = T, scale. = T) 
+   # autoplot(pca, data = boot, colour = 'celltypes')
+  #library(ggplot2)
+  #ggplot(boot, aes(x=TRGC1, y=TRDC, color=celltypes)) + geom_point()
+  return(boot)
+}
+
+#' Main function neural network
+#'
+#' @param filename Directory and filename of the h5 file
+#' @return annotations
+#' @export
+Vidi_v3 <- function (E, R, clusters = NULL, fine.tune = F)
+{
+  # keep only unique row names
+  logik = CID.IsUnique(rownames(E))
+  E = E[logik,]
+  
+  # intersect genes with reference set
+  gns = unlist(sapply(R$features, function(x){ as.character(x$gene)}))
+  gns = unique(gns)
+  gns = sort(gns)
+  gns = intersect(rownames(E), gns)
+  V = E[rownames(E) %in% gns, ]
+  dat = R$data[rownames(R$data) %in% gns,]
+  
+  # make sure data are in the same order
+  V = V[order(rownames(V)),]
+  dat = dat[order(rownames(dat)),]
+  
+  # normalize to the mean library size
+  V = CID.Normalize(V)
+  dat = CID.Normalize(dat)
+  
+  # impute genes
+  edges = CID.LoadEdges(data.dir = spring.dir)
+  dM = CID.GetDistMat(edges)
+  V = KSoftImpute(E = V, dM = dM)
+  
+  # normalize
+  normalize <- function(x) {
+    return ((x - min(x)) / (max(x) - min(x)))
+  }
+  
+  V = t(apply(V, 1, function(x){
+    normalize(x)
+  }))
+  dat = t(apply(dat, 1, function(x){
+    normalize(x)
+  }))
+  
+  res = list("")
+  # classify data
+  for (i in 1:8)
+  {  
+    # limit to predictive features
+    gns = sort(R$features[[i]]$gene)
+    gns = sort(intersect(intersect(rownames(V), rownames(dat)), gns))
+    Z = V[rownames(V) %in% gns, ]
+    dat_small = dat[rownames(dat) %in% gns,]
+    
+    # make sure order is the same
+    Z = Z[order(rownames(Z)), ]
+    dat_small = dat_small[order(rownames(dat_small)),]
+    
+    # subset cells
+    if (i == 2) {
+      l = res[[1]] == "Immune"
+      Z = Z[,l]
+    }
+    if (i == 3) {
+      l = res[[2]] == "Not.HSC"
+      Z = Z[,l]
+    } 
+    if (i == 4) {
+      l = res[[3]] == "Lymphocytes"
+      Z = Z[,l]
+    }
+    if (i == 5) {
+      l = res[[3]] == "Myeloid"
+      Z = Z[,l]
+    }
+    if (i == 6) {
+      l = res[[4]] == "B.cells"
+      Z = Z[,l]
+    }
+    if (i == 7) {
+      l = res[[6]] == "B.cells.NoPlasma"
+      Z = Z[,l]
+    }
+    if (i == 8) {
+      l = res[[4]] == "TNK"
+      Z = Z[,l]
+    }
+    
+    # limit training set to hierarchy
+    xx = as.character(R$celltypes[,i])
+    logik = R$celltypes[,i] %in% as.character(unique(R$features[[i]]$cluster))
+    dat_small = dat_small[,logik]
+    xx = xx[logik]
+    
+    # establish reference samples
+    if (fine.tune) {
+      subs = round(sqrt(table(clusters)))
+      subsample = unlist(sapply(1:length(unique(clusters)), function(x){
+        idx = match(x, names(subs))
+        paste(clusters[clusters == x], sample(letters[1:subs[idx]], size = sum(clusters == x), replace = T), sep = "_")
+      }))
+      tt = aggregate(Matrix::t(Z),by=list(subsample),mean)
+      tt = as.matrix(tt[,-1])
+      z = sort(unique(as.vector(apply(tt, 1, function(x){
+        dd = cor(dat_small, x, method = "spearman")
+        order(dd, decreasing = T)[1:5]
+      }))))
+      dat_small = dat_small[,z]
+      # z-score transform for co-normalization
+      dat_small = t(apply(dat_small, 1, function(x){
+        #z = x + rnorm(n = length(x), mean = mean(x),sd = 1)
+        scale(x)
+      }))
+      #df = data.frame(t(dat_small), celltypes = celltypes[z,i])
+      xx = as.character(celltypes[z,i])
+    } #else {
+       # dat_small = t(apply(dat_small, 1, function(x){
+      #    scale(x)
+      #  }))
+    #}
+    
+    # remove any low variance genes
+    kmu = apply(Z, 1, function(x){sum(x != 0)})
+    logik = kmu > 0;
+    Z = Z[logik,]
+    dat_small = dat_small[logik,]
+    
+    # add a small noise factor for variance stabilization
+    #N = abs(0.01*matrix(rnorm(nrow(Z)*col(Z)), nrow = nrow(Z), ncol = ncol(Z)))
+    #kmu = Matrix::rowMeans(Z)/10
+    #Z = Z + N * kmu
+    #Z2 = t(apply(Z, 1, function(x){
+    #  q = scale(log2( 1 + x) )
+    #  q = q - min(q)
+    #  q / max(q)
+    #}))
+    
+    # perform principal components analysis
+    #pca <- prcomp(x = t(dat_small), center = T, scale. = T)
+    
+    # correlate PCs with cell type status
+    #fits = apply(pca$x, 2, function(x){
+    #  fit = lm(x ~ xx)
+    #  summary(fit)$coefficients[,4][2]
+    #})
+    #logik = fits < 0.05
+    
+    # project data
+    #Z2 = scale(Matrix::t(Z), pca$center, pca$scale) %*% pca$rotation
+    #df = scale(t(dat_small), pca$center, pca$scale) %*% pca$rotation
+    #df2 = pca$x[,logik]
+    
+    # quantile normalize
+    #lbls = c(rep("Reference", nrow(df)), rep("Test", nrow(Z)))
+    #dat_merged = preprocessCore::normalize.quantiles(cbind(t(df), t(as.matrix(Z))))
+    #df = t(dat_merged[,lbls == "Reference"])
+    #Z = t(dat_merged[,lbls == "Test"])
+    
+    # shift every PCA to zero
+    #df2 = apply(df2, 2, function(x){
+    #  x - min(x)
+    #})
+    #Z2 = apply(Z2, 2, function(x){
+    #  x - min(x)
+    #})
+    
+    # normalize to 1
+    #df2 = apply(df2, 2, function(x){
+    #  x/max(x)
+    #})
+    #Z2 = apply(Z2, 2, function(x){
+    #  x/max(x)
+    #})
+    
+    # add cell labels
+    df = data.frame(t(dat_small), celltypes = xx)
+    # autoplot(pca, data = df2, colour = 'celltypes')
+    
+    # train a neural network
+    nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F)
+    
+    # scale factor normalize
+    #SF = sapply(1:ncol(Z), function(x){
+    #abs(max(Z[,x]) / max(df[,x]))
+    #  })
+    #diag_SF = Matrix::Matrix(data = 0, nrow = ncol(Z), ncol = ncol(Z), sparse = T)
+    #diag(diag_SF) <- 1 / SF
+    #Z = as.matrix(Z) %*% diag_SF
+    
+    #Predict=neuralnet::compute(nn, Z2)
+    Predict = predict(nn, Z2)
+    # prob <- Predict$net.result
+    if (i > 1)
+    {
+      res[[i]] = res[[i - 1]]
+      res[[i]][l] = apply(Predict, 1, function(z) {sort(nn$model.list$response)[which.max(z)]})
+    } else {
+      res[[i]] = apply(Predict, 1, function(z) {sort(nn$model.list$response)[which.max(z)]})
+    }
+    # table(res[[i]], json_data$CellTypesID)
+    # if desired, run svm instead
+    #model <- e1071::svm(celltypes ~ ., data = df, probability=TRUE)
+    #xx = predict(model, as.matrix(Z), probability=TRUE)
+    #xx = attr(xx, "probabilities")
+    # assign cells based on probability
+    #colnames(xx)[apply(xx, 1, which.max)]
+  }
+  
+  # write results
+  cr = list("")
+  cr$Immune_Vidi = res[[1]]
+  xx = res[[2]]
+  xx[res[[1]] == "Immune"] = xx[res[[1]] == "Immune"]
+  xx[res[[1]] != "Immune"] = res[[1]][res[[1]] != "Immune"]
+  xx[xx == "Not.HSC"] = res[[3]][xx == "Not.HSC"]
+  xx[xx == "Lymphocytes"] = res[[4]][xx == "Lymphocytes"]
+  xx[xx == "Myeloid"] = res[[5]][xx == "Myeloid"]
+  xx[xx == "B.cells"] = res[[6]][xx == "B.cells"]
+  xx[xx == "B.cells.NoPlasma"] = res[[7]][xx == "B.cells.NoPlasma"]
+  xx[xx == "TNK"] = res[[8]][xx == "TNK"]
+  cr$CellTypes_Vidi = xx
+  cr = cr[-1]
+  return(cr)
+
+}
+
+#' Main function SVM
+#'
+#' @param filename Directory and filename of the h5 file
+#' @return annotations
+#' @export
+Vidi_v2 <- function (E, clusters, R)
+{
+  # keep only unique row names
+  logik = CID.IsUnique(rownames(E))
+  E = E[logik,]
+  
+  # intersect genes with reference set
+  gns = intersect(rownames(E), rownames(R$data))
+  V = E[rownames(E) %in% gns, ]
+  dat = R$data[rownames(R$data) %in% gns,]
+  
+  # make sure data are in the same order
+  V = V[order(rownames(V)),]
+  dat = dat[order(rownames(dat)),]
+  
+  # classify data
+  res = lapply(1:10, function(i){
+    
+    # limit to predictive features
+    gns = sort(R$features[[i]]$gene)
+    Z = V[rownames(V) %in% gns, ]
+    dat_small = dat[rownames(dat) %in% gns,]
+    
+    # limit training set to hierarchy
+    logik = R$celltypes[,i] %in% as.character(unique(R$features[[i]]$cluster))
+    dat_small = dat_small[,logik]
+    celltypes = R$celltypes[logik,]
+    
+    # establish reference samples
+    if (fine.tune) {
+      subs = round(sqrt(table(clusters)))
+      subsample = unlist(sapply(1:length(unique(clusters)), function(x){
+        idx = match(x, names(subs))
+        paste(clusters[clusters == x], sample(letters[1:subs[idx]], size = sum(clusters == x), replace = T), sep = "_")
+      }))
+      tt = aggregate(Matrix::t(Z),by=list(subsample),mean)
+      tt = as.matrix(tt[,-1])
+      z = sort(unique(as.vector(apply(tt, 1, function(x){
+        dd = cor(dat_small, x, method = "spearman")
+        order(dd, decreasing = T)[1:5]
+      }))))
+      dat_small = dat_small[,z]
+      # add white noise for variance stabilization and then z-score transform for co-normalization
+      dat_small = t(apply(dat_small, 1, function(x){
+        z = x + rnorm(n = length(x), mean = mean(x),sd = 1)
+        scale(z)
+      }))
+      df = data.frame(t(dat_small), celltypes = celltypes[z,i])
+    } else {
+      # add white noise for variance stabilization and then z-score transform for co-normalization
+      dat_small = t(apply(dat_small, 1, function(x){
+        z = x + rnorm(n = length(x), mean = mean(x),sd = 1)
+        scale(z)
+      }))
+      df = data.frame(t(dat_small), celltypes = celltypes[,i])
+    }
+
+    # train a neural network
+    nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = "logistic",
+                 linear.output = F)
+    
+    # add white noise and z-score transform; iterate until convergence
+        Z2 = data.frame(apply(Z, 1, function(x){
+          z = x + rnorm(n = length(x), mean = mean(x),sd = 1)
+          scale(z)
+        }))
+        Predict=neuralnet::compute(nn, Z2)
+        prob <- Predict$net.result
+        apply(prob, 1, function(z) {sort(as.character(unique(R$features[[i]]$cluster)))[which.max(z)]})
+  })
+  
+  # write results
+  cr = list("")
+  
+  # get immune cells
+  cr$immune = res[[1]]
+  
+  
+  cr$immune[res[[1]] == "NonImmune" & res[[3]] == "Lymphocytes" & res[[4]] == "B.cells" & res[[6]] == "Plasma.cells"]
+  cr$hema = res[[2]]
+  cr$hema[cr$immune == "NonImmune"] = "NonImmune" 
+  cr$celltypes = res[[3]]
+  cr$celltypes[cr$immune == "NonImmune"] = "NonImmune"
+  
+  
+  cr$L0 = cr$celltypes
+  cr$L0[cr$celltypes == "Lymphocytes"] = res[[4]][cr$celltypes == "Lymphocytes"]
+  cr$L1 = cr$L0
+  cr$L1[cr$L0 == "Myeloid"] = res[[5]][cr$L0 == "Myeloid"]
+  cr$L2 = cr$L1
+  cr$L2[cr$L1 == "B.cells"] = res[[6]][cr$L1 == "B.cells"]
+  cr$L3 = cr$L2
+  cr$L3[cr$L2 == "B.cells.NoPlasma"] = res[[7]][cr$L2 == "B.cells.NoPlasma"]
+  cr$L4 = cr$L3
+  cr$L4[cr$L3 == "B.cells.NoPlasma"] = res[[8]][cr$L3 == "B.cells.NoPlasma"]
+  
+  cr = cr[-1]
+  return(cr)
+}
+
+#' Show hierarchical structure
+#'
+#' @param R Reference dataset
+#' @return annotations by hierarchy
+#' @export
+ShowHierarchy <- function (R)
+{
+  df = lapply(1:ncol(R$celltypes), function(x){
+    if (x == 1)
+    {
+      unique(R$celltypes[,x])
+    } else {
+      logik = R$celltypes[,x] != R$celltypes[,x-1]
+      dat = R$celltypes[logik,]
+      unique(dat[,x])
+    }
+  })
+  names(df) <- colnames(R$celltypes)
+  return(df)
+}
+
+#' Main function SVM
+#'
+#' @param filename Directory and filename of the h5 file
+#' @return annotations
+#' @export
+Vidi <- function (E, clusters, R)
+{
+  # keep only unique row names
+  logik = CID.IsUnique(rownames(E))
+  E = E[logik,]
+  
+  # intersect genes with reference set
+  mrks = toupper(unlist(c(R$de.genes.main$`B-cells`$Fibroblasts,R$de.genes.main$Fibroblasts$`B-cells`)))
+  gns = intersect(rownames(E), mrks)
+  V = E[rownames(E) %in% gns, ]
+  dat = R$data[rownames(R$data) %in% gns,]
+  
+  # make sure data are in the same order
+  V = V[order(rownames(V)),]
+  dat = dat[order(rownames(dat)),]
+  xx = rownames(dat)
+  
+  # establish reference samples
+  # keep top 5 samples by correlation with each down-sampled cluster mean
+  subs = round(sqrt(table(clusters)))
+  subsample = unlist(sapply(1:length(unique(clusters)), function(x){
+    idx = match(x, names(subs))
+    paste(clusters[clusters == x], sample(letters[1:subs[idx]], size = sum(clusters == x), replace = T), sep = "_")
+  }))
+  tt = aggregate(Matrix::t(V),by=list(subsample),mean)
+  tt = as.matrix(tt[,-1])
+  z = sort(unique(as.vector(apply(tt, 1, function(x){
+    dd = cor(dat, x, method = "spearman")
+    order(dd, decreasing = T)[1:5]
+  }))))
+  
+  dat = dat[,z]
+  
+  # classify data
+  res = lapply(1:length(R$features), function(x){
+    # get shared gene names of features
+    if (!is.null(R$features[[x]])) {
+    gns = intersect(rownames(E), R$features[[x]]$gene[order(R$features[[x]]$avg_logFC, decreasing = T)])
+   # gns = sample(gns, size = round(length(gns)/2))
+    E_small = as.matrix(E[rownames(E) %in% gns,])
+    dat = R$data[rownames(R$data) %in% gns,]
+   
+    E_small = E_small[order(rownames(E_small)),]
+    dat = dat[order(rownames(dat)),]
+    
+    # look at samples in the region
+    logik = R$celltypes[,x] %in% unique(R$features[[x]]$cluster)
+    dat = dat[,logik]
+    celltypes = R$celltypes[logik,x]
+    
+    # co-normalize after scaling with quantile normalization
+    lbls = c(rep("Reference", ncol(dat)), rep("SingleCell", ncol(E_small)))
+    dat_merged = preprocessCore::normalize.quantiles(cbind(dat, E_small))
+    dat = dat_merged[,lbls == "Reference"]
+    E_small = dat_merged[,lbls != "Reference"]
+    #dat = t(scale(t(dat)))
+    #E_small = t(scale(t(E_small)))
+
+    df = data.frame(t(dat), celltypes = celltypes)
+    
+    model <- e1071::svm(celltypes ~ ., data = df, probability=TRUE)
+    xx = predict(model, t( E_small), probability=TRUE)
+    xx = attr(xx, "probabilities")
+    
+    # assign cells based on probability
+    colnames(xx)[apply(xx, 1, which.max)]
+    # celltypes[apply(xx, 1, max) < 0.6] = "Other"
+    } else {
+      rep(colnames(R$celltypes)[x], ncol(E))
+    }
+  })
+  
+  # write results
+  cr = list("")
+  cr$immune = res[[1]]
+  cr$hema = res[[2]]
+  cr$hema[cr$immune == "NonImmune"] = "NonImmune" 
+  cr$celltypes = res[[3]]
+  cr$celltypes[cr$hema == "Myeloid"] = "Myeloid"
+  cr$celltypes[cr$immune == "NonImmune"] = "NonImmune"
+  cr = cr[-1]
+  return(cr)
+}
+
 #' Load 10X count matrix from an h5 file
 #'
 #' @param filename Directory and filename of the h5 file
@@ -337,21 +1565,24 @@ CID.Impute <- function(E, data.dir = NULL, do.par = TRUE)
 #' @param genes a character vector of genes to impute
 #' @return Imputed values for every gene
 #' @export
-KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F)
+KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F, verbose = T)
 {
   # check inputs
   stopifnot(class(E) %in% c("dgCMatrix","dgTMatrix", "matrix", "data.frame"))
   stopifnot(!is.null(rownames(E)));
   if (class(E) %in% c("matrix", "data.frame"))
     E = Matrix::Matrix(as.matrix(E), sparse = T)
-  
-  cat(" ..........  Entry in KSoftImpute \n");
-  ta = proc.time()[3];
-  
-  # main function
-  cat(" ..........  Running K soft imputation on input data matrix :\n");
-  cat("             nrow = ", nrow(E), "\n", sep = "");
-  cat("             ncol = ", ncol(E), "\n", sep = "");
+  if (verbose)
+  {
+    cat(" ..........  Entry in KSoftImpute \n");
+    ta = proc.time()[3];
+    
+    # main function
+    cat(" ..........  Running K soft imputation on input data matrix :\n");
+    cat("             nrow = ", nrow(E), "\n", sep = "");
+    cat("             ncol = ", ncol(E), "\n", sep = "");
+  }
+
   
   if (!is.null(genes.to.use))
     E = E[rownames(E) %in% genes.to.use,]
@@ -370,7 +1601,7 @@ KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F)
   
   # g = dM[[1]] %*% bas + 1/2 * dM[[2]] %*% bas
   g = dM[[1]] %*% bas
-  dd = g / Matrix::rowSums(g)
+  dd = g / (Matrix::rowSums(g) + 1)
   diag(dd) <- 1
   E_new = E %*% dd;
   E_new = CID.Normalize(E_new)
@@ -382,9 +1613,11 @@ KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F)
     write.table(rownames(E_new), file = paste(data.dir, "genes_ksoft_imputed.txt", sep = "/"))
   }
   
-  tb = proc.time()[3] - ta;
-  cat("\n ..........  Exit KSoftImpute.\n");
-  cat("             Execution time = ", tb, " s.\n", sep = "");
+  if (verbose) {
+    tb = proc.time()[3] - ta;
+    cat("\n ..........  Exit KSoftImpute.\n");
+    cat("             Execution time = ", tb, " s.\n", sep = "");
+  }
   
   return(E_new)
 }
@@ -2144,6 +3377,66 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", data.
     C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
     json_data$Immune$label_colors = as.list(C[[1]])
   }
+  if ("Immune_Vidi" %in% names(cr))
+  {
+    Q = cr$Immune_Vidi
+    json_data$Immune_Vidi$label_list = Q
+    C = get_colors(Q)
+    Ntypes = sum(C[[1]] == "")
+    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
+    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
+    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
+    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
+    json_data$Immune_Vidi$label_colors = as.list(C[[1]])
+  }
+  if ("CellTypes_Vidi" %in% names(cr))
+  {
+    Q = cr$CellTypes_Vidi
+    json_data$CellTypes_Vidi$label_list = Q
+    C = get_colors(Q)
+    Ntypes = sum(C[[1]] == "")
+    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
+    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
+    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
+    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
+    json_data$CellTypes_Vidi$label_colors = as.list(C[[1]])
+  }
+  if ("CellTypes_Vidi_novel" %in% names(cr))
+  {
+    Q = cr$CellTypes_Vidi_novel
+    json_data$CellTypes_Vidi_novel$label_list = Q
+    C = get_colors(Q)
+    Ntypes = sum(C[[1]] == "")
+    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
+    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
+    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
+    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
+    json_data$CellTypes_Vidi_novel$label_colors = as.list(C[[1]])
+  }
+  if ("CellStates_Vidi" %in% names(cr))
+  {
+    Q = cr$CellStates_Vidi
+    json_data$CellStates_Vidi$label_list = Q
+    C = get_colors(Q)
+    Ntypes = sum(C[[1]] == "")
+    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
+    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
+    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
+    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
+    json_data$CellStates_Vidi$label_colors = as.list(C[[1]])
+  }
+  if ("CellStates_Vidi_novel" %in% names(cr))
+  {
+    Q = cr$CellStates_Vidi_novel
+    json_data$CellStates_Vidi_novel$label_list = Q
+    C = get_colors(Q)
+    Ntypes = sum(C[[1]] == "")
+    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
+    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
+    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
+    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
+    json_data$CellStates_Vidi_novel$label_colors = as.list(C[[1]])
+  }
   if ("immunestates" %in% names(cr))
   {
     Q = cr$immunestates
@@ -2318,6 +3611,22 @@ CID.GetDistMat <- function(edges, n = 4)
   for (j in 1:n)
     if(j == 1) dm[[j]] = m else dm[[j]] = m %^% j
   return(dm)
+}
+
+#' Get main cell types from hierarchy
+#'
+#' @param R reference matrix 
+#' @return a vector of cell type identities given the hierarchy
+#' @export
+get_celltypes <- function(R) {
+  
+  # we need to populate a data frame with labels at each level of the hierarchy
+  celltypes = unique(unlist(R$immune_hierarchy, use.names = F)) # bottom level
+  qq = do.call(c, unlist(R$immune_hierarchy, recursive=FALSE))
+  
+  # construct a data frame from the list
+  R$immune_hierarchy[names(R$immune_hierarchy)]
+
 }
 
 #' Split large data into smaller chunks
