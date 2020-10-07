@@ -17,14 +17,14 @@
   <p align="center">
     Get the most out of your single cell data.
     <br />
-    <a href="https://htmlpreview.github.io/?https://github.com/sanofi-pi/signac/blob/master/vignettes/human-mouse.html"><strong>Explore the docs »</strong></a>
+    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/signac/blob/master/vignettes/human-mouse.html"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://htmlpreview.github.io/?https://github.com/sanofi-pi/signac/blob/master/vignettes/human-mouse.html">View Demo</a>
+    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/signac/blob/master/vignettes/human-mouse.html">View Demo</a>
     ·
-    <a href="https://github.com/sanofi-pi/signac/issues">Report Bug</a>
+    <a href="https://github.com/mathewchamberlain/signac/issues">Report Bug</a>
     ·
-    <a href="https://github.com/sanofi-pi/signac/issues">Request Feature</a>
+    <a href="https://github.com/mathewchamberlain/signac/issues">Request Feature</a>
   </p>
 </p>
 
@@ -73,18 +73,18 @@ To install signac in R, simply do:
 ### Installation
 
 ```r
-devtools::install_github("sanofi-pi/signac")
+devtools::install_github("mathewchamberlain/signac")
 ```
 
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Running signac is simple. [Here is an example vignette](https://htmlpreview.github.io/?https://github.com/sanofi-pi/signac/blob/master/vignettes/human-mouse.html) for processing a 1:1 mixture of human and mouse cells hosted on 10X. More to come.
+Running signac is simple. [Here is an example vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/signac/blob/master/vignettes/human-mouse.html) for processing a 1:1 mixture of human and mouse cells hosted on 10X. More to come.
 
 <!-- ROADMAP -->
 ## Roadmap
 
-See the [open issues](https://github.com/sanofi-pi/signac/issues) for a list of proposed features (and known issues).
+See the [open issues](https://github.com/mathewchamberlain/signac/issues) for a list of proposed features (and known issues).
 
 <!-- CONTRIBUTING -->
 ## Contributing
@@ -107,19 +107,19 @@ Distributed under the GPL v3.0 License. See `LICENSE` for more information.
 
 Mathew Chamberlain - [linkedin](https://linkedin.com/in/chamberlainmathew) - mathew.chamberlain@sanofi.com
 
-Project Link: [https://github.com/sanofi-pi/signac](https://github.com/sanofi-pi/signac)
+Project Link: [https://github.com/mathewchamberlain/signac](https://github.com/mathewchamberlain/signac)
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/sanofi-pi/signac.svg?style=flat-square
-[contributors-url]: https://github.com/sanofi-pi/signac/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/sanofi-pi/signac.svg?style=flat-square
-[forks-url]: https://github.com/sanofi-pi/signac/network/members
-[stars-shield]: https://img.shields.io/github/stars/sanofi-pi/signac.svg?style=flat-square
-[stars-url]: https://github.com/sanofi-pi/signac/stargazers
-[issues-shield]: https://img.shields.io/github/issues/sanofi-pi/signac.svg?style=flat-square
-[issues-url]: https://github.com/sanofi-pi/signac/issues
-[license-shield]: https://img.shields.io/github/license/sanofi-pi/signac.svg?style=flat-square
+[contributors-shield]: https://img.shields.io/github/contributors/mathewchamberlain/signac.svg?style=flat-square
+[contributors-url]: https://github.com/mathewchamberlain/signac/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/mathewchamberlain/signac.svg?style=flat-square
+[forks-url]: https://github.com/mathewchamberlain/signac/network/members
+[stars-shield]: https://img.shields.io/github/stars/mathewchamberlain/signac.svg?style=flat-square
+[stars-url]: https://github.com/mathewchamberlain/signac/stargazers
+[issues-shield]: https://img.shields.io/github/issues/mathewchamberlain/signac.svg?style=flat-square
+[issues-url]: https://github.com/mathewchamberlain/signac/issues
+[license-shield]: https://img.shields.io/github/license/mathewchamberlain/signac.svg?style=flat-square
 [license-url]: https://choosealicense.com/licenses/gpl-3.0/
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=flat-square&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/chamberlainmathew

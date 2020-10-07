@@ -13,5 +13,5 @@ Encoding: UTF-8
 LazyData: false
 RoxygenNote: 7.1.0
 biocViews: biomaRt(>= 2.36.0), Biobase(>= 2.40.0), edgeR(>= 3.22.1), limma(>= 3.36.1)
-URL: http://github.com/sanofi-pi/Signac
-BugReports: http://github.com/sanofi-pi/Signac/issues
+URL: http://github.com/mathewchamberlain/Signac
+BugReports: http://github.com/mathewchamberlain/Signac/issues
