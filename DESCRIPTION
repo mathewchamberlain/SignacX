@@ -4,9 +4,9 @@ Title: Cell type and state identification based on gene expression patterns
 Version: 2.0.0
 Author: Mathew Chamberlain, Virginia Savova
 Maintainer: Mathew Chamberlain <mathew.chamberlain@sanofi.com>
-Imports: Matrix, qlcMatrix(>= 0.9.7), Seurat(>= 2.3.1), rjson (>= 0.2.18), igraph (>= 1.2.1), jsonlite (>= 1.5), RColorBrewer (>= 1.1.2), methods, stats, graphics, neuralnet, e1071, randomForest, lme4
+Imports: Matrix, qlcMatrix(>= 0.9.7), Seurat(>= 2.3.1), rjson (>= 0.2.18), igraph (>= 1.2.1), jsonlite (>= 1.5), RColorBrewer (>= 1.1.2), methods, stats, graphics, neuralnet, e1071, randomForest, lme4, knitr
 Suggests: RJDBC(>= 0.2-7.1), rJava(>= 0.9-9), DBI(>= 1.0.0), xCell, SAVER
-Description: Signac is an algorithm that addresses the classification problem in single cell RNA sequencing. We often have an expression matrix and we need to classify the cells into their cell types and cell states based on their gene expression patterns. Note: v0.1.1 is an attempt to fix a bug where NK cells were being over-called relative to T cells.
+Description: Signac is an algorithm that addresses the classification problem in single cell RNA sequencing. We often have an expression matrix and we need to classify the cells into their cell types and cell states based on their gene expression patterns.
 Depends: R (>= 3.1.0)
 License: GPL-3 | file LICENSE
 Encoding: UTF-8
@@ -15,3 +15,4 @@ RoxygenNote: 7.1.0
 biocViews: biomaRt(>= 2.36.0), Biobase(>= 2.40.0), edgeR(>= 3.22.1), limma(>= 3.36.1)
 URL: http://github.com/mathewchamberlain/Signac
 BugReports: http://github.com/mathewchamberlain/Signac/issues
+VignetteBuilder: knitr
