@@ -1,9 +1,260 @@
+#' Generate a probability plot
+#'
+#' @param df one element of the list returned by Signac function call (see ?Signac)
+#' @return ggplot object
+#' @export
+ProbabilityPlot = function(df)
+{
+  ggplot(df, aes(x=genes_detected, y=probability, color=celltypes)) + geom_point() + geom_errorbar(aes(ymin=probability-error, ymax=probability+error), width=.2) + xlab("Genes detected") + ylab("Probability")
+}
+
+
+#' Get genes from xCell publication
+#'
+#' @param dataset default is NULL
+#' @return a list of gene signatures
+#' @export
+getxCellGenes <- function(dataset = NULL)
+{
+  ## load signatures from xCell
+  # devtools::install_github('dviraran/xCell')
+  data("xCell.data", package = 'xCell')
+  # get gene IDs
+  signatures = lapply(xCell.data$signatures@.Data, function(x) {x@geneIds})
+  
+  # get celltypes
+  celltypes = lapply(xCell.data$signatures@.Data, function(x) {sub("\\%.*", "", x@setName)})
+  
+  # get technologies
+  datasets = lapply(xCell.data$signatures@.Data, function(x) {gsub(".*[%]([^.]+)[%].*", "\\1", x@setName)})
+  
+  if (!is.null(dataset)){
+    logik = sapply(datasets, function(x) {x %in% dataset})
+    celltypes = unlist(celltypes[logik])
+    signatures = signatures[logik]
+  } else {
+    celltypes = unlist(celltypes)
+  }
+  
+  names(signatures) = celltypes 
+  
+  return(signatures)   
+}
+
+#' Differential Expression Analysis for reference dataset
+#'
+#' @param R A reference list as returned by data("Reference_sim")
+#' @return a list of DEG tables
+#' @export
+GetMarkers <- function(R)
+{
+  E = R$data
+  # set colnames
+  colnames(E) <- seq(1, ncol(E))
+  # Set up object
+  outs = lapply(1:ncol(R$celltypes),function(x){
+    lbls = R$celltypes[,x]
+    if (length(unique(lbls)) == 1)
+    {
+      return(NULL)
+    } else {
+      if (x > 1)
+      {
+        logik = R$celltypes[,x] != R$celltypes[,x-1]
+        dat = E[,logik]
+        lbls = lbls[logik]
+      } else {
+        dat = E
+        lbls = lbls
+      }
+      ctrl <- Seurat::CreateSeuratObject(counts = dat, project = "CID", min.cells = 0)
+      ctrl <- Seurat::NormalizeData(ctrl, normalization.method = "RC")
+      ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
+      ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
+      Seurat::FindAllMarkers(ctrl, only.pos = T, min.cells.group = 0)
+    }
+  })
+  
+  return(outs)
+}
+
+#' Jackknife Differential Expression Analysis
+#'
+#' @param E A gene by cell expression matrix
+#' @param Samples A character vector of samples
+#' @param Identities A character vector of cell type or cluster labels
+#' @param Disease A character vector of disease labels
+#' @param do.par if TRUE, code is run in parallel on all available cores minus one
+#' @param num.cores optionally, user can hard set the number of cores to use
+#' @return a DEG table Jackknifed
+#' @export
+JackD <- function(E, Samples, Disease, Identities, do.par = F, num.cores = 1)
+{
+  cat(" ..........  Entry in JackD: \n");
+  ta = proc.time()[3];
+  cat("             Number of cells:", ncol(E), "\n");
+  cat("             Number of genes:", nrow(E), "\n");
+  u = as.character(unique(Samples))
+  cat("             Number of samples:", length(u), "\n");
+  
+  if (do.par)
+    num.cores = parallel::detectCores() - 1
+  
+  colnames(E) <- 1:ncol(E)
+  
+  outs = parallel::mclapply(u, function(x){
+    # dropout one sample
+    logik = Samples != x;
+    E_dummy          = E[,logik]
+    Disease_dummy    = Disease[logik]
+    Identities_dummy = Identities[logik]
+    # create Seurat object for each cell type; run differential expression
+    y = as.character(unique(Identities_dummy))
+    qq = lapply(y, function(z){
+      logik = Identities_dummy == z;
+      E.          = E_dummy[,logik]
+      Disease.    = Disease_dummy[logik]
+      Identities. = Identities_dummy[logik]
+      ctrl <- Seurat::CreateSeuratObject(counts = E.)
+      ctrl <- Seurat::NormalizeData(object = ctrl)
+      ctrl <- Seurat::AddMetaData(ctrl, metadata=Disease., col.name = "Disease")
+      ctrl <- Seurat::SetIdent(ctrl, value='Disease')
+      Seurat::FindAllMarkers(ctrl, only.pos = T)
+    })
+    names(qq) <- y
+    qq
+  }, mc.cores =  num.cores)
+  return(outs)
+}
+
+
+#' Main function for mixed effect modeling
+#'
+#' @param dataset data frame of covariate, cell type, clustering or disease information
+#' @param cluster celltypes returned by Signac or cluster identities
+#' @param contrast Typically disease
+#' @param random_effects User specified random effect variables in dataset
+#' @param fixed_effects User specific fixed effects in dataset
+#' @param verbose If TRUE, algorithm reports outputs
+#' @return mixed effect model results
+#' @export
+MASC <- function(dataset, cluster, contrast, random_effects = NULL, fixed_effects = NULL,
+                 verbose = FALSE) {
+  # Check inputs
+  if (is.factor(dataset[[contrast]]) == FALSE) {
+    stop("Specified contrast term is not coded as a factor in dataset")
+  }
+  
+  cat(" ..........  Entry in MASC \n");
+  ta = proc.time()[3];
+  
+  # Generate design matrix from cluster assignments
+  cluster <- as.character(cluster)
+  designmat <- model.matrix(~ cluster + 0, data.frame(cluster = cluster))
+  dataset <- cbind(designmat, dataset)
+  
+  # Convert cluster assignments to string
+  cluster <- as.character(cluster)
+  # Prepend design matrix generated from cluster assignments
+  designmat <- model.matrix(~ cluster + 0, data.frame(cluster = cluster))
+  dataset <- cbind(designmat, dataset)
+  # Create output list to hold results
+  res <- vector(mode = "list", length = length(unique(cluster)))
+  names(res) <- attributes(designmat)$dimnames[[2]]
+  
+  # Create model formulas
+  if (!is.null(fixed_effects) && !is.null(random_effects)) {
+    model_rhs <- paste0(c(paste0(fixed_effects, collapse = " + "),
+                          paste0("(1|", random_effects, ")", collapse = " + ")),
+                        collapse = " + ")
+    if (verbose == TRUE) {
+      message(paste("Using null model:", "cluster ~", model_rhs))
+    }
+  } else if (!is.null(fixed_effects) && is.null(random_effects)) {
+    model_rhs <- paste0(fixed_effects, collapse = " + ")
+    if (verbose == TRUE) {
+      message(paste("Using null model:", "cluster ~", model_rhs))
+      # For now, do not allow models without mixed effects terms
+      stop("No random effects specified")
+    }
+  } else if (is.null(fixed_effects) && !is.null(random_effects)) {
+    model_rhs <- paste0("(1|", random_effects, ")", collapse = " + ")
+    if (verbose == TRUE) {
+      message(paste("Using null model:", "cluster ~", model_rhs))
+    }
+  } else {
+    model_rhs <- "1" # only includes intercept
+    if (verbose == TRUE) {
+      message(paste("Using null model:", "cluster ~", model_rhs))
+      stop("No random or fixed effects specified")
+    }
+  }
+  
+  # Initialize list to store model objects for each cluster
+  cluster_models <- vector(mode = "list",
+                           length = length(attributes(designmat)$dimnames[[2]]))
+  names(cluster_models) <- attributes(designmat)$dimnames[[2]]
+  
+  # Run nested mixed-effects models for each cluster
+  for (i in seq_along(attributes(designmat)$dimnames[[2]])) {
+    test_cluster <- attributes(designmat)$dimnames[[2]][i]
+    if (verbose == TRUE) {
+      message(paste("Creating logistic mixed models for", test_cluster))
+    }
+    null_fm <- as.formula(paste0(c(paste0(test_cluster, " ~ 1 + "),
+                                   model_rhs), collapse = ""))
+    full_fm <- as.formula(paste0(c(paste0(test_cluster, " ~ ", contrast, " + "),
+                                   model_rhs), collapse = ""))
+    # Run null and full mixed-effects models
+    null_model <- lme4::glmer(formula = null_fm, data = dataset,
+                              family = binomial, nAGQ = 1, verbose = 0,
+                              control = glmerControl(optimizer = "bobyqa"))
+    full_model <- lme4::glmer(formula = full_fm, data = dataset,
+                              family = binomial, nAGQ = 1, verbose = 0,
+                              control = glmerControl(optimizer = "bobyqa"))
+    model_lrt <- anova(null_model, full_model)
+    # calculate confidence intervals for contrast term beta
+    contrast_lvl2 <- paste0(contrast, levels(dataset[[contrast]])[2])
+    contrast_ci <- confint.merMod(full_model, method = "Wald",
+                                  parm = contrast_lvl2)
+    # Save model objects to list
+    cluster_models[[i]]$null_model <- null_model
+    cluster_models[[i]]$full_model <- full_model
+    cluster_models[[i]]$model_lrt <- model_lrt
+    cluster_models[[i]]$confint <- contrast_ci
+  }
+  
+  # Organize results into output dataframe
+  output <- data.frame(cluster = attributes(designmat)$dimnames[[2]],
+                       size = colSums(designmat))
+  output$model.pvalue <- sapply(cluster_models, function(x) x$model_lrt[["Pr(>Chisq)"]][2])
+  output[[paste(contrast_lvl2, "OR", sep = ".")]] <- sapply(cluster_models, function(x) exp(fixef(x$full)[[contrast_lvl2]]))
+  output[[paste(contrast_lvl2, "OR", "95pct.ci.lower", sep = ".")]] <- sapply(cluster_models, function(x) exp(x$confint[contrast_lvl2, "2.5 %"]))
+  output[[paste(contrast_lvl2, "OR", "95pct.ci.upper", sep = ".")]] <- sapply(cluster_models, function(x) exp(x$confint[contrast_lvl2, "97.5 %"]))
+  
+  tb = proc.time()[3] - ta;
+  cat("\n ..........  Exit MASC.\n");
+  cat("             Execution time = ", tb, " s.\n", sep = "");
+  
+  # Return MASC results
+    return(output)
+}
+
 #' Main function for classification
 #'
-#' @param filename Directory and filename of the h5 file
-#' @return annotations
+#' @param E a sparse gene (rows) by cell (column) matrix, or a Seurat object. Rows are HUGO symbols.
+#' @param R Reference data; see data("Reference_sim").
+#' @param spring.dir If using SPRING, directory to categorical_coloring_data.json. Default is NULL.
+#' @param model.use Machine learning model to use. Default option is neural network. Can also be set to 'svm' or 'rf'.
+#' @param N Number of machine learning models to train (for nn and svm). Default is 25.
+#' @param num.cores Number of cores to use. Default is 1.
+#' @param threshold Probability threshold for assigning cells to "Unclassified." Default is 0.5.
+#' @param smooth if TRUE, smooths the cell type classifications. Default is TRUE.
+#' @param impute if TRUE, gene expression values are imputed prior to cell type classification. Default is TRUE.
+#' @param verbose if TRUE, code will report outputs. Default is TRUE.
+#' @return cell type annotations.
 #' @export
-Signac <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T)
+Signac_Solo <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T)
 {
   
   flag = class(E) == "Seurat"
@@ -100,7 +351,7 @@ Signac <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.cores 
     if (model.use == "nn"){
       res = parallel::mclapply(1:N, function(x) {
         nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F)
-        Predict = predict(nn, Matrix::t(Z))
+        Predict = stats::predict(nn, Matrix::t(Z))
         colnames(Predict) <- sort(nn$model.list$response)
         return(Predict)
       }, mc.cores = num.cores)
@@ -114,7 +365,7 @@ Signac <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.cores 
     # if desired, run svm
     if (model.use == "svm") {
       model = e1071::svm(celltypes ~ ., data = df, probability=TRUE)
-      xx = predict(model, t(Z), probability=TRUE)
+      xx = stats::predict(model, t(Z), probability=TRUE)
       res = attr(xx, "probabilities")
       xx = apply(res, 1, which.max)
       celltypes = colnames(res)[xx]
@@ -125,7 +376,7 @@ Signac <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.cores 
     if (model.use == "rf") {
       res = parallel::mclapply(1:N, function(x) {
         model = randomForest::randomForest(celltypes ~ ., data=df, keep.forest = TRUE)
-        predict(model,newdata=Matrix::t(Z),type="prob")
+        stats::predict(model,newdata=Matrix::t(Z),type="prob")
       }, mc.cores = num.cores)
       res = Reduce(res, f = '+') / N
       xx = apply(res, 1, which.max)
@@ -157,12 +408,23 @@ Signac <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.cores 
 
 #' Main function for classification
 #'
-#' @param filename Directory and filename of the h5 file
+#' @param E a sparse gene (rows) by cell (column) matrix, or a Seurat object. Rows are HUGO symbols.
+#' @param R Reference dataset; user should do data("Reference_sim") and then set R to Refernence_sim.
+#' @param spring.dir If using SPRING, directory to categorical_coloring_data.json. Default is NULL.
+#' @param model.use Machine learning model to use. Default option is neural network. Can also be set to 'svm' or 'rf'.
+#' @param N Number of machine learning models to train (for nn and svm). Default is 25.
+#' @param num.cores Number of cores to use. Default is 1.
+#' @param threshold Probability threshold for assigning cells to "Unclassified." Default is 0.5.
+#' @param smooth if TRUE, smooths the cell type classifications. Default is TRUE.
+#' @param impute if TRUE, gene expression values are imputed prior to cell type classification. Default is TRUE.
+#' @param verbose if TRUE, code will report outputs. Default is TRUE.
+#' @param do.normalize if TRUE, cells are normalized to the mean library size. Default is TRUE.
+#' @param probability if TRUE, returns the probability associated with each cell type label. Default is TRUE.
 #' @return annotations
 #' @export
-Signac_batch <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T, do.normalize = T, probability = F)
+Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T, do.normalize = T, probability = F)
 {
-  
+
   flag = class(E) == "Seurat"
   
   if (flag & impute)
@@ -170,7 +432,7 @@ Signac_batch <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.
   
   if (verbose)
   {
-    cat(" ..........  Entry in Signac batch \n");
+    cat(" ..........  Entry in Signac \n");
     ta = proc.time()[3];
     
     # main function
@@ -258,10 +520,39 @@ Signac_batch <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.
     # train a neural network (N times)
     if (model.use == "nn"){
       res = parallel::mclapply(1:N, function(x) {
-        nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F)
-        Predict = predict(nn, Matrix::t(Z))
+        nn=neuralnet::neuralnet(celltypes~.,hidden=2,data=df, act.fct = 'logistic', linear.output = F)
+        Predict = stats::predict(nn, Matrix::t(Z))
         colnames(Predict) <- sort(nn$model.list$response)
         return(Predict)
+      }, mc.cores = num.cores)
+      res.squared.mean <- Reduce("+", lapply(res, "^", 2)) / N
+      res = Reduce(res, f = '+') / N
+      res.variance <- res.squared.mean - res^2
+      res.sd <- sqrt(res.variance)
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Other"
+      df = data.frame(celltypes = celltypes, probability = kmax, error = res.sd[xx], percent_features_detected = round(Matrix::colSums(Z != 0) / nrow(Z), digits = 3) * 100)
+      df$celltypes = as.character(df$celltypes)
+    }
+    # if desired, run svm
+    if (model.use == "svm") {
+      model = e1071::svm(celltypes ~ ., data = df, probability=TRUE)
+      xx = stats::predict(model, t(Z), probability=TRUE)
+      res = attr(xx, "probabilities")
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Other"
+      df = data.frame(celltypes = celltypes, probability = kmax)
+      df$celltypes = as.character(df$celltypes)
+    }
+    # if desired, run RF
+    if (model.use == "rf") {
+      res = parallel::mclapply(1:N, function(x) {
+        model = randomForest::randomForest(celltypes ~ ., data=df, keep.forest = TRUE)
+        stats::predict(model,newdata=Matrix::t(Z),type="prob")
       }, mc.cores = num.cores)
       res = Reduce(res, f = '+') / N
       xx = apply(res, 1, which.max)
@@ -269,33 +560,13 @@ Signac_batch <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.
       kmax = apply(res, 1, max)
       celltypes[kmax < threshold] = "Other"
       df = data.frame(celltypes = celltypes, probability = kmax)
-    }
-    # if desired, run svm
-    if (model.use == "svm") {
-      model = e1071::svm(celltypes ~ ., data = df, probability=TRUE)
-      xx = predict(model, t(Z), probability=TRUE)
-      res = attr(xx, "probabilities")
-      xx = apply(res, 1, which.max)
-      celltypes = colnames(res)[xx]
-      kmax = apply(res, 1, max)
-      celltypes[kmax < threshold] = "Other"
-    }
-    # if desired, run RF
-    if (model.use == "rf") {
-      res = parallel::mclapply(1:N, function(x) {
-        model = randomForest::randomForest(celltypes ~ ., data=df, keep.forest = TRUE)
-        predict(model,newdata=Matrix::t(Z),type="prob")
-      }, mc.cores = num.cores)
-      res = Reduce(res, f = '+') / N
-      xx = apply(res, 1, which.max)
-      celltypes = colnames(res)[xx]
-      kmax = apply(res, 1, max)
-      celltypes[kmax < threshold] = "Other"
+      df$celltypes = as.character(df$celltypes)
     }
       # smooth the output classifications
       if (smooth)
         df$celltypes = CID.smooth(df$celltypes, dM[[1]])
     
+    # return probabilities and cell type classifications
     if (probability){
       return(df)
     } else {
@@ -311,11 +582,26 @@ Signac_batch <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.
     return(res)
 }
 
-Generate_lbls = function(cr, spring.dir = NULL, full.dataset = NULL, smooth = T)
+#' Generate labels from classifications
+#'
+#' @param cr list returned by Signac function call.
+#' @param E a sparse gene (rows) by cell (column) matrix, or a Seurat object. Rows are HUGO symbols.
+#' @param spring.dir If using SPRING, directory to categorical_coloring_data.json. Default is NULL.
+#' @param smooth if TRUE, smooths the cell type classifications. Default is TRUE.
+#' @return cell type labels (list) for each level of the hierarchy.
+#' @export
+Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
 {
-  # impute genes
+
   if (!is.null(spring.dir)){
     edges = CID.LoadEdges(data.dir = spring.dir)
+    dM = CID.GetDistMat(edges)
+    louvain = CID.Louvain(edges = edges)
+  }
+  
+  flag = class(E) == "Seurat"
+  if (flag) {
+    edges = E@graphs$RNA_nn
     dM = CID.GetDistMat(edges)
     louvain = CID.Louvain(edges = edges)
   }
@@ -354,12 +640,12 @@ Generate_lbls = function(cr, spring.dir = NULL, full.dataset = NULL, smooth = T)
     immune = CID.smooth(immune, dM[[1]])
   }
   }
-  #logik = immune == "Other" | celltypes == "Other" | cellstates == "Other"
-  #cellstates[logik] = "Other"
-  #celltypes[logik] = "Other"
-  #immune[logik] = "Other"
+  logik = immune == "Other" | celltypes == "Other" | cellstates == "Other"
+  cellstates[logik] = "Other"
+  celltypes[logik] = "Other"
+  immune[logik] = "Other"
   
-  res$Immune_Vidi = immune
+  res$Immune = immune
   if (!is.null(spring.dir))
   {
   do = data.frame(table(louvain[cellstates == "Other"]))
@@ -383,317 +669,33 @@ Generate_lbls = function(cr, spring.dir = NULL, full.dataset = NULL, smooth = T)
       cellstates_novel = new_lbls$lbls
       celltypes_novel[grepl("^[+]", cellstates_novel)] = new_lbls$lbls[grepl("^[+]", cellstates_novel)]
     } else {
-      res$CellTypes_Vidi_novel = celltypes
-      res$CellStates_Vidi_novel = cellstates
+      res$CellTypes_novel = celltypes
+      res$CellStates_novel = cellstates
     }
   } else {
-    res$CellTypes_Vidi_novel = celltypes_novel
-    res$CellStates_Vidi_novel = cellstates_novel
+    res$CellTypes_novel = celltypes_novel
+    res$CellStates_novel = cellstates_novel
   }
   }
-  res = res[-1]
-  res$CellTypes_Vidi = celltypes
-  res$CellStates_Vidi = cellstates
+
+  res$CellTypes = celltypes
+  res$CellStates = cellstates
+
+  names(res)[names(res) == ""] = paste0("L", 1:sum(names(res) == ""))
   
   return(res)
 }
 
-#' Main function neural network
+#' Main function for learning
 #'
-#' @param filename Directory and filename of the h5 file
-#' @return annotations
-#' @export
-Vidi_v5 <- function (E, R, spring.dir = NULL, model.use = "nn")
-{
-  # keep only unique row names
-  logik = CID.IsUnique(rownames(E))
-  E = E[logik,]
-  
-  # intersect genes with reference set
-  gns = intersect(rownames(E), R$genes)
-  V = E[rownames(E) %in% gns, ]
-  
-  # make sure data are in the same order
-  V = V[order(rownames(V)),]
-  
-  # normalize to the mean library size
-  V = CID.Normalize(V)
-  
-  # normalize
-  normalize <- function(x) {
-    return ((x - min(x)) / (max(x) - min(x)))
-  }
-  V = t(apply(V, 1, function(x){
-    normalize(x)
-  }))
-
-  logik = apply(V, 1, function(x) {any(is.na(x))})
-  V = V[!logik,]
-  
-  # impute genes
-  if (!is.null(spring.dir)){
-    edges = CID.LoadEdges(data.dir = spring.dir)
-    dM = CID.GetDistMat(edges)
-  }
-  
-  res = lapply(1:length(R$Reference), function(i) {  
-    # make sure order is the same
-    celltypes = R$Reference[[i]]$celltypes
-    gns = sort(intersect(rownames(V), colnames(R$Reference[[i]])))
-    Z = V[rownames(V) %in% gns, ]
-    dat = R$Reference[[i]][,colnames(R$Reference[[i]]) %in% gns]
-    Z = Z[order(rownames(Z)), ]
-    dat = dat[, order(colnames(dat))]
-    
-    # remove any low variance genes
-    kmu = apply(Z, 1, function(x){sum(x != 0)})
-    logik = kmu > 0;
-    Z = Z[logik,]
-    dat = dat[,logik]
-    
-    if (!is.null(spring.dir)){
-    Z = KSoftImpute(E = Z, dM = dM)
-    Z = t(apply(Z, 1, function(x){
-      normalize(x)
-    }))
-    }
-    
-    # build training set
-    df = data.frame(dat, celltypes = celltypes)
-    
-    # train a neural network
-    if (model.use == "nn"){
-      nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F, rep = 2)
-      Predict = predict(nn, Matrix::t(Z))
-      return(apply(Predict, 1, function(z) {sort(nn$model.list$response)[which.max(z)]}))
-    }
-    # if desired, run svm NOTE: very unstable results compared to neural network and much slower
-    if (model.use == "svm") {
-      model <- e1071::svm(celltypes ~ ., data = df, probability=TRUE)
-      xx = predict(model, t(Z), probability=TRUE)
-      xx = attr(xx, "probabilities")
-      # assign cells based on probability
-      return(colnames(xx)[apply(xx, 1, which.max)])
-    }
-  })
-  
-  return(res)
-}
-
-#' Main function neural network
-#'
-#' @param filename Directory and filename of the h5 file
-#' @return annotations
-#' @export
-Vidi_v4 <- function (E, R, clusters = NULL, fine.tune = F, spring.dir = NULL)
-{
-  # keep only unique row names
-  logik = CID.IsUnique(rownames(E))
-  E = E[logik,]
-  
-  # intersect genes with reference set
-  gns = unlist(sapply(R$features, function(x){ as.character(x$gene)}))
-  gns = unique(gns)
-  gns = sort(gns)
-  gns = intersect(rownames(E), gns)
-  V = E[rownames(E) %in% gns, ]
-  dat = R$data[rownames(R$data) %in% gns,]
-  
-  # make sure data are in the same order
-  V = V[order(rownames(V)),]
-  dat = dat[order(rownames(dat)),]
-  
-  # normalize to the mean library size
-  V = CID.Normalize(V)
-  dat = CID.Normalize(dat)
-  
-  # impute genes
-  edges = CID.LoadEdges(data.dir = spring.dir)
-  dM = CID.GetDistMat(edges)
-  V = KSoftImpute(E = V, dM = dM)
-  
-  # normalize
-  normalize <- function(x) {
-    return ((x - min(x)) / (max(x) - min(x)))
-  }
-  
-  # save before normalization
-  V_Delta = V
-  dat_Delta = dat
-  
-  V = t(apply(V, 1, function(x){
-    normalize(x)
-  }))
-  dat = t(apply(dat, 1, function(x){
-    normalize(x)
-  }))
-  
-  logik = apply(V, 1, function(x) {any(is.na(x))})
-  V = V[!logik,]
-  dat = dat[!logik,]
-  
-  res = list("")
-  # classify data
-  for (i in 1:10)
-  {  
-    w = clusters
-    # limit to predictive features
-    gns = sort(R$features[[i]]$gene)
-    gns = sort(intersect(intersect(rownames(V), rownames(dat)), gns))
-    Z = V[rownames(V) %in% gns, ]
-    dat_small = dat[rownames(dat) %in% gns,]
-    
-    # make sure order is the same
-    Z = Z[order(rownames(Z)), ]
-    dat_small = dat_small[order(rownames(dat_small)),]
-    
-    # subset cells
-    if (i == 2) {
-      l = res[[1]] == "Immune"
-      Z = Z[,l]
-      w = w[l]
-    }
-    if (i == 3) {
-      l = res[[2]] == "Not.HSC"
-      Z = Z[,l]
-      w = w[l]
-    } 
-    if (i == 4) {
-      l = res[[3]] == "Lymphocytes"
-      Z = Z[,l]
-      w = w[l]
-    }
-    if (i == 5) {
-      l = res[[3]] == "Myeloid"
-      Z = Z[,l]
-      w = w[l]
-    }
-    if (i == 6) {
-      l = res[[4]] == "B.cells"
-      Z = Z[,l]
-      w = w[l]
-    }
-    if (i == 7) {
-      l = res[[6]] == "B.cells.NoPlasma"
-      Z = Z[,l]
-      w = w[l]
-    }
-    if (i == 8) {
-      l = res[[4]] == "TNK"
-      Z = Z[,l]
-      w = w[l]
-    }
-    if (i == 9) {
-      l = res[[8]] == "T.cells"
-      Z = Z[,l]
-      w = w[l]
-    }
-    if (i == 10) {
-      l = res[[9]] == "T.cells.CD4.regs.gd"
-      Z = Z[,l]
-      w = w[l]
-    }
-    
-    # limit training set to hierarchy
-    xx = as.character(R$celltypes[,i])
-    logik = R$celltypes[,i] %in% as.character(unique(R$features[[i]]$cluster))
-    dat_small = dat_small[,logik]
-    xx = xx[logik]
-    
-    # establish reference samples
-    if (fine.tune) {
-      subs = round(sqrt(table(w)))
-      subsample = unlist(sapply(unique(w), function(x){
-        idx = match(x, names(subs))
-        paste(w[w == x], sample(letters[1:subs[idx]], size = sum(w == x), replace = T), sep = "_")
-      }))
-      tt = aggregate(Matrix::t(Z),by=list(subsample),mean)
-      tt = as.matrix(tt[,-1])
-      z = sort(unique(as.vector(apply(tt, 1, function(x){
-        dd = cor(dat_small, x, method = "spearman")
-        order(dd, decreasing = T)[1:100]
-      }))))
-      dat_small = dat_small[,z]
-      xx = xx[z]
-    }
-    
-    if (length(unique(xx)) == 1) {
-      
-      if (i > 1)
-      {
-        res[[i]] = res[[i - 1]]
-        res[[i]][l] = rep(xx[1], sum(l))
-      } else {
-        res[[i]] = rep(xx[1], ncol(Z))
-      }
-      
-    } else {
-    
-    # remove any low variance genes
-    kmu = apply(Z, 1, function(x){sum(x != 0)})
-    logik = kmu > 0;
-    Z = Z[logik,]
-    dat_small = dat_small[logik,]
-    
-    # add cell labels
-    df = data.frame(t(dat_small), celltypes = xx)
-    # autoplot(pca, data = df2, colour = 'celltypes')
-    
-    # train a neural network
-    nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F)
-    
-    Z = t(Z)
-    
-    # scale factor normalize
-    #SF = sapply(1:ncol(Z), function(x){
-    #abs(max(Z[,x]) / max(df[,x]))
-    #  })
-    #diag_SF = Matrix::Matrix(data = 0, nrow = ncol(Z), ncol = ncol(Z), sparse = T)
-    #diag(diag_SF) <- 1 / SF
-    #Z = as.matrix(Z) %*% diag_SF
-    
-    #Predict=neuralnet::compute(nn, Z2)
-    Predict = predict(nn, Z)
-    # prob <- Predict$net.result
-    if (i > 1)
-    {
-      res[[i]] = res[[i - 1]]
-      res[[i]][l] = apply(Predict, 1, function(z) {sort(nn$model.list$response)[which.max(z)]})
-    } else {
-      res[[i]] = apply(Predict, 1, function(z) {sort(nn$model.list$response)[which.max(z)]})
-    }
-    # table(res[[i]], json_data$CellTypesID)
-    # if desired, run svm instead
-    #model <- e1071::svm(celltypes ~ ., data = df, probability=TRUE)
-    #xx = predict(model, as.matrix(Z), probability=TRUE)
-    #xx = attr(xx, "probabilities")
-    # assign cells based on probability
-    #colnames(xx)[apply(xx, 1, which.max)]
-    }
-  }
-  
-  # write results
-  cr = list("")
-  cr$Immune_Vidi = res[[1]]
-  xx = res[[2]]
-  xx[res[[1]] == "Immune"] = xx[res[[1]] == "Immune"]
-  xx[res[[1]] != "Immune"] = res[[1]][res[[1]] != "Immune"]
-  xx[xx == "Not.HSC"] = res[[3]][xx == "Not.HSC"]
-  xx[xx == "Lymphocytes"] = res[[4]][xx == "Lymphocytes"]
-  xx[xx == "Myeloid"] = res[[5]][xx == "Myeloid"]
-  xx[xx == "B.cells"] = res[[6]][xx == "B.cells"]
-  xx[xx == "B.cells.NoPlasma"] = res[[7]][xx == "B.cells.NoPlasma"]
-  xx[xx == "TNK"] = res[[8]][xx == "TNK"]
-  cr$CellTypes_Vidi = xx
-  cr = cr[-1]
-  return(cr)
-  
-}
-
-#' Main function transfer learning
-#'
-#' @param filename Directory and filename of the h5 file
-#' @return annotations
+#' @param E a sparse gene (rows) by cell (column) matrix. Rows are HUGO symbols.
+#' @param learned_types Types for learning
+#' @param labels cell type labels for the columns of E.
+#' @param size Number of bootstrapped samples for machine learning. Default is 1,000.
+#' @param logfc.threshold Cutoff for feature selection. Default is 0.25.
+#' @param spring.dir if using SPRING, directory to categorical_coloring_data.json. Default is NULL.
+#' @param impute if TRUE, performs imputation prior to bootstrapping. Default is TRUE.
+#' @return training data frame to be added to a new reference training set
 #' @export
 SignacLearn <- function (E, learned_types, labels, size = 1000, impute = T, spring.dir = NULL, logfc.threshold = 0.25)
 {
@@ -753,7 +755,7 @@ SignacLearn <- function (E, learned_types, labels, size = 1000, impute = T, spri
       dd = t(apply(dummy, 1, function(z) {
         sample(z, size = size, replace = T)}))
       dd = t(apply(dd, 1, function(z){
-        rnorm(n = length(z), mean = mean(z), sd = sd(z))
+        stats::rnorm(n = length(z), mean = mean(z), sd = sd(z))
       }))
       # now sample from cells in cluster 2, size cells with True Negative Expr.
       logik = !rownames(dat) %in% x$gene
@@ -763,7 +765,7 @@ SignacLearn <- function (E, learned_types, labels, size = 1000, impute = T, spri
       dd2 = t(apply(dummy, 1, function(z) {
         sample(z, size = size, replace = T)}))
       dd2 = t(apply(dd2, 1, function(z){
-        rnorm(n = length(z), mean = mean(z), sd = sd(z))
+        stats::rnorm(n = length(z), mean = mean(z), sd = sd(z))
       }))
       rbind(dd, dd2)
     })
@@ -783,337 +785,6 @@ SignacLearn <- function (E, learned_types, labels, size = 1000, impute = T, spri
   #library(ggplot2)
   #ggplot(boot, aes(x=TRGC1, y=TRDC, color=celltypes)) + geom_point()
   return(boot)
-}
-
-#' Main function neural network
-#'
-#' @param filename Directory and filename of the h5 file
-#' @return annotations
-#' @export
-Vidi_v3 <- function (E, R, clusters = NULL, fine.tune = F)
-{
-  # keep only unique row names
-  logik = CID.IsUnique(rownames(E))
-  E = E[logik,]
-  
-  # intersect genes with reference set
-  gns = unlist(sapply(R$features, function(x){ as.character(x$gene)}))
-  gns = unique(gns)
-  gns = sort(gns)
-  gns = intersect(rownames(E), gns)
-  V = E[rownames(E) %in% gns, ]
-  dat = R$data[rownames(R$data) %in% gns,]
-  
-  # make sure data are in the same order
-  V = V[order(rownames(V)),]
-  dat = dat[order(rownames(dat)),]
-  
-  # normalize to the mean library size
-  V = CID.Normalize(V)
-  dat = CID.Normalize(dat)
-  
-  # impute genes
-  edges = CID.LoadEdges(data.dir = spring.dir)
-  dM = CID.GetDistMat(edges)
-  V = KSoftImpute(E = V, dM = dM)
-  
-  # normalize
-  normalize <- function(x) {
-    return ((x - min(x)) / (max(x) - min(x)))
-  }
-  
-  V = t(apply(V, 1, function(x){
-    normalize(x)
-  }))
-  dat = t(apply(dat, 1, function(x){
-    normalize(x)
-  }))
-  
-  res = list("")
-  # classify data
-  for (i in 1:8)
-  {  
-    # limit to predictive features
-    gns = sort(R$features[[i]]$gene)
-    gns = sort(intersect(intersect(rownames(V), rownames(dat)), gns))
-    Z = V[rownames(V) %in% gns, ]
-    dat_small = dat[rownames(dat) %in% gns,]
-    
-    # make sure order is the same
-    Z = Z[order(rownames(Z)), ]
-    dat_small = dat_small[order(rownames(dat_small)),]
-    
-    # subset cells
-    if (i == 2) {
-      l = res[[1]] == "Immune"
-      Z = Z[,l]
-    }
-    if (i == 3) {
-      l = res[[2]] == "Not.HSC"
-      Z = Z[,l]
-    } 
-    if (i == 4) {
-      l = res[[3]] == "Lymphocytes"
-      Z = Z[,l]
-    }
-    if (i == 5) {
-      l = res[[3]] == "Myeloid"
-      Z = Z[,l]
-    }
-    if (i == 6) {
-      l = res[[4]] == "B.cells"
-      Z = Z[,l]
-    }
-    if (i == 7) {
-      l = res[[6]] == "B.cells.NoPlasma"
-      Z = Z[,l]
-    }
-    if (i == 8) {
-      l = res[[4]] == "TNK"
-      Z = Z[,l]
-    }
-    
-    # limit training set to hierarchy
-    xx = as.character(R$celltypes[,i])
-    logik = R$celltypes[,i] %in% as.character(unique(R$features[[i]]$cluster))
-    dat_small = dat_small[,logik]
-    xx = xx[logik]
-    
-    # establish reference samples
-    if (fine.tune) {
-      subs = round(sqrt(table(clusters)))
-      subsample = unlist(sapply(1:length(unique(clusters)), function(x){
-        idx = match(x, names(subs))
-        paste(clusters[clusters == x], sample(letters[1:subs[idx]], size = sum(clusters == x), replace = T), sep = "_")
-      }))
-      tt = aggregate(Matrix::t(Z),by=list(subsample),mean)
-      tt = as.matrix(tt[,-1])
-      z = sort(unique(as.vector(apply(tt, 1, function(x){
-        dd = cor(dat_small, x, method = "spearman")
-        order(dd, decreasing = T)[1:5]
-      }))))
-      dat_small = dat_small[,z]
-      # z-score transform for co-normalization
-      dat_small = t(apply(dat_small, 1, function(x){
-        #z = x + rnorm(n = length(x), mean = mean(x),sd = 1)
-        scale(x)
-      }))
-      #df = data.frame(t(dat_small), celltypes = celltypes[z,i])
-      xx = as.character(celltypes[z,i])
-    } #else {
-       # dat_small = t(apply(dat_small, 1, function(x){
-      #    scale(x)
-      #  }))
-    #}
-    
-    # remove any low variance genes
-    kmu = apply(Z, 1, function(x){sum(x != 0)})
-    logik = kmu > 0;
-    Z = Z[logik,]
-    dat_small = dat_small[logik,]
-    
-    # add a small noise factor for variance stabilization
-    #N = abs(0.01*matrix(rnorm(nrow(Z)*col(Z)), nrow = nrow(Z), ncol = ncol(Z)))
-    #kmu = Matrix::rowMeans(Z)/10
-    #Z = Z + N * kmu
-    #Z2 = t(apply(Z, 1, function(x){
-    #  q = scale(log2( 1 + x) )
-    #  q = q - min(q)
-    #  q / max(q)
-    #}))
-    
-    # perform principal components analysis
-    #pca <- prcomp(x = t(dat_small), center = T, scale. = T)
-    
-    # correlate PCs with cell type status
-    #fits = apply(pca$x, 2, function(x){
-    #  fit = lm(x ~ xx)
-    #  summary(fit)$coefficients[,4][2]
-    #})
-    #logik = fits < 0.05
-    
-    # project data
-    #Z2 = scale(Matrix::t(Z), pca$center, pca$scale) %*% pca$rotation
-    #df = scale(t(dat_small), pca$center, pca$scale) %*% pca$rotation
-    #df2 = pca$x[,logik]
-    
-    # quantile normalize
-    #lbls = c(rep("Reference", nrow(df)), rep("Test", nrow(Z)))
-    #dat_merged = preprocessCore::normalize.quantiles(cbind(t(df), t(as.matrix(Z))))
-    #df = t(dat_merged[,lbls == "Reference"])
-    #Z = t(dat_merged[,lbls == "Test"])
-    
-    # shift every PCA to zero
-    #df2 = apply(df2, 2, function(x){
-    #  x - min(x)
-    #})
-    #Z2 = apply(Z2, 2, function(x){
-    #  x - min(x)
-    #})
-    
-    # normalize to 1
-    #df2 = apply(df2, 2, function(x){
-    #  x/max(x)
-    #})
-    #Z2 = apply(Z2, 2, function(x){
-    #  x/max(x)
-    #})
-    
-    # add cell labels
-    df = data.frame(t(dat_small), celltypes = xx)
-    # autoplot(pca, data = df2, colour = 'celltypes')
-    
-    # train a neural network
-    nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F)
-    
-    # scale factor normalize
-    #SF = sapply(1:ncol(Z), function(x){
-    #abs(max(Z[,x]) / max(df[,x]))
-    #  })
-    #diag_SF = Matrix::Matrix(data = 0, nrow = ncol(Z), ncol = ncol(Z), sparse = T)
-    #diag(diag_SF) <- 1 / SF
-    #Z = as.matrix(Z) %*% diag_SF
-    
-    #Predict=neuralnet::compute(nn, Z2)
-    Predict = predict(nn, Z2)
-    # prob <- Predict$net.result
-    if (i > 1)
-    {
-      res[[i]] = res[[i - 1]]
-      res[[i]][l] = apply(Predict, 1, function(z) {sort(nn$model.list$response)[which.max(z)]})
-    } else {
-      res[[i]] = apply(Predict, 1, function(z) {sort(nn$model.list$response)[which.max(z)]})
-    }
-    # table(res[[i]], json_data$CellTypesID)
-    # if desired, run svm instead
-    #model <- e1071::svm(celltypes ~ ., data = df, probability=TRUE)
-    #xx = predict(model, as.matrix(Z), probability=TRUE)
-    #xx = attr(xx, "probabilities")
-    # assign cells based on probability
-    #colnames(xx)[apply(xx, 1, which.max)]
-  }
-  
-  # write results
-  cr = list("")
-  cr$Immune_Vidi = res[[1]]
-  xx = res[[2]]
-  xx[res[[1]] == "Immune"] = xx[res[[1]] == "Immune"]
-  xx[res[[1]] != "Immune"] = res[[1]][res[[1]] != "Immune"]
-  xx[xx == "Not.HSC"] = res[[3]][xx == "Not.HSC"]
-  xx[xx == "Lymphocytes"] = res[[4]][xx == "Lymphocytes"]
-  xx[xx == "Myeloid"] = res[[5]][xx == "Myeloid"]
-  xx[xx == "B.cells"] = res[[6]][xx == "B.cells"]
-  xx[xx == "B.cells.NoPlasma"] = res[[7]][xx == "B.cells.NoPlasma"]
-  xx[xx == "TNK"] = res[[8]][xx == "TNK"]
-  cr$CellTypes_Vidi = xx
-  cr = cr[-1]
-  return(cr)
-
-}
-
-#' Main function SVM
-#'
-#' @param filename Directory and filename of the h5 file
-#' @return annotations
-#' @export
-Vidi_v2 <- function (E, clusters, R)
-{
-  # keep only unique row names
-  logik = CID.IsUnique(rownames(E))
-  E = E[logik,]
-  
-  # intersect genes with reference set
-  gns = intersect(rownames(E), rownames(R$data))
-  V = E[rownames(E) %in% gns, ]
-  dat = R$data[rownames(R$data) %in% gns,]
-  
-  # make sure data are in the same order
-  V = V[order(rownames(V)),]
-  dat = dat[order(rownames(dat)),]
-  
-  # classify data
-  res = lapply(1:10, function(i){
-    
-    # limit to predictive features
-    gns = sort(R$features[[i]]$gene)
-    Z = V[rownames(V) %in% gns, ]
-    dat_small = dat[rownames(dat) %in% gns,]
-    
-    # limit training set to hierarchy
-    logik = R$celltypes[,i] %in% as.character(unique(R$features[[i]]$cluster))
-    dat_small = dat_small[,logik]
-    celltypes = R$celltypes[logik,]
-    
-    # establish reference samples
-    if (fine.tune) {
-      subs = round(sqrt(table(clusters)))
-      subsample = unlist(sapply(1:length(unique(clusters)), function(x){
-        idx = match(x, names(subs))
-        paste(clusters[clusters == x], sample(letters[1:subs[idx]], size = sum(clusters == x), replace = T), sep = "_")
-      }))
-      tt = aggregate(Matrix::t(Z),by=list(subsample),mean)
-      tt = as.matrix(tt[,-1])
-      z = sort(unique(as.vector(apply(tt, 1, function(x){
-        dd = cor(dat_small, x, method = "spearman")
-        order(dd, decreasing = T)[1:5]
-      }))))
-      dat_small = dat_small[,z]
-      # add white noise for variance stabilization and then z-score transform for co-normalization
-      dat_small = t(apply(dat_small, 1, function(x){
-        z = x + rnorm(n = length(x), mean = mean(x),sd = 1)
-        scale(z)
-      }))
-      df = data.frame(t(dat_small), celltypes = celltypes[z,i])
-    } else {
-      # add white noise for variance stabilization and then z-score transform for co-normalization
-      dat_small = t(apply(dat_small, 1, function(x){
-        z = x + rnorm(n = length(x), mean = mean(x),sd = 1)
-        scale(z)
-      }))
-      df = data.frame(t(dat_small), celltypes = celltypes[,i])
-    }
-
-    # train a neural network
-    nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = "logistic",
-                 linear.output = F)
-    
-    # add white noise and z-score transform; iterate until convergence
-        Z2 = data.frame(apply(Z, 1, function(x){
-          z = x + rnorm(n = length(x), mean = mean(x),sd = 1)
-          scale(z)
-        }))
-        Predict=neuralnet::compute(nn, Z2)
-        prob <- Predict$net.result
-        apply(prob, 1, function(z) {sort(as.character(unique(R$features[[i]]$cluster)))[which.max(z)]})
-  })
-  
-  # write results
-  cr = list("")
-  
-  # get immune cells
-  cr$immune = res[[1]]
-  
-  
-  cr$immune[res[[1]] == "NonImmune" & res[[3]] == "Lymphocytes" & res[[4]] == "B.cells" & res[[6]] == "Plasma.cells"]
-  cr$hema = res[[2]]
-  cr$hema[cr$immune == "NonImmune"] = "NonImmune" 
-  cr$celltypes = res[[3]]
-  cr$celltypes[cr$immune == "NonImmune"] = "NonImmune"
-  
-  
-  cr$L0 = cr$celltypes
-  cr$L0[cr$celltypes == "Lymphocytes"] = res[[4]][cr$celltypes == "Lymphocytes"]
-  cr$L1 = cr$L0
-  cr$L1[cr$L0 == "Myeloid"] = res[[5]][cr$L0 == "Myeloid"]
-  cr$L2 = cr$L1
-  cr$L2[cr$L1 == "B.cells"] = res[[6]][cr$L1 == "B.cells"]
-  cr$L3 = cr$L2
-  cr$L3[cr$L2 == "B.cells.NoPlasma"] = res[[7]][cr$L2 == "B.cells.NoPlasma"]
-  cr$L4 = cr$L3
-  cr$L4[cr$L3 == "B.cells.NoPlasma"] = res[[8]][cr$L3 == "B.cells.NoPlasma"]
-  
-  cr = cr[-1]
-  return(cr)
 }
 
 #' Show hierarchical structure
@@ -1137,183 +808,10 @@ ShowHierarchy <- function (R)
   return(df)
 }
 
-#' Main function SVM
-#'
-#' @param filename Directory and filename of the h5 file
-#' @return annotations
-#' @export
-Vidi <- function (E, clusters, R)
-{
-  # keep only unique row names
-  logik = CID.IsUnique(rownames(E))
-  E = E[logik,]
-  
-  # intersect genes with reference set
-  mrks = toupper(unlist(c(R$de.genes.main$`B-cells`$Fibroblasts,R$de.genes.main$Fibroblasts$`B-cells`)))
-  gns = intersect(rownames(E), mrks)
-  V = E[rownames(E) %in% gns, ]
-  dat = R$data[rownames(R$data) %in% gns,]
-  
-  # make sure data are in the same order
-  V = V[order(rownames(V)),]
-  dat = dat[order(rownames(dat)),]
-  xx = rownames(dat)
-  
-  # establish reference samples
-  # keep top 5 samples by correlation with each down-sampled cluster mean
-  subs = round(sqrt(table(clusters)))
-  subsample = unlist(sapply(1:length(unique(clusters)), function(x){
-    idx = match(x, names(subs))
-    paste(clusters[clusters == x], sample(letters[1:subs[idx]], size = sum(clusters == x), replace = T), sep = "_")
-  }))
-  tt = aggregate(Matrix::t(V),by=list(subsample),mean)
-  tt = as.matrix(tt[,-1])
-  z = sort(unique(as.vector(apply(tt, 1, function(x){
-    dd = cor(dat, x, method = "spearman")
-    order(dd, decreasing = T)[1:5]
-  }))))
-  
-  dat = dat[,z]
-  
-  # classify data
-  res = lapply(1:length(R$features), function(x){
-    # get shared gene names of features
-    if (!is.null(R$features[[x]])) {
-    gns = intersect(rownames(E), R$features[[x]]$gene[order(R$features[[x]]$avg_logFC, decreasing = T)])
-   # gns = sample(gns, size = round(length(gns)/2))
-    E_small = as.matrix(E[rownames(E) %in% gns,])
-    dat = R$data[rownames(R$data) %in% gns,]
-   
-    E_small = E_small[order(rownames(E_small)),]
-    dat = dat[order(rownames(dat)),]
-    
-    # look at samples in the region
-    logik = R$celltypes[,x] %in% unique(R$features[[x]]$cluster)
-    dat = dat[,logik]
-    celltypes = R$celltypes[logik,x]
-    
-    # co-normalize after scaling with quantile normalization
-    lbls = c(rep("Reference", ncol(dat)), rep("SingleCell", ncol(E_small)))
-    dat_merged = preprocessCore::normalize.quantiles(cbind(dat, E_small))
-    dat = dat_merged[,lbls == "Reference"]
-    E_small = dat_merged[,lbls != "Reference"]
-    #dat = t(scale(t(dat)))
-    #E_small = t(scale(t(E_small)))
-
-    df = data.frame(t(dat), celltypes = celltypes)
-    
-    model <- e1071::svm(celltypes ~ ., data = df, probability=TRUE)
-    xx = predict(model, t( E_small), probability=TRUE)
-    xx = attr(xx, "probabilities")
-    
-    # assign cells based on probability
-    colnames(xx)[apply(xx, 1, which.max)]
-    # celltypes[apply(xx, 1, max) < 0.6] = "Other"
-    } else {
-      rep(colnames(R$celltypes)[x], ncol(E))
-    }
-  })
-  
-  # write results
-  cr = list("")
-  cr$immune = res[[1]]
-  cr$hema = res[[2]]
-  cr$hema[cr$immune == "NonImmune"] = "NonImmune" 
-  cr$celltypes = res[[3]]
-  cr$celltypes[cr$hema == "Myeloid"] = "Myeloid"
-  cr$celltypes[cr$immune == "NonImmune"] = "NonImmune"
-  cr = cr[-1]
-  return(cr)
-}
-
-#' Load 10X count matrix from an h5 file
-#'
-#' @param filename Directory and filename of the h5 file
-#' @param use.names Boolean TRUE, see ?Seurat::Read10X_h5
-#' @return Count matrix with genes and barcodes
-#' @export
-CID.Read10Xh5 <- function (filename, use.names = TRUE)
-{
-  if (!requireNamespace("hdf5r", quietly = TRUE)) {
-    stop("Please install hdf5r to read HDF5 files")
-  }
-  if (!file.exists(filename)) {
-    stop("File not found")
-  }
-  
-  infile <- hdf5r::H5File$new(filename)
-  genomes <- names(infile)
-  
-  if ("matrix" %in% genomes)
-  {
-    if (!infile$attr_exists("PYTABLES_FORMAT_VERSION")) {
-      if (use.names) {
-        feature_slot <- "features/name"
-      }
-      else {
-        feature_slot <- "features/id"
-      }
-    } else {
-      if (use.names) {
-        feature_slot <- "name"
-        feature_slot2 = "feature_type"
-      }
-      else {
-        feature_slot = "name"
-      }
-    }
-  } else {
-    if (!infile$attr_exists("PYTABLES_FORMAT_VERSION")) {
-      if (use.names) {
-        feature_slot <- "features/name"
-      }
-      else {
-        feature_slot <- "features/id"
-      }
-      if (basename(filename) == "count_matrix.h5")
-      {
-        feature_slot <- "genes"
-      }
-      
-    } else {
-      if (use.names) {
-        feature_slot <- "gene_names"
-        feature_slot2 = "genes"
-      }
-      else {
-        feature_slot = "genes"
-      }
-    }
-  }
-  
-  output <- list()
-  
-  for (genome in genomes) {
-    counts <- infile[[paste0(genome, "/data")]]
-    indices <- infile[[paste0(genome, "/indices")]]
-    indptr <- infile[[paste0(genome, "/indptr")]]
-    shp <- infile[[paste0(genome, "/shape")]]
-    features <- infile[[paste0(genome, "/", feature_slot)]][]
-    barcodes <- infile[[paste0(genome, "/barcodes")]]
-    sparse.mat <- Matrix::sparseMatrix(i = indices[] + 1, p = indptr[],
-                                       x = as.numeric(counts[]), dims = shp[], giveCsparse = FALSE)
-    rownames(sparse.mat) <- features
-    colnames(sparse.mat) <- barcodes[]
-    sparse.mat <- as(object = sparse.mat, Class = "dgCMatrix")
-    output[[genome]] <- sparse.mat
-  }
-  infile$close_all()
-  if (length(output) == 1) {
-    return(output[[genome]])
-  }
-  else {
-    return(output)
-  }
-}
-
 #' Load data file from directory
 #'
 #' @param data.dir Directory containing matrix.mtx and genes.txt.
+#' @param mfn file name; default is 'matrix.mtx'
 #' @return A sparse matrix with rownames equivalent to the names in genes.txt
 #' @export
 CID.LoadData <- function(data.dir, mfn = "matrix.mtx")
@@ -1363,60 +861,6 @@ CID.LoadData <- function(data.dir, mfn = "matrix.mtx")
     E = Matrix::t(E)
   rownames(E) <- genes
   E
-}
-
-#' Load imputed data file from directory
-#'
-#' @param imputed.data.dir Directory containing matrix.mtx and genes.txt.
-#' @param type indicates the imputation method used. Default is "ksoft", the other option is "saver".
-#' @return A sparse matrix with rownames equivalent to the names in genes.txt
-#' @export
-CID.LoadImputedData <- function(imputed.data.dir, type = "ksoft")
-{
-  imputed.data.dir = gsub("\\/$", "", imputed.data.dir, perl = TRUE);
-  gE <- paste(imputed.data.dir,paste0("matrix_",type,"_imputed.mtx"), sep="/")
-  E <- Matrix::readMM(gE)
-  # read genes
-  fn <-"genes_saver_imputed.txt"
-  fn <- paste0("genes_",type,"_imputed.txt")
-  gG <- paste(imputed.data.dir,fn, sep = "/")
-  flag = file.exists(gG);
-  if (!flag) {
-    cat("ERROR: from CID.LoadData:\n");
-    cat("file = ", gG, " does not exist.\n", sep = "");
-    stop()
-  }
-  genes <- read.delim(gG, stringsAsFactors = F, header = T)$x
-  if (genes[1] != gsub( "_.*$", "", genes[1] ))
-    genes = gsub( "_.*$", "", genes )
-  if (grepl("^1", genes[1]))
-    genes = do.call(rbind, strsplit(genes, " "))[,2]
-  flag = length(genes) %in% c(nrow(E), ncol(E));
-  if (!flag) {
-    cat("ERROR: from CID.LoadImputedData:\n");
-    cat("length of genes = ", length(genes), " is not equal to nrow(E) = ", nrow(E), ", or ncol(E) = ", ncol(E), "\n", sep = "");
-    stop()
-  }
-  if (nrow(E) != length(genes))
-    E = Matrix::t(E)
-  rownames(E) <- genes
-  E
-}
-
-#' Load chunked imputed data files from directory
-#'
-#' @param chunk.dir As defined in ?CID.chunk
-#' @return A sparse matrix with rownames equivalent to the names in genes.txt
-#' @export
-CID.LoadImputedDataFolder <- function(chunk.dir)
-{
-  chunk.dir = gsub("\\/$", "", chunk.dir, perl = TRUE)
-  fls = list.files(chunk.dir, full.names = TRUE)
-  idx = as.integer(do.call(rbind, strsplit(fls, split = "Chunk"))[,2])
-  fls = fls[order(idx)]
-  E = lapply(fls, CID.LoadImputedData)
-  E = do.call(cbind,E)
-  return(E)
 }
 
 #' Load edges from edge list
@@ -1475,74 +919,18 @@ CID.Normalize <- function(E)
   return(E)
 }
 
-#' Library size UN-normalize
-#'
-#' @param E Expression matrix
-#' @return Normalized expression matrix to mean of total counts
-#' @export
-CID.UnNormalize <- function(E, total_counts)
-{
-  xx = NULL
-  if (!is.null(colnames(E)))
-    xx <- colnames(E)
-  
-  m = Matrix::Matrix(0, ncol(E), ncol(E))
-  target_mean = sum(total_counts)
-  diag(m) <- total_counts / target_mean
-  
-  E2 = Matrix::Matrix(E %*% m, sparse = TRUE)
-  if (!is.null(xx))
-    colnames(E) <- xx
-  return(E)
-}
-
-#' Chunk a dataset
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame).
-#' @param chunk.dir A directory where the chunked matrices will be stored. If the directory does not exist, it will be created.
-#' @param number_of_chunks the number of chunks (e.g., the number of sub-sampled matrices after chunking)
-#' @return A directory with chunked matrix
-#' @export
-#'
-CID.Chunk <- function(E, chunk.dir, number_of_chunks = 30)
-{
-  chunk.dir = gsub("\\/$", "", chunk.dir, perl = TRUE);
-  E = array_split(E, number_of_chunks = number_of_chunks)
-  if (is.null(chunk.dir))
-  {
-    cat("Please specify a chunk.dir. \n")
-    stop()
-  }
-  if (!dir.exists(chunk.dir))
-    dir.create(chunk.dir)
-  names(E) <- paste0("Chunk", seq_along(1:length(E)))
-  large.dirs = paste(chunk.dir, names(E), sep = "/")
-  q = lapply(large.dirs, function(x){
-    if (!dir.exists(x))
-      dir.create(x)})
-  mapply(function(x,y){
-    Matrix::writeMM(Matrix::Matrix(x, sparse = TRUE), file = paste(y, "matrix.mtx", sep = "/"))
-    write.table(rownames(x), file = paste(y, "genes.txt", sep = "/"), col.names = F)
-  }, x = E, y = large.dirs)
-}
-
 #' Imputation wrapper
 #'
 #' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols.
 #' @param data.dir directory for saving "matrix_saver_imputed.mtx" for future loading.
 #' @param do.par Boolean. If true, imputation is performed in parallel on half of the machines available cores. Default = FALSE.
+#' @param genes.to.use Genes for imputation
 #' @return imputed expression matrix with only marker genes in rows.
 #' @export
 #'
-CID.Impute <- function(E, data.dir = NULL, do.par = TRUE)
+CID.Impute <- function(E, genes.to.use, data.dir = NULL, do.par = TRUE)
 {
-  if (ncol(E) > 80000)
-    return("Chunk first, and then run on the chunks. See ?CID.chunk. \n")
-  markers = Signac::markers
-  cellstate_markers = Signac::cellstate_markers
-  load("/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/pipelines/Signac/data/immune_markers.rda")
-  genes = do.call(rbind, cellstate_markers)
-  genes.ind <- which(rownames(E) %in% unique(c(as.character(markers$`HUGO symbols`), as.character(genes$`HUGO symbols`), as.character(immune_markers$`HUGO symbols`))))
+  genes.ind <- which(rownames(E) %in% genes.to.use)
   if (do.par)
   { 
     numCores = parallel::detectCores()
@@ -1561,8 +949,10 @@ CID.Impute <- function(E, data.dir = NULL, do.par = TRUE)
 #' K soft imputation
 #'
 #' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @param data.dir directory of SPRING files "edges.csv" and "categorical_coloring_data.json"
-#' @param genes a character vector of genes to impute
+#' @param dM see ?CID.GetDistMat
+#' @param genes.to.use a character vector of genes to impute. Default is NULL.
+#' @param do.save If TRUE, imputed matrix is saved in directory. Default is FALSE.
+#' @param verbose If TRUE, code reports outputs.
 #' @return Imputed values for every gene
 #' @export
 KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F, verbose = T)
@@ -1622,21 +1012,13 @@ KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F, verbose
   return(E_new)
 }
 
-#' Check input classes
-#'
-#' @return Checks for function calls
-#' @export
-RunChecks <- function(...)
-{
-  stopifnot(class(E) %in% c("dgCMatrix","dgTMatrix", "matrix", "data.frame", "Seurat"))
-  stopifnot(!is.null(rownames(E)))
-}
-
 #' Get edges that are either pre-computed, or generate new edges
 #'
+#' @param data.dir directory
+#' @param E see Signac
 #' @return edges for cell-cell similarity network
 #' @export
-CID.GetEdges <- function(...)
+CID.GetEdges <- function(E = NULL, data.dir = NULL)
 {
   if (is.null(data.dir))
   {
@@ -1647,1153 +1029,11 @@ CID.GetEdges <- function(...)
   return(edges)
 }
 
-#' Main function
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @param reference if default, uses the standard Signac markers (see ?CID.SeeMarkers).
-#' @param full.dataset If E was subsetted or imputed, full.dataset is the full expression matrix, which is loaded for the detection of novel cell types. Default is NULL.
-#' @param pval p-value cutoff for feature selection, as described in the manuscript + markdown file. Default is pval = 0.05.
-#' @param data.dir directory of SPRING files "edges.csv" and "categorical_coloring_data.json"
-#' @param entropy cells amended to high entropy labels with respect to their neighbors in the KNN graph are appended "Other" if entropy = TRUE. Default is TRUE.
-#' @param omit Force remove specific cell types / states. Default is NULL.
-#' @param force.keep Force keep specific cell types / states. Default is NULL.
-#' @param sorted If cells are expected to be pure or mostly homogeneous (e.g., by FACs sorting), set sorted = TRUE. Default is FALSE.
-#' @param do.impute Run SAVER or Ksoft imputation. Default is TRUE.
-#' @param do.log log2 transform counts + 1. Default is TRUE.
-#' @param min.cells minimum number of cells to call a discrete population. Default is 30.
-#' @param nonimmune flag for whether we expect to see nonimmune cells in the tissue. Default is FALSE.
-#' @return Filtered markers where each marker must have at least ncells that express at least ncounts
-#' @export
-CID.CellID <- function(E, pval = 0.05, data.dir = NULL, entropy = T, omit = NULL, force.keep = NULL, sorted = F, do.impute = T, do.log = T, min.cells = 30, nonimmune = "auto", thold, learned = F)
-{
-  # load markers
-  if (learned == F)
-  {
-    data("markers")
-    data("cellstate_markers")
-    data("immune_markers")
-    data("nonimmune_markers")
-    all_markers = rbind(markers, do.call(rbind, cellstate_markers))
-    all_markers = rbind(all_markers, nonimmune_markers)
-    reference = list("")
-  } else {
-    data("markers_learned.rda")
-    data("cellstate_markers_learned.rda")
-    data("immune_markers.rda")
-    data("nonimmune_markers_learned.rda")
-    markers = markers_learned;
-    cellstate_markers = cellstate_markers_learned;
-    nonimmune_markers = nonimmune_markers_learned;
-    all_markers = rbind(markers, do.call(rbind, cellstate_markers))
-    all_markers = rbind(all_markers, nonimmune_markers)
-    reference = list("")
-  }
-  
-  # check inputs
-  inputs = match.call()
-  RunChecks(inputs)
-  if (class(E) %in% c("matrix", "data.frame"))
-    E = Matrix::Matrix(as.matrix(E), sparse = T)
-  if (!is.null(data.dir))
-    data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
-  
-  # main function
-  cat(" ..........  Entry in CID.CellID \n");
-  ta = proc.time()[3];
-  cat(" ..........  Computing Signac scores for cell types on input data matrix :\n");
-  cat("             nrow = ", nrow(E), "\n", sep = "");
-  cat("             ncol = ", ncol(E), "\n", sep = "");
-  
-  # normalize to the mean library size
-  E = CID.Normalize(E)
-  
-  # user can omit any cell type or cell state
-  if (!is.null(omit))
-  {
-    cat(" ..........  Forcibly omitting features :\n");
-    all_markers = all_markers[! all_markers$`Cell population` %in% omit, ]
-    markers = markers[! markers$`Cell population` %in% omit, ]
-    nonimmune_markers = nonimmune_markers[! nonimmune_markers$`Cell population` %in% omit, ]
-    cellstate_markers = cellstate_markers[! names(cellstate_markers) %in% omit]
-    cellstate_markers = lapply(cellstate_markers, function(x){ x[! x$`Cell population` %in% omit,] })
-    cat("             Omitted = ", paste0(omit, collapse = ", "), "\n");
-  }
-  
-  if (class(E) != "Seurat")
-  {
-    # get edges for cell-cell similarity network
-    edges = CID.GetEdges(inputs)
-    
-    # compute distance matrix
-    distMat = CID.GetDistMat(edges = edges)
-    
-    # get Louvain clusters
-    louvain = CID.Louvain(edges = edges)
-  } else {
-    # compute distance matrix
-    distMat = CID.GetDistMat(edges = pbmc@graphs$RNA_nn)
-    
-    # get louvain clusters
-    louvain = as.character(pbmc@meta.data$seurat_clusters)
-    
-    # keep scale data
-    E <- Matrix::Matrix(pbmc@assays$RNA@scale.data, sparse = T)
-  }
-  
-  # we keep the full.dataset and segment the rest for efficiency
-  full.dataset = E
-  
-  # user can let Signac auto-detect the presence of nonimmune cells
-  if (nonimmune == "auto")
-  {
-    filtered_features=subset(immune_markers,get("HUGO symbols")%in%rownames(E))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    # compute cell type scores data.frame
-    scores = CID.append(E,filtered_features, sorted = F)
-    nonimmune = diptest::dip.test(c(as.numeric(scores[1,]), as.numeric(scores[2,])))$p.value < 0.2
-  }
-  
-  # user can assert the presence of nonimmune cells
-  if (nonimmune){
-    all_markers = rbind(all_markers, nonimmune_markers)
-    E = E[intersect(row.names(E), union(immune_markers$`HUGO symbols`, all_markers$`HUGO symbols`)),,drop=F]
-  } else {
-    E = E[intersect(row.names(E), all_markers$`HUGO symbols`),,drop=F]
-  }
-  
-  # log2 + 1 transform
-  if (do.log)
-    E = Matrix::Matrix(log2(E + 1), sparse = T)
-  
-  # run KSoft imputation
-  if (do.impute)
-    E = KSoftImpute(E, dM = distMat)
-  
-  if (nonimmune)
-  {
-    filtered_features=subset(immune_markers,get("HUGO symbols")%in%rownames(E))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    # compute cell type scores data.frame
-    scores = CID.append(E,filtered_features, sorted = F)
-    indexMax = apply(scores, 2, which.max);
-    immunetypes = rownames(scores)[indexMax];
-    immunetypes = CID.smooth(immunetypes, distMat[[1]])
-    df = table(immunetypes, louvain)
-    indexMax = apply(df, 2, which.max)
-    df = data.frame(lbls = colnames(df), type = rownames(df)[indexMax])
-    immunetypes = as.character(df$type[match(louvain, df$lbls)])
-    celltypes = immunetypes
-    if (learned){
-      filtered_features = CID.filter2(l = E, m  = nonimmune_markers, n = pval, o = FALSE)
-      # compute cell type scores data.frame
-      scores = CID.append(E, filtered_features, sorted = T)
-      indexMax = apply(scores, 2, which.max);
-      celltypes[immunetypes == "NonImmune"] <- rownames(scores)[indexMax][immunetypes == "NonImmune"];
-      # amend low scoring states to "NonImmune"
-      kmax = apply(scores, 2 ,max)
-      diff = kmax - apply(scores, 2, min)
-      diff = diff[immunetypes == "NonImmune"]
-      kmax = kmax[immunetypes == "NonImmune"]
-      celltypes[immunetypes == "NonImmune"][diff < (mean(diff) - 2 * sd(diff))] = "NonImmune"
-      celltypes = CID.smooth(celltypes, distMat[[1]])
-    }
-  } else {
-    immunetypes = rep("Immune", ncol(E))
-    immunestates = rep("Immune", ncol(E))
-    celltypes = immunetypes
-  }
-  
-  # get features
-  filtered_features = CID.filter2(l = full.dataset, m = markers, n = pval, o = FALSE)
-  
-  if (!is.null(force.keep))
-  {
-    flag = ! force.keep %in% names(filtered_features)
-    if (flag){
-      q=subset(markers,get("HUGO symbols")%in%rownames(E))
-      q=split(q[,c("HUGO symbols", "Cell population" ,"Polarity")], q[,"Cell population"])
-      filtered_features = c(filtered_features, q[names(q) %in% force.keep])
-      cat(" ..........  Forcibly keeping features :\n");
-      cat("             Kept = ", paste0(names(filtered_features), collapse = ", "), "\n");
-    }
-  }
-  
-  # compute cell type scores data.frame
-  scores = CID.append(E, filtered_features, sorted = T)
-  
-  # assign output classifications
-  cat(" ..........  Assigning output classifications \n", sep ="");
-  indexMax = apply(scores, 2, which.max);
-  celltypes[immunetypes == "Immune"] <- rownames(scores)[indexMax][immunetypes == "Immune"];
-  
-  # amend low scoring states to "Other"
-  kmax = apply(scores, 2 ,max)
-  diff = kmax - apply(scores, 2, min)
-  diff = diff[immunetypes == "Immune"]
-  kmax = kmax[immunetypes == "Immune"]
-  celltypes[immunetypes == "Immune"][diff < (mean(diff) - 2 * sd(diff))] = "Other"
-  celltypes[immunetypes == "Immune"][kmax < 0] = "Other"
-  
-  # smooth the output classifications
-  celltypes = CID.smooth(celltypes, distMat[[1]])
-  
-  # assign Others
-  if (entropy)
-    celltypes = CID.entropy(celltypes, distMat)
-  
-  # assign any populations of less than min.cells to "Other"
-  q = data.frame(table(celltypes))
-  celltypes[celltypes %in% q$celltypes[q$Freq <= min.cells]] = "Other"
-  
-  # cell state deep dive classifications
-  cat(" ..........  Computing CID scores for cell states! \n");
-  cellstates = celltypes
-  cellstates_merged = celltypes
-  
-  # get only cell states with cell types in the data
-  logik = names(cellstate_markers) %in% cellstates;
-  
-  # get output list
-  k = 0
-  outs  = list("")
-  outs2 = list("")
-  
-  while(any(logik))
-  {
-    # get filtered features for cell states
-    state_features = mapply(function(x, y){
-      CID.filter2(l = full.dataset, m = x, n = pval, o = F)
-    }, x = cellstate_markers[logik], y = names(cellstate_markers)[logik], SIMPLIFY = F)
-    
-    # it is possible that all of a given cell type has no discernable cell states
-    flag = sapply(state_features, is.null)
-    if (any(flag)){
-      cellstates[cellstates == names(state_features)[flag]] = "Other";
-      state_features = state_features[!flag]
-    }
-    
-    # if a cell state has only one present type, we default to that label for all cells
-    flag = sapply(state_features, function(x) length(x)) == 1
-    if (any(flag)){
-      cellstates[cellstates == names(state_features)[flag]] = as.character(state_features[flag][[1]][[1]][1,2]);
-      state_features = state_features[!flag]
-    }
-    
-    # get scores for cell states
-    scores = mapply(function(x,y){
-      q = CID.append(E[,cellstates == y], x, sorted = F)
-      if (cor(t(q[1,]), t(q[2,])) < -0.95)
-        q = CID.append(E[,cellstates == y], x, sorted = T)
-      q
-    }, x = state_features, y = names(state_features), SIMPLIFY = F)
-    
-    for (j in 1:length(scores))
-    {
-      logik = cellstates == names(scores)[j]
-      if (any(logik))
-      {
-        indexMax   = apply(scores[[j]], 2, which.max);
-        actual.max = apply(scores[[j]], 2, max);
-        actual.min = apply(scores[[j]], 2, min);
-        cellstates[logik] = rownames(scores[[j]])[indexMax];
-        # amend low scoring states to "Other"
-        diff = actual.max - actual.min;
-        cellstates[logik][diff < (mean(diff) - 2 * sd(diff))] = "Other"
-        qq = lapply(distMat, function(x) x[logik,logik])
-        cellstates[logik] = CID.smooth(rownames(scores[[j]])[indexMax], qq[[1]])  
-        cellstates[logik] = CID.smooth(cellstates[logik], qq[[1]])
-        cellstates[logik] = CID.smooth(cellstates[logik], qq[[1]])
-        if (entropy)
-          cellstates[logik] = CID.entropy(cellstates[logik], qq)
-        
-        #if (length(unique(cellstates[logik])) > 1 & names(scores)[j] %in% cellstates_merged)
-        #{
-        #  # do DEG testing
-        #  dummy = full.dataset[,logik]
-        #  colnames(dummy) <- cellstates[logik]
-        #  pos = CID.PosMarkers3(dummy, threshold = thold)
-        #  q = lapply(pos, function(p){do.call(rbind, p)})
-        #  pre = unique(colnames(dummy))
-        
-        # any categories with no differentially expressed genes are merged
-        #  logik2 = sapply(q, function(x) {x$ident.1[1] == "NONE"})
-        
-        # if (any(logik2)){
-        #    cellstates_merged[cellstates %in% names(logik2)[logik2]] = names(scores)[j]
-        #  } else {
-        #    cellstates_merged[logik] = cellstates[logik]
-        #  }
-        #}
-        
-        k = k + 1
-        outs[[k]] = cellstates[logik]
-        outs2[[k]] = cellstates
-      }
-    }
-    logik = names(cellstate_markers) %in% cellstates;
-  }
-  cellstates_merged = cellstates
-  
-  do = data.frame(table(louvain[cellstates == "Other"]))
-  df = data.frame(table(louvain[louvain %in% do$Var1]))
-  logik = (1 - phyper(do$Freq, df$Freq , length(cellstates) - do$Freq, sum(cellstates == "Other"))) < 0.01;
-  # logik = F
-  if (any(logik)){
-    do = do[logik,]
-    logik = do$Freq > 3; # require at least 3 cell communities
-    if (any(logik)){
-      celltypes_novel  = celltypes;
-      cellstates_novel = cellstates;
-      cat("             Signac found", sum(logik), "novel celltypes!\n");
-      lbls = rep("All", ncol(E))
-      logik = louvain %in% do$Var1[logik] & cellstates == "Other";
-      lbls[logik] = louvain[logik]
-      colnames(full.dataset) <- lbls
-      # FF = apply(full.dataset, 1, sd)^2 / Matrix::rowMeans(full.dataset)
-      # full.dataset = full.dataset[FF > median(FF), ]
-      new_lbls = CID.PosMarkers2(full.dataset, cellstates)
-      cellstates_novel = new_lbls$lbls
-      celltypes_novel[grepl("^[+]", cellstates_novel)] = new_lbls$lbls[grepl("^[+]", cellstates_novel)]
-    } else {
-      celltypes_novel  = celltypes
-      cellstates_novel = cellstates
-    }
-  } else {
-    celltypes_novel  = celltypes
-    cellstates_novel = cellstates
-  }
-  
-  # write nonimmune cell states
-  if ("NonImmune" %in% immunetypes)
-  { 
-    immunestates = cellstates_novel
-    immunestates[immunestates == "NonImmune"] = paste0(immunestates[immunestates == "NonImmune"], "_", louvain[immunestates == "NonImmune"])
-  } else {
-    immunestates = cellstates_novel
-  }
-  
-  # Package output
-  cr = list(celltypes = celltypes,
-            celltypes_novel = celltypes_novel,
-            cellstates = cellstates,
-            cellstates_novel = cellstates_novel,
-            cellstates_merged = cellstates_merged,
-            immune = immunetypes,
-            immunestates = immunestates,
-            louvain = louvain)
-  
-  tb = proc.time()[3] - ta;
-  cat("\n ..........  Exit CID.CellID.\n");
-  cat("             Execution time = ", tb, " s.\n", sep = "");
-  return (cr);
-}
-
-#' Learn new cell type markers
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @param cells.ind a named list of the indices of the cells, and the name of the putatitive label
-#' @param reference if default, uses the standard Signac markers (see ?CID.SeeMarkers).
-#' @return an updated reference set with the new cell type
-#' @export
-CID.Learn <- function(E, cells.ind, refererence = 'default')
-{
-  if (class(reference) == 'character')
-    load("./data/LM22.rda")
-  
-  logik = CID.IsUnique(rownames(E))
-  E = E[logik,]
-  
-  L = lapply(cells.ind,function(x){na.omit(E[, x])})
-  M = do.call(cbind, L)
-  
-  # do cell type markers first
-  logik = grepl(":", colnames(M))
-  if (any(logik)){
-    nms = do.call(rbind, strsplit(colnames(M)[logik], split = ":"))
-    colnames(M)[logik] <- nms[,1]
-  }
-  
-  S = LM22$data
-  colnames(S) <- LM22$main_types
-  
-  gns = intersect(rownames(S), rownames(E))
-  
-  New_Ref = cbind(M[rownames(M) %in% gns,], S[rownames(S) %in% gns,])
-  New_Ref = CID.Normalize(as.matrix(New_Ref))
-  
-  master_types = CID.GetLearningMarkers(E = New_Ref, full.dataset = E, logfc.threshold = 1)
-  
-  new_markers = rbind(markers, master_types)
-  new_markers = unique(new_markers)
-  new_markers = new_markers[order(new_markers$`Cell population`),]
-  
-  master_list = list( B.cells       =   list(B.cells.naive  = c("B.cells:B.cells.naive", "B_cell:Naive"),
-                                             B.cells.memory = c("B.cells:B.cells.memory", "B_cell:Memory")) ,
-                      MPh           =   list(Monocytes      = c("MPh:Monocytes",unique(colnames(S)[grepl("Monocyte", colnames(S))]), "Monocytes"),
-                                             Macrophages    = c("MPh:Macrophages.M0"),
-                                             Dendritic      = c("MPh:Dendritic.cells.activated","MPh:Dendritic.cells.resting", "DC:monocyte-derived",
-                                                                unique(colnames(S)[grepl("DC:monocyte-derived:", colnames(S))]))),
-                      Monocytes     =   list(Mon.Classical  = c("Monocyte:CD14+"),
-                                             Mon.NonClass   = c("Monocyte:CD16+")),
-                      TNK           =   list(T.cells        = c(unique(colnames(S)[grepl("^TNK:T", colnames(S))]),
-                                                                unique(colnames(S)[grepl("T_cell", colnames(S))]),
-                                                                "CD4+ T-cells", "CD8+ T-cells"),
-                                             NK             = c("TNK:NK.cells.activated", "TNK:NK.cells.resting", "NK cells", "NK_cell:IL2")),
-                      T.cells       =   list(T.cells.CD8    = c("TNK:T.cells.CD8", "CD8+ T-cells", "T_cell:CD8+_naive", "T_cell:CD8+"),
-                                             T.CD4.FH.regs  = c("TNK:T.cells.CD4.memory.activated",
-                                                                "TNK:T.cells.CD4.memory.resting", "TNK:T.cells.CD4.naive",
-                                                                "TNK:T.cells.follicular.helper", "TNK:T.cells.regulatory..Tregs.",
-                                                                "CD4+ T-cells", "T_cell:CD4+_effector_memory", "T_cell:CD4+_Naive",
-                                                                "T_cell:CD4+", "T_cell:Treg:Naive", "T_cell:CD4+_central_memory")),
-                      T.CD4.FH.regs =   list(T.regs         = c("TNK:T.cells.regulatory..Tregs.", "T_cell:Treg:Naive"),
-                                             T.CD4.FH       = c("TNK:T.cells.CD4.memory.activated",
-                                                                "TNK:T.cells.CD4.memory.resting", "TNK:T.cells.CD4.naive",
-                                                                "TNK:T.cells.follicular.helper", "CD4+ T-cells", "T_cell:CD4+_central_memory")),
-                      T.CD4.FH      =   list(T.cells.FH     = c("TNK:T.cells.follicular.helper"),
-                                             T.cells.CD4    = c("TNK:T.cells.CD4.naive","TNK:T.cells.CD4.memory.activated",
-                                                                "TNK:T.cells.CD4.memory.resting", "CD4+ T-cells", "T_cell:CD4+_central_memory")),
-                      T.cells.CD4  =    list(T.cells.CD4n   = "TNK:T.cells.CD4.naive",
-                                             T.cells.CD4m   = c("TNK:T.cells.CD4.memory.activated","TNK:T.cells.CD4.memory.resting", "T_cell:CD4+_central_memory")),
-                      Granulocytes  =    list(Neutrophil = "Granulocytes:Neutrophils",
-                                              Eosinophils    = "Granulocytes:Eosinophils")
-  )
-  
-  logik = names(master_list) %in% nms[,1];
-  logik2 = names(master_list[[which(logik)]]) %in% nms[,2]
-  
-  S = LM22$data
-  colnames(S) <- LM22$types
-  
-  gns = intersect(rownames(S), rownames(E))
-  
-  New_Ref = cbind(M[rownames(M) %in% gns,], S[rownames(S) %in% gns,])
-  New_Ref = CID.Normalize(as.matrix(New_Ref))
-  
-}
-
-#' Learn new cell type markers
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @param cells.ind a named list of the indices of the cells, and the name of the putatitive label
-#' @return an updated reference set with the new cell type
-#' @export
-CID.Learn2 <- function(E, cells.ind, markers = NULL)
-{
-  cat(" ..........  Learning and refining cell type markers on training subset: \n");
-  cat("             cells used = ", length(unlist(cells.ind)), "\n", sep = "");
-  
-  # load default markers
-  if (is.null(markers))
-    load("./data/markers.rda")
-  
-  # get unique gene names only
-  logik = CID.IsUnique(rownames(E))
-  E = E[logik,]
-  
-  # get training set
-  L = lapply(cells.ind,function(x){na.omit(E[, x])})
-  M = do.call(cbind, L)
-  
-  # define markers based on Z-score transformation of log2 + 1 nUMI
-  M = log2(M + 1)
-  M = Matrix::t(scale(Matrix::t(M)))
-  
-  # remove any NA values
-  logik = apply(M, 1, function(x) any(!is.na(x)))
-  M = M[logik,]
-  
-  # split into train set into test + dev sets
-  set.seed(42)
-  train <- sample(ncol(M), 0.7*ncol(M), replace = FALSE)
-  TrainSet <- M[,train]
-  TestSet  <- M[,-train]
-  
-  # convert to numeric
-  q = t(aggregate(t(M), list(colnames(M)), sum))
-  colnames(q) <- q[1,]
-  q = q[-1,]
-  q = apply(q, 2, as.numeric)
-  gns = rownames(M)
-  
-  # convert to marker format
-  master_types = apply(q, 2, function(x) gns[order(x, decreasing = T)])
-  
-  # define function for optimizing K
-  optim_K <- function(K, x = master_types, y = markers[markers$`Cell population` %in% colnames(master_types),], z = TrainSet)
-  {
-    cls = colnames(x)
-    x = reshape2::melt(x[1:K,])
-    x = data.frame(genes = x$value, celltype = x$Var2, polarity = "+")
-    colnames(x) <- colnames(y)
-    
-    x = rbind(x, y)
-    x = unique(x)
-    x = x[sample(nrow(x), nrow(x), replace = T), ]
-    x = unique(x)
-    
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(E))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    scores = CID.append(z, filtered_features, sorted = T)
-    
-    indexMax = apply(scores, 2, which.max);
-    celltypes_train <- rownames(scores)[indexMax];
-    acc = sum(celltypes_train == colnames(z)) / ncol(z)
-    
-    return(list(acc = acc, markers_used = x))
-  }
-  
-  cat(" ..........  Training Signac classifier on training set: \n");
-  cat("             nrow = ", nrow(TrainSet), "\n", sep = "");
-  cat("             ncol = ", ncol(TrainSet), "\n", sep = "");
-  
-  q = sapply(2:30, function(x){
-    N_markers = rep(x, 100)
-    sapply(N_markers, optim_K)
-  })
-  
-  accs = unlist(q[c(TRUE, FALSE)])
-  mrks = q[c(FALSE, TRUE)]
-  new_markers = mrks[which(accs == max(accs))]
-  
-  cat(" ..........  Done! Model accuracy on training set = ", max(accs), "\n");
-  
-  q_test = lapply(new_markers, function(x){
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(TestSet))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    scores = CID.append(TestSet, filtered_features, sorted = T)
-    
-    indexMax = apply(scores, 2, which.max);
-    celltypes_test <- rownames(scores)[indexMax];
-    acc = sum(celltypes_test == colnames(TestSet)) / ncol(TestSet)
-  })
-  
-  accs_test = unlist(q[c(TRUE, FALSE)])
-  mrks_test = q[c(FALSE, TRUE)]
-  
-  cat(" ..........  Model accuracy on test set = ", max(accs_test), "\n");
-  
-  new_markers = mrks_test[which(accs_test == max(accs_test))]
-  
-  new_markers = lapply(new_markers, function(x) {
-    x[order(x[,2]),]
-  })
-  
-  scores_test = lapply(new_markers, function(x){
-    x$`Cell population` = as.character(x$`Cell population`)
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(TestSet))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    CID.append(TestSet, filtered_features, sorted = T)
-  })
-  
-  cor_test = sapply(scores_test, function(x){
-    d = cor(t(x))
-    diag(d) <- 0
-    sum(d)
-  })
-  
-  cat(" ..........  Number of models with optimum performance = ", length(new_markers), "\n");
-  
-  new_markers = new_markers[[which.min(cor_test)]]
-  
-  return(new_markers)
-  
-}
-
-#' Learn new cell type markers
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @return an updated reference set with the new cell type
-#' @export
-CID.Learn3 <- function(E, markers = NULL)
-{
-  cat(" ..........  Learning and refining cell type markers on training subset: \n");
-  cat("             cells used = ", ncol(E), "\n", sep = "");
-  
-  # load default markers
-  if (is.null(markers))
-    load("./data/markers.rda")
-  
-  # get unique gene names only
-  logik = CID.IsUnique(rownames(E))
-  M = E[logik,]
-  
-  # split into train set into balanced test + dev sets, balanced by the minimum population
-  if (length(unique(colnames(M))) != 2)
-  {
-    df = data.frame(table(colnames(M)))
-    min.pop = min(df$Freq)
-    dummy = M[,colnames(M) %in% df$Var1[df$Freq < 5 * min.pop]]
-    dummy2 = M[,colnames(M) %in% df$Var1[df$Freq > 5 * min.pop]]
-    balmat = list("")
-    for (j in 1:length(unique(colnames(dummy2))))
-      balmat[[j]] = dummy2[,which(colnames(dummy2) == unique(colnames(dummy2))[j])[sample((df$Freq[df$Var1 == unique(colnames(dummy2))[j]] / min.pop), replace = FALSE)]]
-    balmat = do.call(cbind, balmat)
-    M = cbind(dummy, balmat)
-  }
-  
-  # log2 + 1 transform
-  M = log2(M + 1)
-  M = Matrix::Matrix(Matrix::t(scale(Matrix::t(M))), sparse = T)
-  
-  # remove any NA values
-  logik = apply(M, 1, function(x) any(!is.na(x)))
-  M = M[logik,]  
-  
-  set.seed(42)
-  train <- sample(ncol(M), 0.7*ncol(M), replace = FALSE)
-  TrainSet <- M[,train]
-  TestSet  <- M[,-train]
-  
-  # convert to numeric
-  q = Matrix::t(Matrix.utils::aggregate.Matrix(Matrix::t(TestSet), factor(colnames(TestSet)), fun = 'mean'))
-  gns = rownames(M)
-  
-  # convert to marker format
-  master_types = apply(q, 2, function(x) gns[order(x, decreasing = T)])
-  
-  # define function for optimizing K
-  optim_K <- function(K, x = master_types, y = markers[markers$`Cell population` %in% colnames(master_types),], z = TrainSet)
-  {
-    cls = colnames(x)
-    x = reshape2::melt(x[1:K,])
-    x = data.frame(genes = x$value, celltype = x$Var2, polarity = "+")
-    colnames(x) <- colnames(y)
-    
-    x = rbind(x, y)
-    x = unique(x)
-    x = x[sample(nrow(x), nrow(x), replace = T), ]
-    x = unique(x)
-    
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(E))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    scores = CID.append(z, filtered_features, sorted = T)
-    
-    indexMax = apply(scores, 2, which.max);
-    celltypes_train <- rownames(scores)[indexMax];
-    #acc = sum(celltypes_train == colnames(z)) / ncol(z)
-    
-    acc = sapply(unique(celltypes_train), function(x){
-      sum(celltypes_train == x & colnames(z) == x) / sum(celltypes_train == x)
-    })
-    
-    acc = mean(acc)
-    
-    return(list(acc = acc, markers_used = x))
-  }
-  
-  cat(" ..........  Training Signac classifier on training set: \n");
-  cat("             nrow = ", nrow(TrainSet), "\n", sep = "");
-  cat("             ncol = ", ncol(TrainSet), "\n", sep = "");
-  
-  q = sapply(100, function(x){
-    N_markers = rep(x, 1000)
-    numCores = parallel::detectCores()
-    parallel::mclapply(N_markers, optim_K, mc.cores =  numCores - 1)
-  })
-  
-  #accs = unlist(q[c(TRUE, FALSE)])
-  #mrks = q[c(FALSE, TRUE)]
-  #new_markers = mrks[which(accs == max(accs))]
-  accs = sapply(q, function(x) x[[1]])
-  mrks = lapply(q, function(x) x[[2]])
-  new_markers = mrks[which(accs > mean(accs))]
-  
-  cat(" ..........  Done! Model accuracy on training set = ", max(accs), "\n");
-  
-  accs_test = sapply(new_markers, function(x){
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(TestSet))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    scores = CID.append(TestSet, filtered_features, sorted = T)
-    
-    indexMax = apply(scores, 2, which.max);
-    celltypes_test <- rownames(scores)[indexMax];
-    # acc = sum(celltypes_test == colnames(TestSet)) / ncol(TestSet)
-    
-    acc = sapply(unique(celltypes_train), function(x){
-      sum(celltypes_train == x & colnames(z) == x) / sum(celltypes_train == x)
-    })
-    
-    mean(acc)
-  })
-  
-  cat(" ..........  Model accuracy on test set = ", max(accs_test), "\n");
-  
-  new_markers = mrks[which(accs_test == max(accs_test))]
-  
-  new_markers = lapply(new_markers, function(x) {
-    x[order(x[,2]),]
-  })
-  
-  scores_test = lapply(new_markers, function(x){
-    x$`Cell population` = as.character(x$`Cell population`)
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(TestSet))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    CID.append(TestSet, filtered_features, sorted = T)
-  })
-  
-  cor_test = sapply(scores_test, function(x){
-    d = cor(t(x))
-    diag(d) <- 0
-    sum(d)
-  })
-  
-  cat(" ..........  Number of models with optimum performance = ", length(which.min(cor_test)), "\n");
-  
-  new_markers = new_markers[[which.min(cor_test)]]
-  
-  return(new_markers)
-  
-}
-
-#' Learn new cell type markers
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @return an updated reference set with the new cell type
-#' @export
-CID.Learn4 <- function(E)
-{
-  cat(" ..........  Learning and refining cell type markers on training subset: \n");
-  cat("             cells used = ", ncol(E), "\n", sep = "");
-  
-  # get unique gene names only
-  logik = CID.IsUnique(rownames(E))
-  M = E[logik,]
-  
-  # split into train set into balanced test + dev sets, balanced by the minimum population
-  if (length(unique(colnames(M))) != 2)
-  {
-    df = data.frame(table(colnames(M)))
-    min.pop = min(df$Freq)
-    dummy = M[,colnames(M) %in% df$Var1[df$Freq == min.pop]]
-    dummy2 = M[,colnames(M) %in% df$Var1[df$Freq > min.pop]]
-    balmat = list("")
-    for (j in 1:length(unique(colnames(dummy2))))
-      balmat[[j]] = dummy2[,which(colnames(dummy2) == unique(colnames(dummy2))[j])[sample(1:sum(colnames(dummy2) == unique(colnames(dummy2))[j]), min.pop , replace = FALSE)]]
-    balmat = do.call(cbind, balmat)
-    M = cbind(dummy, balmat)
-  }
-  
-  
-  M = log2(M + 1)
-  
-  # remove any NA values
-  logik = apply(M, 1, function(x) any(!is.na(x)))
-  M = M[logik,]
-  
-  set.seed(42)
-  train <- sample(ncol(M), 0.7*ncol(M), replace = FALSE)
-  TrainSet <- M[,train]
-  TestSet  <- M[,-train]
-  
-  # run random forest
-  lbls = as.factor(colnames(TrainSet))
-  TrainSet = Matrix::t(TrainSet)
-  xx <- colnames(TrainSet)
-  xx = make.names(xx)
-  colnames(TrainSet) <- xx
-  model <- randomForest::randomForest(lbls ~ ., data = TrainSet)
-  
-  # test on the TestSet
-  TestSet = Matrix::t(TestSet)
-  colnames(TestSet) <- xx
-  pred <- predict(model, newdata = TestSet)
-  table(pred, rownames(TestSet))
-  
-  # convert to numeric
-  q = Matrix::t(Matrix.utils::aggregate.Matrix(Matrix::t(TestSet), factor(colnames(TestSet)), fun = 'mean'))
-  gns = rownames(M)
-  
-  # convert to marker format
-  master_types = apply(q, 2, function(x) gns[order(x, decreasing = T)])
-  
-  # define function for optimizing K
-  optim_K <- function(K, x = master_types, y = markers[markers$`Cell population` %in% colnames(master_types),], z = TrainSet)
-  {
-    cls = colnames(x)
-    x = reshape2::melt(x[1:K,])
-    x = data.frame(genes = x$value, celltype = x$Var2, polarity = "+")
-    colnames(x) <- colnames(y)
-    
-    x = rbind(x, y)
-    x = unique(x)
-    x = x[sample(nrow(x), nrow(x), replace = T), ]
-    x = unique(x)
-    
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(E))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    scores = CID.append(z, filtered_features, sorted = T)
-    
-    indexMax = apply(scores, 2, which.max);
-    celltypes_train <- rownames(scores)[indexMax];
-    #acc = sum(celltypes_train == colnames(z)) / ncol(z)
-    
-    acc = sapply(unique(celltypes_train), function(x){
-      sum(celltypes_train == x & colnames(z) == x) / sum(celltypes_train == x)
-    })
-    
-    acc = mean(acc)
-    
-    return(list(acc = acc, markers_used = x))
-  }
-  
-  cat(" ..........  Training Signac classifier on training set: \n");
-  cat("             nrow = ", nrow(TrainSet), "\n", sep = "");
-  cat("             ncol = ", ncol(TrainSet), "\n", sep = "");
-  
-  q = sapply(100, function(x){
-    N_markers = rep(x, 1000)
-    numCores = parallel::detectCores()
-    parallel::mclapply(N_markers, optim_K, mc.cores =  numCores - 1)
-  })
-  
-  #accs = unlist(q[c(TRUE, FALSE)])
-  #mrks = q[c(FALSE, TRUE)]
-  #new_markers = mrks[which(accs == max(accs))]
-  accs = sapply(q, function(x) x[[1]])
-  mrks = lapply(q, function(x) x[[2]])
-  new_markers = mrks[which(accs > mean(accs))]
-  
-  cat(" ..........  Done! Model accuracy on training set = ", max(accs), "\n");
-  
-  accs_test = sapply(new_markers, function(x){
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(TestSet))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    scores = CID.append(TestSet, filtered_features, sorted = T)
-    
-    indexMax = apply(scores, 2, which.max);
-    celltypes_test <- rownames(scores)[indexMax];
-    # acc = sum(celltypes_test == colnames(TestSet)) / ncol(TestSet)
-    
-    acc = sapply(unique(celltypes_train), function(x){
-      sum(celltypes_train == x & colnames(z) == x) / sum(celltypes_train == x)
-    })
-    
-    mean(acc)
-  })
-  
-  cat(" ..........  Model accuracy on test set = ", max(accs_test), "\n");
-  
-  new_markers = mrks[which(accs_test == max(accs_test))]
-  
-  new_markers = lapply(new_markers, function(x) {
-    x[order(x[,2]),]
-  })
-  
-  scores_test = lapply(new_markers, function(x){
-    x$`Cell population` = as.character(x$`Cell population`)
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(TestSet))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    CID.append(TestSet, filtered_features, sorted = T)
-  })
-  
-  cor_test = sapply(scores_test, function(x){
-    d = cor(t(x))
-    diag(d) <- 0
-    sum(d)
-  })
-  
-  cat(" ..........  Number of models with optimum performance = ", length(which.min(cor_test)), "\n");
-  
-  new_markers = new_markers[[which.min(cor_test)]]
-  
-  return(new_markers)
-  
-}
-
-#' Learn new cell type markers
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @return an updated reference set with the new cell type
-#' @export
-CID.Learn5 <- function(E, markers = NULL)
-{
-  cat(" ..........  Learning and refining cell type markers on training subset: \n");
-  cat("             cells used = ", ncol(E), "\n", sep = "");
-  
-  # load default markers
-  if (is.null(markers))
-    load("./data/markers.rda")
-  
-  # get unique gene names only
-  logik = CID.IsUnique(rownames(E))
-  M = E[logik,]
-  
-  # log2 + 1 transform
-  M = log2(M + 1)
-  M = Matrix::Matrix(Matrix::t(scale(Matrix::t(M))), sparse = T)
-  
-  # remove any NA values
-  logik = apply(M, 1, function(x) any(!is.na(x)))
-  M = M[logik,]  
-  
-  # balance dataset
-  min.pop = min(table(colnames(M)))
-  min.grp = names(which.min(table(colnames(M))))
-  
-  dummy = M[,colnames(M) != min.grp]
-  dummy = dummy[,sample(1:ncol(dummy), size = 2 * min.pop)]
-  M = cbind(dummy, M[, colnames(M) == min.grp])
-  
-  set.seed(42)
-  train <- sample(ncol(M), 0.7*ncol(M), replace = FALSE)
-  TrainSet <- M[,train]
-  TestSet  <- M[,-train]
-  
-  # convert to numeric
-  q = Matrix::t(Matrix.utils::aggregate.Matrix(Matrix::t(TestSet), factor(colnames(TestSet)), fun = 'mean'))
-  gns = rownames(M)
-  
-  # convert to marker format
-  master_types = apply(q, 2, function(x) gns[order(x, decreasing = T)])
-  
-  # define function for optimizing K
-  optim_K <- function(K, x = master_types, y = markers[markers$`Cell population` %in% colnames(master_types),], z = TrainSet)
-  {
-    cls = colnames(x)
-    x = reshape2::melt(x[1:K,])
-    x = data.frame(genes = x$value, celltype = x$Var2, polarity = "+")
-    colnames(x) <- colnames(y)
-    
-    x = rbind(x, y)
-    x = unique(x)
-    
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(E))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    
-    # randomly sample the filtered_features
-    filtered_features = lapply(filtered_features, function(x){unique(x[sample(nrow(x), nrow(x), replace = T), ])})
-    
-    scores = CID.append(z, filtered_features, sorted = T)
-    
-    indexMax = apply(scores, 2, which.max);
-    celltypes_train <- rownames(scores)[indexMax];
-    #acc = sum(celltypes_train == colnames(z)) / ncol(z)
-    
-    acc = sapply(unique(celltypes_train), function(x){
-      sum(celltypes_train == x & colnames(z) == x) / sum(celltypes_train == x)
-    })
-    
-    acc = mean(acc)
-    
-    p = do.call(rbind, filtered_features)
-    rownames(p) <- NULL
-    
-    return(list(acc = acc, markers_used = p))
-  }
-  
-  cat(" ..........  Training Signac classifier on training set: \n");
-  cat("             nrow = ", nrow(TrainSet), "\n", sep = "");
-  cat("             ncol = ", ncol(TrainSet), "\n", sep = "");
-  
-  q = sapply(100, function(x){
-    N_markers = rep(x, 1000)
-    numCores = parallel::detectCores()
-    parallel::mclapply(N_markers, optim_K, mc.cores =  numCores - 1)
-  })
-  
-  #accs = unlist(q[c(TRUE, FALSE)])
-  #mrks = q[c(FALSE, TRUE)]
-  #new_markers = mrks[which(accs == max(accs))]
-  accs = sapply(q, function(x) x[[1]])
-  mrks = lapply(q, function(x) x[[2]])
-  new_markers = mrks[which(accs > mean(accs))]
-  
-  cat(" ..........  Done! Model accuracy on training set = ", max(accs), "\n");
-  
-  accs_test = sapply(new_markers, function(x){
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(TestSet))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    scores = CID.append(TestSet, filtered_features, sorted = T)
-    
-    indexMax = apply(scores, 2, which.max);
-    celltypes_test <- rownames(scores)[indexMax];
-    # acc = sum(celltypes_test == colnames(TestSet)) / ncol(TestSet)
-    
-    acc = sapply(unique(celltypes_train), function(x){
-      sum(celltypes_train == x & colnames(z) == x) / sum(celltypes_train == x)
-    })
-    
-    mean(acc)
-  })
-  
-  cat(" ..........  Model accuracy on test set = ", max(accs_test), "\n");
-  
-  new_markers = mrks[which(accs_test == max(accs_test))]
-  
-  new_markers = lapply(new_markers, function(x) {
-    x[order(x[,2]),]
-  })
-  
-  scores_test = lapply(new_markers, function(x){
-    x$`Cell population` = as.character(x$`Cell population`)
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(TestSet))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    CID.append(TestSet, filtered_features, sorted = T)
-  })
-  
-  cor_test = sapply(scores_test, function(x){
-    d = cor(t(x))
-    diag(d) <- 0
-    sum(d)
-  })
-  
-  cat(" ..........  Number of models with optimum performance = ", length(which.min(cor_test)), "\n");
-  
-  new_markers = new_markers[[which.min(cor_test)]]
-  
-  return(new_markers)
-  
-}
-
-#' Learn new cell type markers
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @return an updated reference set with the new cell type
-#' @export
-CID.Learn6 <- function(E, markers = NULL)
-{
-  cat(" ..........  Learning and refining cell type markers on training subset: \n")
-  cat("             cells used = ", ncol(E), "\n", sep = "")
-  
-  # load default markers
-  if (is.null(markers))
-    load("./data/markers.rda")
-  
-  # get unique gene names only
-  logik = CID.IsUnique(rownames(E))
-  M = E[logik,]
-  
-  # log2 + 1 transform
-  M = log2(M + 1)
-  M = Matrix::Matrix(Matrix::t(scale(Matrix::t(M))), sparse = T)
-  
-  # remove any NA values
-  logik = apply(M, 1, function(x) any(!is.na(x)))
-  M = M[logik,]
-  
-  # balance dataset
-  min.pop = min(table(colnames(M)))
-  min.grp = names(which.min(table(colnames(M))))
-  
-  dummy = M[,colnames(M) != min.grp]
-  dummy = dummy[,sample(1:ncol(dummy), size = 2 * min.pop)]
-  M = cbind(dummy, M[, colnames(M) == min.grp])
-  
-  set.seed(42)
-  train <- sample(ncol(M), 0.7*ncol(M), replace = FALSE)
-  TrainSet <- M[,train]
-  TestSet  <- M[,-train]
-  
-  # convert to numeric
-  q = Matrix::t(Matrix.utils::aggregate.Matrix(Matrix::t(TestSet), factor(colnames(TestSet)), fun = 'mean'))
-  gns = rownames(M)
-  
-  # convert to marker format
-  master_types = apply(q, 2, function(x) gns[order(x, decreasing = T)])
-  
-  # define function for optimizing K
-  optim_K <- function(K, x = master_types, y = markers[markers$`Cell population` %in% colnames(master_types),], z = TrainSet)
-  {
-    cls = colnames(x)
-    x = reshape2::melt(x[1:K,])
-    x = data.frame(genes = x$value, celltype = x$Var2, polarity = "+")
-    colnames(x) <- colnames(y)
-    
-    x = rbind(x, y)
-    x = unique(x)
-    
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(E))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    
-    # randomly sample the filtered_features
-    filtered_features = lapply(filtered_features, function(x){unique(x[sample(nrow(x), nrow(x), replace = T), ])})
-    
-    scores = CID.append(z, filtered_features, sorted = T)
-    
-    indexMax = apply(scores, 2, which.max);
-    celltypes_train <- rownames(scores)[indexMax];
-    #acc = sum(celltypes_train == colnames(z)) / ncol(z)
-    
-    acc = sapply(unique(celltypes_train), function(x){
-      sum(celltypes_train == x & colnames(z) == x) / sum(celltypes_train == x)
-    })
-    
-    acc = mean(acc)
-    
-    p = do.call(rbind, filtered_features)
-    rownames(p) <- NULL
-    
-    return(list(acc = acc, markers_used = p))
-  }
-  
-  cat(" ..........  Training Signac classifier on training set: \n");
-  cat("             nrow = ", nrow(TrainSet), "\n", sep = "");
-  cat("             ncol = ", ncol(TrainSet), "\n", sep = "");
-  
-  q = sapply(100, function(x){
-    N_markers = rep(x, 1000)
-    numCores = parallel::detectCores()
-    parallel::mclapply(N_markers, optim_K, mc.cores =  numCores - 1)
-  })
-  
-  #accs = unlist(q[c(TRUE, FALSE)])
-  #mrks = q[c(FALSE, TRUE)]
-  #new_markers = mrks[which(accs == max(accs))]
-  accs = sapply(q, function(x) x[[1]])
-  mrks = lapply(q, function(x) x[[2]])
-  new_markers = mrks[which(accs > mean(accs))]
-  
-  cat(" ..........  Done! Model accuracy on training set = ", max(accs), "\n");
-  
-  accs_test = sapply(new_markers, function(x){
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(TestSet))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    scores = CID.append(TestSet, filtered_features, sorted = T)
-    
-    indexMax = apply(scores, 2, which.max);
-    celltypes_test <- rownames(scores)[indexMax];
-    # acc = sum(celltypes_test == colnames(TestSet)) / ncol(TestSet)
-    
-    acc = sapply(unique(celltypes_train), function(x){
-      sum(celltypes_train == x & colnames(z) == x) / sum(celltypes_train == x)
-    })
-    
-    mean(acc)
-  })
-  
-  cat(" ..........  Model accuracy on test set = ", max(accs_test), "\n");
-  
-  new_markers = mrks[which(accs_test == max(accs_test))]
-  
-  new_markers = lapply(new_markers, function(x) {
-    x[order(x[,2]),]
-  })
-  
-  scores_test = lapply(new_markers, function(x){
-    x$`Cell population` = as.character(x$`Cell population`)
-    filtered_features=subset(x,get("HUGO symbols")%in%rownames(TestSet))
-    filtered_features=split(filtered_features[,c("HUGO symbols", "Cell population" ,"Polarity")], filtered_features[,"Cell population"])
-    CID.append(TestSet, filtered_features, sorted = T)
-  })
-  
-  cor_test = sapply(scores_test, function(x){
-    d = cor(t(x))
-    diag(d) <- 0
-    sum(d)
-  })
-  
-  cat(" ..........  Number of models with optimum performance = ", length(which.min(cor_test)), "\n");
-  
-  new_markers = new_markers[[which.min(cor_test)]]
-  
-  return(new_markers)
-  
-}
-
 #' Get indices of training markers
 #'
 #' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
 #' @param data.dir if default, uses the standard Signac markers (see ?CID.SeeMarkers).
+#' @param method.use either 'max.genes.detected' or 'min.entropy'
 #' @return a list of cell indices and names to use for training set
 #' @export
 CID.GetTrainingSet <- function(E, data.dir = NULL, method.use = "max.genes.detected")
@@ -2860,336 +1100,6 @@ CID.GetTrainingSet <- function(E, data.dir = NULL, method.use = "max.genes.detec
   }
   
   return(q)
-  
-}
-
-#' Get indices of training markers
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @param data.dir if default, uses the standard Signac markers (see ?CID.SeeMarkers).
-#' @return a list of cell indices and names to use for training set
-#' @export
-CID.GetTrainingSet2 <- function(E, cr,  data.dir = NULL)
-{
-  inputs = match.call()
-  
-  # get edges for cell-cell similarity network
-  edges = CID.GetEdges(inputs)
-  
-  # compute distance matrix
-  distM = CID.GetDistMat(edges = edges)
-  
-  # Calculate normalized shannon entropy for each cell j for all connections with shortest path < N
-  shannon = rep(0, ncol(E))
-  ac = colnames(E)
-  
-  if (class(distM) == "list")
-  {
-    dM = Reduce('+', distM) > 0;
-    # create identity matrix to subtract off self
-    I <- methods::new("ngTMatrix", 
-                      i = as.integer(1:nrow(dM) - 1L), 
-                      j = as.integer(1:nrow(dM) - 1L),
-                      Dim = as.integer(c(nrow(dM), nrow(dM))))
-    dM = dM - I
-  } else {
-    dM = distM
-  }
-  
-  # create matrix for cell labels 
-  m = Matrix::Matrix(0, nrow = length(ac), ncol = length(unique(ac)), sparse = T)
-  m[cbind(1:nrow(m), as.numeric(factor(ac)))] <- 1
-  
-  res = dM %*% m
-  res = res / Matrix::rowSums(res)
-  N_unique = length(unique(ac))
-  shannon = apply(res, 1, function(freqs) {-sum(freqs[freqs != 0] * log(freqs[freqs != 0])) / log(2) / log2(N_unique)})
-  
-  df = data.frame(cells = ac, entropy = shannon)
-  
-  q = lapply(unique(df$cells), function(x){
-    which(df$cells == x)[order(df$entropy[df$cells == x])]
-  })
-  names(q) <- unique(df$cells)
-  idx = which(names(q) == "Other")
-  q[-idx]
-  
-  total_counts = Matrix::colSums(E != 0)
-  
-  df = data.frame(cells = ac, entropy = total_counts)
-  
-  q = lapply(unique(df$cells), function(x){
-    which(df$cells == x)[order(df$entropy[df$cells == x], decreasing = TRUE)[1:round(0.1 * sum(df$cells == x))]]
-  })
-  names(q) <- unique(df$cells)
-  
-  
-  return(q)
-  
-}
-
-#' Unsupervised main function
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
-#' @param data.dir directory of SPRING files "edges.csv" and "categorical_coloring_data.json"
-#' @return Filtered markers where each marker must have at least ncells that express at least ncounts
-#' @export
-CID.UnsupervisedLearning <- function(E, data.dir = NULL)
-{
-  # check input
-  inputs = match.call()
-  if (class(E) %in% c("matrix", "data.frame"))
-    E = Matrix::Matrix(as.matrix(E), sparse = T)
-  if (!is.null(data.dir))
-    data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
-  cat(" ..........  Entry in CID.CellID \n");
-  ta = proc.time()[3];
-  
-  # main function
-  cat(" ..........  Running unsupervised classification for cell types on input data matrix :\n");
-  cat("             nrow = ", nrow(E), "\n", sep = "");
-  cat("             ncol = ", ncol(E), "\n", sep = "");
-  
-  # get edges for cell-cell similarity network
-  edges = CID.GetEdges(inputs)
-  
-  # compute distance matrix
-  distMat = CID.GetDistMat(edges = edges)
-  
-  # get Louvain clusters
-  louvain = CID.Louvain(edges = edges)
-  
-  # get overlap between all Louvain clusters in KNN network
-  m = Matrix::Matrix(0, nrow = length(louvain), ncol = length(unique(louvain)), sparse = T)
-  m[cbind(1:nrow(m), as.numeric(factor(louvain)))] <- 1
-  res = distMat[[1]] %*% m
-  colnames(res) <- unique(louvain)
-  q = aggregate(as.matrix(res), list(louvain), sum)
-  colnames(q) <- c("Groups", levels(factor(louvain)))
-  q2 = as.matrix(q[,-1])
-  rownames(q2) <- colnames(q2)
-  q2 = log2(q2 + 1)
-  q2 = q2 / rowSums(q2)
-  
-  # get any Louvain clusters with >f %  edge connections
-  idx = apply(q2, 1, function(x) colnames(q2)[which (x > 0.02)])
-  names(idx) = rownames(q2)
-  
-  # merge them into groups
-  celltypes = louvain
-  
-  for (j in 1:length(idx))
-  {
-    logik = which(sapply(idx, function(x) sum(idx[[j]] %in% x) > 0))
-    celltypes[celltypes %in% unlist(idx[logik])] = paste("Group", j)
-  }
-  
-  # get markers for these cell types
-  cat("             Signac found", length(unique(celltypes)), "celltypes and ", length(unique(louvain)), "cellstates!\n");
-  colnames(E) <- celltypes
-  new_lbls = CID.PosMarkers2(E, celltypes)
-  celltypes = new_lbls$lbls
-  cat("             Establishing markers for cellstates...\n");
-  
-  # break these markers down into cell states
-  cellstates = celltypes
-  pb = txtProgressBar(min = 0, max = length(unique(celltypes)), initial = 0) 
-  for (j in 1:length(unique(celltypes))){
-    logik = celltypes == unique(celltypes)[j]
-    for (k in 1:length(unique(louvain[logik])))
-    {
-      Q = E[,logik]
-      dummy = louvain[logik]
-      lbls = rep("All", ncol(Q))
-      lbls[dummy == unique(louvain[logik])[k]] = dummy[dummy == unique(louvain[logik])[k]]
-      colnames(Q) <- lbls
-      new_lbls = CID.PosMarkers2(Q, lbls)
-      cellstates[louvain == unique(louvain[logik])[k]] = new_lbls$lbls[new_lbls$lbls != "All"]
-    }
-    setTxtProgressBar(pb,j)
-  }
-  
-  cr = list(celltypes_unsup  = celltypes,
-            cellstates_unsup = cellstates)
-  
-  tb = proc.time()[3] - ta;
-  cat("\n ..........  Exit CID.CellID.\n");
-  cat("             Execution time = ", tb, " s.\n", sep = "");
-  return (cr);
-}
-
-
-
-#' filters the geneset markers
-#'
-#' @param D An expression matrix with features (genes) in rows and samples (cells) in columns.
-#' @param markersG A data frame with four columns ('HUGO Symbol', 'Cell Population', 'ENTREZ ID', 'Polarity'). Default is internally set to data(markers_v4).
-#' @param pval p-value cutoff, as described in the manuscript. Default is 0.01.
-#' @param sorted see ?CID.CellID
-#' @return A list of markers and features.
-#' @export
-CID.filter2 <- function(l, m, n, o)
-{
-  if (o)
-    m = m[m$Polarity == "+", ]
-  l = l[intersect(row.names(l),m$"HUGO symbols"),,drop=F]
-  l = l[apply(l, 1, sd) != 0,]
-  markers.names = unique(m$`Cell population`)
-  cat(" ..........  Filtering markers for features: \n","           ",paste(markers.names,collapse = ", ", sep = ""))
-  features=subset(m,get("HUGO symbols")%in%rownames(l))
-  features=split(features[,c("HUGO symbols", "Cell population" ,"Polarity")], features[,"Cell population"])
-  features=features[intersect(markers.names,names(features))]
-  features=features[sapply(features,function(x)sum(x$Polarity == "+") > 1)]
-  missing.populations=setdiff(markers.names,names(features))
-  features23=features[sapply(features,function(x)nrow(x)<3)]
-  features=features[sapply(features,function(x)nrow(x)>=3)]
-  if (NROW(features) >= 3)
-  {
-    L = lapply(features,function(x){na.omit(l[intersect(row.names(l),x$"HUGO symbols"[x$Polarity == "+"]),,drop=F])})
-    # set.seed("42")
-    
-    # get pairwise combinations of markers with the top five markers
-    # downsampling does not seem to affect results; done for speed.
-    cols = lapply(L, function(x){
-      t( combn(1:nrow(x), 2))
-    })
-    
-    # run pairwise correlation test
-    Q = mapply(function(x, y){
-      apply( x , 1 , function(z) cor.test( y[z[1], ] , y[  z[2], ] )$p.value )
-    }, x = cols, y = L)
-    
-    # remove features with weak overall correlation; median had the best sensitivity
-    QC = sapply(Q, median)
-    logik = QC > n & sapply(L, nrow) > 2;
-    features = features[!logik]; L = L[!logik]
-    if(!length(features))
-      return(NULL)
-    
-    # combine features 
-    features = c(features, features23)
-    
-  } else {
-    for (j in levels(m$Polarity))
-    {
-      L = lapply(features,function(x){na.omit(l[intersect(row.names(l),x$"HUGO symbols"[x$Polarity == j]),,drop=F])})
-      
-      # remove markers that do not cluster with maximal group
-      M = do.call(rbind, L)
-      
-      # generate correlation matrix, cluster and cut into two groups
-      cor_mat = qlcMatrix::cosSparse(Matrix::t(M))
-      ix = hclust(dist(cor_mat))
-      grps = cutree(ix, k = (length(L)))
-      vec = as.character(unlist(sapply(features, function(x) x$`Cell population`[x$Polarity == j])))
-      q = table(data.frame(from = vec, to = grps))
-      
-      # find the maximal group
-      idx = apply(q,1,which.max)
-      genes_keep = names(grps)[grps %in% idx]
-      
-      # remove unstable markers from features
-      features = lapply(features, function(x){
-        x1 = x[x$`HUGO symbols` %in% genes_keep & x$Polarity == j,]
-        rbind(x[x$Polarity != j,], x1)
-      })
-    }
-    features = c(features, features23)
-  }
-  filtered.populations=setdiff(markers.names,setdiff(names(features),missing.populations))
-  if(length(filtered.populations) > 0)
-    cat(paste("\nNo markers exist for this feature(s) due to filtering:",paste(filtered.populations,collapse=", ")), "\n")
-  if(length(filtered.populations)  == 0 & length(missing.populations) == 0)
-    cat("\n ..........  Markers exist for all features! \n")
-  features
-}
-
-#' filters the geneset markers
-#'
-#' @param expression An expression matrix with features (genes) in rows and samples (cells) in columns.
-#' @param markersG A data frame with four columns ('HUGO Symbol', 'Cell Population', 'ENTREZ ID', 'Polarity'). Default is internally set to data(markers_v4).
-#' @param pval p-value cutoff, as described in the manuscript. Default is 0.1.
-#' @return A list of markers and features.
-#' @export
-CID.filter <- function(expression, markersG, pval = pval)
-{
-  expression = expression[intersect(row.names(expression),markersG$"HUGO symbols"),,drop=F]
-  expression = log(expression + 1, 2)
-  markers.names = unique(markersG$`Cell population`)
-  cat(" ..........  Filtering markers for features: \n","           ",paste(markers.names,collapse = ", ", sep = ""))
-  features=subset(markersG,get("HUGO symbols")%in%rownames(expression))
-  features=split(features[,c("HUGO symbols", "Polarity")], features[,"Cell population"])
-  features=features[intersect(markers.names,names(features))]
-  features=features[sapply(features,function(x)nrow(x)>0)]
-  missing.populations=setdiff(markers.names,names(features))
-  if (NROW(features) > 2)
-  {
-    L = lapply(features,function(x){na.omit(expression[intersect(row.names(expression),x$"HUGO symbols"[x$Polarity == "+"]),,drop=F])})
-    Q = lapply(L, function(x) {
-      q = qlcMatrix::cosSparse(Matrix::t(x))
-      diag(q) <- 0
-      apply(q,1,function(x) max(abs(x)))})
-    filter = summary(unlist(Q))[2]
-    QC = lapply(Q, function(x) sum(x < filter))
-    QC = mapply(function(x,y) { 1 - phyper(x - 1, sum(unlist(Q) < filter), length(unlist(Q)) - sum(unlist(Q) < filter), length(y)) }, x = QC, y = Q)
-    logik = QC < pval;
-    features = features[!logik]
-    #filter = summary(unlist(Q))[1]
-    filter = -1;
-    nms = unlist(lapply(Q, function(x) names(x)[x > filter]))
-    features = lapply(features, function(x) rbind(x[x[,1] %in% nms,], x[x$Polarity == "-",]))
-  }
-  features = features[sapply(features, function(x) sum(x$Polarity == "+") != 0)]
-  filtered.populations=setdiff(markers.names,setdiff(names(features),missing.populations))
-  if(length(missing.populations)>0)
-    warning(paste("No markers exist for this feature(s):",paste(missing.populations,collapse=", ")), ".\n")
-  if(length(filtered.populations) > 0)
-    cat(paste("\nNo markers exist for this feature(s) due to filtering:",paste(filtered.populations,collapse=", ")), "\n")
-  if(length(filtered.populations)  == 0 & length(missing.populations) == 0)
-    cat("\n ..........  Markers exist for all features! \n")
-  features
-}
-
-#' Calculates Signac scores
-#'
-#' @param expression An expression matrix with features (genes) in rows and samples (cells) in columns.
-#' @param featuresG A list of features, where each list entry is a character vector of markers.
-#' @param sorted see ?CID.CellID
-#' @return A matrix of CellID scores; features by cells.
-#' @export
-CID.append=function(expression,featuresG, sorted)
-{
-  if (!sorted)
-  {
-    # subset expression matrix
-    Z = expression[row.names(expression) %in% as.character(unlist(lapply(featuresG, function(x) x = x[,1]))), ]
-    # Z-score transform
-    Z = Matrix::t(scale(Matrix::t(Z)))
-    # Get CellID scores
-    res = as.data.frame(Matrix::t(do.call(cbind,
-                                          lapply(featuresG,function(x){
-                                            if (any(x$Polarity == "-")) {
-                                              apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "+"]),,drop=F],2,function(x) mean(x, na.rm = T)) -
-                                                apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "-"]),,drop=F],2,function(x) mean(x, na.rm = T))
-                                            } else if (!any(x$Polarity == "-")) {
-                                              apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "+"]),,drop=F],2,function(x) mean(x, na.rm = T))
-                                            } else if (!any(x$Polarity == "+")) {
-                                              apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "-"]),,drop=F],2,function(x) mean(-1 * x, na.rm = T))
-                                            }
-                                          }))))
-    res = res[order(rownames(res)),]
-    res
-  } else {
-    # subset expression matrix
-    Z = expression[row.names(expression) %in% as.character(unlist(lapply(featuresG, function(x) x = x[,1]))), ]
-    # Get CellID scores
-    res = as.data.frame(Matrix::t(do.call(cbind,
-                                          lapply(featuresG,function(x){
-                                            apply(Z[intersect(row.names(Z),x$`HUGO symbols`[x$Polarity == "+"]),,drop=F],2,function(x) mean(x, na.rm = T))
-                                          }))))
-    res = res[order(rownames(res)),]
-    res
-  }
 }
 
 #' Smoothing function
@@ -3526,12 +1436,12 @@ get_colors <- function(P)
                  "T.cells.CD8"                ,  "T.cells.CD4.FH.regs"         , "Not.Mast"          , 
                  "Mast"                       ,  "Mast.cells.activated"        , "Mast.cells.resting",
                  "Macrophages"                ,  "Dendritic"                   , "T.cells.follicular.helper",
-                 "NK.cells"                   ,  "Mon.NonClass"                , "Mon.Classical"    ,
-                 "DCs.Resting"                ,  "DCs.Activated"               , "T.cells.CD4n"     ,
-                 "T.cells.CD4m"               ,  "Mon.NonClass"                , "Neutro.inflam"    ,
+                 "NK.cells"                   ,  "Mon.NonClassical"                , "Mon.Classical"    ,
+                 "DCs.Resting"                ,  "DCs.Activated"               , "T.cells.CD4.naive"     ,
+                 "T.cells.CD4.memory"          ,  "Mon.NonClass"                , "Neutro.inflam"    ,
                  "T.cells"                    ,  "T.CD4.FH"                    , "T.cells.gd"       ,
-                 "Neutrophil"                 ,  "T.cells.cyto"                ,  "T.cells.CD8n"    ,
-                 "T.cells.CD8m"               ,  "T.cells.CD8.CD4"             ,  "NK.CD56.bright"  ,
+                 "Neutrophil"                 ,  "T.cells.cyto"                ,  "T.cells.CD8naive"    ,
+                 "T.cells.CD8em"               ,  "T.cells.CD8.CD4"             ,  "NK.CD56.bright"  ,
                  "NK.CD56.dim")
   sub_colors =c( "#a3b300"                    ,  "#f9d801"                     , "#d0e4e5"          ,
                  "#F9A602"                    ,  "#f97501"                     , "#d6b171"          ,
@@ -3547,8 +1457,8 @@ get_colors <- function(P)
                  "#d4e881"                    , "#ad9bf2"                      , "#db1bbe"          ,
                  "#bb7fc7"                    , "#e68181"                      , "#ebbf8a"          ,
                  "#f7f2b2"                    , "#c75e4c"                      , "#92c74c"          , 
-                 "#f7f2b2"                    , "#f9d801"                      , "#d0e4e5"          ,
-                 "#d4e881"                    , "#d4e881"                      , "#F9A602"          ,
+                 "#f7f2b2"                    , "#f9d801"                      , "#386CB0"          ,
+                 "#E0FFFF"                    , "#d4e881"                      , "#F9A602"          ,
                  "#d4e881") 
   
   for (i in 1:length(sub_types))
@@ -3746,57 +1656,6 @@ CID.PosMarkers2 <- function(D, acn)
   return(list(lbls = Y, mrks = mrks))
 }
 
-#' Run DEG analysis with Seurat wrapper
-#'
-#' @param D Expression matrix with genes for rows, samples for columns
-#' @param acn Vector of cell type labels 
-#' @return List where each element contains the DEG tables for the one vs. all comparison
-#' @export
-CID.PosMarkers3 <- function(D, threshold)
-{
-  # get lbls
-  lbls = colnames(D)
-  # lbls = paste("Cluster", lbls)
-  # set colnames
-  colnames(D) <- seq(1, ncol(D))
-  # make sure row names are not redundant
-  logik = CID.IsUnique(rownames(D))
-  D = D[logik,]
-  # Set up object
-  ctrl <- suppressWarnings(Seurat::CreateSeuratObject(counts = D))
-  ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
-  ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
-  ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
-  cts = unique(lbls);
-  mrks = list("")
-  dd = list("")
-  for (j in 1:length(cts))
-  {
-    cts2 = cts[-which(cts == cts[j])]
-    for (k in 1:length(cts2))
-    {
-      dd[[k]] = tryCatch(Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = cts2[k], logfc.threshold = threshold), error = function(e) {FALSE})
-      if (class(dd[[k]]) != "logical") {
-        dd[[k]]$ident.1 = cts[j]
-        dd[[k]]$ident.2 = cts2[k]
-        dd[[k]]$gene = rownames(dd)
-        
-        flag = any(dd[[k]]$avg_logFC > 0) & any(dd[[k]]$avg_logFC < 0)
-        
-        if (!flag)
-          dd[[k]] = data.frame(ident.1 = "NONE", ident.2 = "NONE")
-        
-      } else {
-        dd[[k]] = data.frame(ident.1 = "NONE", ident.2 = "NONE")
-      }
-    }
-    mrks[[j]] = dd
-  }
-  names(mrks) <- cts
-  
-  return(mrks)
-}
-
 #' Get KNN edges from single cell data
 #'
 #' @param E Expression matrix with genes for rows, samples for columns
@@ -3953,9 +1812,8 @@ runningquantile <- function(x, y, p, nBins)
 #' @param X Expression matrix with genes for rows, samples for columns, after V score filtering.
 #' @param k KNN parameter. Default is 5.
 #' @param np Number of PCs to build the KNN graph. Default is 50.
-#' @param run_force Runs ForceAtlas2. Default is FALSE.
 #' @param genes_to_use gene list for KNN graph building
-get_knn_graph2 <- function(X, k=4, np, run_force = F, genes_to_use)
+get_knn_graph2 <- function(X, k=4, np, genes_to_use)
 {
   logik = CID.IsUnique(rownames(X))
   X = X[logik,]
@@ -3964,323 +1822,5 @@ get_knn_graph2 <- function(X, k=4, np, run_force = F, genes_to_use)
   ctrl <- Seurat::ScaleData(ctrl, verbose = F)
   ctrl <- Seurat::RunPCA(ctrl, features = genes_to_use, pcs.compute = np, do.print = F)
   ctrl <- Seurat::FindNeighbors(object = ctrl, reduction = "pca", dims = 1:min(c(np, 50)), k.param = k)
-  if (run_force)
-    P <- RunForceAtlas(ctrl)
   return(ctrl@graphs$RNA_nn)
-}
-
-#' Run ForceAtlas2
-#'
-#' @param Q Seurat object created by get_knn_graph2
-RunForceAtlas <- function(Q)
-{
-  cat('Running ForceAtlas2 \n')
-  outs = Q@graphs$RNA_nn
-  outs = igraph::graph.adjacency(outs, diag = F)
-  outs = igraph::get.data.frame(outs)
-  outs = data.frame(apply(outs, 2, as.numeric))
-  outs$weights = 1;
-  colnames(outs) <- c("from", "to", "weights")
-  p <- ForceAtlas2::layout.forceatlas2(outs, directed = FALSE, iterations = 1000, plotstep = 100)
-  return(p)
-}
-
-#' Run GSVA
-#'
-#' @param y expression matrix
-#' @param geneSets list of genesets
-RunGSVA <- function(y, geneSets)
-{
-  wt = colnames(y)
-  
-  y = y[rownames(y) %in% geneSets[[1]],]
-  
-  p <- nrow(y) ## number of genes
-  n <- ncol(y) ## number of samples
-  
-  cts = unique(wt);
-  outs = list("")
-  
-  for (j in 1:length(cts))
-  {
-    nGrp1 <- sum(wt == cts[j]) ## number of samples in group 1
-    nGrp2 <- n - nGrp1 ## number of samples in group 2
-    
-    ## build design matrix
-    design <- cbind(sampleGroup1=1, sampleGroup2vs1=rep(0, n))
-    design[,2][wt == cts[j]] <- 1
-    
-    ## fit linear model
-    fit <- limma::lmFit(y, design)
-    
-    ## estimate moderated t-statistics
-    fit <- limma::eBayes(fit)
-    
-    ## genes in set1 are differentially expressed
-    # topTable(fit, coef="sampleGroup2vs1")
-    outs[[j]] = limma::topTable(fit, coef="sampleGroup2vs1", number = 50)
-  }
-  
-  names(outs) <- cts
-  
-  outs
-  
-  
-  ## estimate GSVA enrichment scores for the three sets
-  # gsva_es <- gsva(as.matrix(y), geneSets, mx.diff=1,parallel.sz = 16)
-  
-  ## fit the same linear model now to the GSVA enrichment scores
-  # colnames(design) <- colnames(y)
-  # fit <- lmFit(gsva_es, design)
-  
-  ## estimate moderated t-statistics
-  # fit <- eBayes(fit)
-  
-  ## set1 is differentially expressed
-  # topTable(fit, coef="sampleGroup2vs1")
-}
-
-#' Run DEG analysis with Seurat wrapper
-#'
-#' @param E Expression matrix with genes for rows, samples for columns
-#' @return List where each element contains the DEG tables for the one vs. all comparison
-#' @export
-CID.GetLearningMarkers <- function(E, full.dataset, logfc.threshold = 1, pseudocount.use = 1)
-{
-  library(scater)
-  # get lbls
-  lbls = colnames(E)
-  # set colnames
-  colnames(E) <- seq(1, ncol(E))
-  # Set up object
-  ctrl <- Seurat::CreateSeuratObject(counts = E, project = "CID", min.cells = 0)
-  ctrl <- Seurat::NormalizeData(ctrl)
-  ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
-  ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
-  outs = list("")
-  cts = unique(lbls)
-  cts = cts[cts != "Other"]
-  n = length(unique(colnames(full.dataset)))
-  for (j in 1:length(cts))
-  {
-    dd = tryCatch(Seurat::FindMarkers(ctrl, ident.1 = cts[j], ident.2 = NULL, test.use = "MAST", min.cells.group = 0, max.cells.per.ident = 200, logfc.threshold = logfc.threshold, pseudocount.use = pseudocount.use), error = function(e) {FALSE})
-    if (class(dd) == "logical")
-      return(NULL)
-    dd$GeneSymbol = rownames(dd)
-    dd$celltype = cts[j]
-    outs[[j]] = dd
-  }
-  names(outs) <- cts
-  # DD = do.call(rbind, outs)
-  
-  # first remove anything with p_val_adj > 0.01
-  res = lapply(outs, function(x) x[x$p_val_adj < 0.01,])
-  
-  # second remove anything with log FC < 0
-  res = lapply(res, function(x) x[x$avg_logFC > 0,])
-  
-  # Third we order each data frame by log FC
-  res = lapply(res, function(x) x[order(x$avg_logFC, decreasing = T),])
-  
-  # Now we remove duplicated markers
-  q = do.call(rbind, res)
-  dups = q$GeneSymbol[!CID.IsUnique(q$GeneSymbol)]
-  res = lapply(res, function(x) x[!x$GeneSymbol %in% dups,])
-  
-  # remove any cell type with zero markers
-  res = res[sapply(res, function(x) nrow(x) != 0)]
-  
-  # now determine sample size
-  res = lapply(res, function(x){
-    D = full.dataset
-    xx = colnames(D)
-    D = CID.Normalize(D)
-    logik = rownames(D) %in% x$GeneSymbol
-    D = D[logik,]
-    if (!is.null(nrow(D)))
-    {
-      idx = match(x$GeneSymbol, rownames(D))
-      D = D[idx,]
-      ksd = apply(D, 1, sd)
-    } else {
-      ksd = sd(D)
-    }
-    # get power estimate
-    q = t(scale(Matrix::t(D)))
-    q = Matrix::t(Matrix.utils::aggregate.Matrix(Matrix::t(q), factor(xx), FUN = 'mean'))
-    P = apply(q, 1, max)
-    s = 1 + 2 * 14.88 * n * (ksd / P) ^ 2
-    x$samplesize = s
-    s = cumsum(1 / x$samplesize)
-    idx = which(s < 1);
-    idx = c(idx, length(idx) + 1)
-    na.omit(x[idx,])
-  })
-  
-  q = do.call(rbind, res)
-  
-  geneset = data.frame(genes = q$GeneSymbol, celltype = q$celltype, Polarity = "+")
-  colnames(geneset) <- c("HUGO symbols", "Cell population", "Polarity")
-  
-  # first remove anything with p_val_adj > 0.01
-  res = lapply(outs, function(x) x[x$p_val_adj < 0.01,])
-  
-  # second remove anything with log FC > 0
-  res = lapply(res, function(x) x[x$avg_logFC < 0,])
-  
-  # Third we order each data frame by log FC
-  res = lapply(res, function(x) x[order(x$avg_logFC),])
-  
-  # Now we remove duplicated markers
-  q = do.call(rbind, res)
-  dups = q$GeneSymbol[!CID.IsUnique(q$GeneSymbol)]
-  res = lapply(res, function(x) x[!x$GeneSymbol %in% dups,])
-  
-  # remove any cell type with zero markers
-  res = res[sapply(res, function(x) nrow(x) != 0)]
-  
-  # now determine sample size
-  res = lapply(res, function(x){
-    if (nrow(x) > 1)
-    {
-      D = full.dataset
-      xx = colnames(D)
-      D = CID.Normalize(D)
-      logik = rownames(D) %in% x$GeneSymbol
-      D = D[logik,]
-      if (!is.null(nrow(D)))
-      {
-        idx = match(x$GeneSymbol, rownames(D))
-        D = D[idx,]
-        ksd = apply(D, 1, sd)
-      } else {
-        ksd = sd(D)
-      }
-      # get power estimate
-      q = t(scale(Matrix::t(D)))
-      q = Matrix::t(Matrix.utils::aggregate.Matrix(Matrix::t(q), factor(xx), FUN = 'mean'))
-      P = apply(q, 1, min)
-      s = 1 + 2 * 14.88 * n * (ksd / P) ^ 2
-      x$samplesize = s
-      s = cumsum(1 / x$samplesize)
-      idx = which(s < 1);
-      idx = c(idx, length(idx) + 1)
-      na.omit(x[idx,])
-    }
-    else{
-      x$samplesize = 1
-      x
-    }
-  })
-  
-  q = do.call(rbind, res)
-  
-  neg = data.frame(genes = q$GeneSymbol, celltype = q$celltype, Polarity = "-")
-  colnames(neg) <- c("HUGO symbols", "Cell population", "Polarity")
-  
-  geneset = rbind(geneset, neg)
-  geneset = geneset[order(geneset$`Cell population`), ]
-  
-  return(geneset)
-}
-
-grab_one_gene_dev <- function(data.dir, gene)
-{
-  require(hdf5r)
-  data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
-  filename = paste(dirname(data.dir), "counts_norm_sparse_genes.hdf5", sep = "/")
-  if (!file.exists(filename)) {
-    stop("File not found")
-  }
-  infile = hdf5r::H5File$new(filename)
-  E = Matrix::Matrix(0, ncol = 1, nrow = hdf5r::h5attributes(infile)$ncells, sparse = T)
-  flag = tryCatch(test_data <- infile[[paste("/cell_ix", gene, sep = "/")]][], error = function(e) { FALSE})
-  if (!class(flag) %in% "logical")
-  {
-    E[flag + 1] = infile[[paste("/counts", gene, sep = "/")]][]
-    return(E)
-  } else {
-    genes = read.table(paste(dirname(data.dir), "/genes.txt", sep = ""), quote="\"", comment.char="", stringsAsFactors=FALSE)$V1
-    logik = grepl(paste0("^", gene, "_"), genes)
-    gene = genes[logik]
-    flag2 = tryCatch(test_data <- infile[[paste("/cell_ix", gene, sep = "/")]][], error = function(e) { FALSE})
-    if (! class(flag2) %in% "logical") {
-      E[flag2 + 1] = infile[[paste("/counts", gene, sep = "/")]][]
-      return(E)
-    } else {
-      cat("ERROR: Unable to find this gene. Can you check the spelling, and make sure that it matches the gene name in these data? \n")
-    }
-  }
-}
-
-grab_one_cell_dev <- function(data.dir, cell_idx)
-{
-  require(hdf5r)
-  cell_idx = cell_idx - 1;
-  data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
-  filename = paste(dirname(data.dir), "counts_norm_sparse_cells.hdf5", sep = "/")
-  if (!file.exists(filename)) {
-    stop("File not found")
-  }
-  infile = hdf5r::H5File$new(filename)
-  E = Matrix::Matrix(0, ncol = 1, nrow = hdf5r::h5attributes(infile)$ngenes + 1, sparse = T)
-  flag = tryCatch(test_data <- infile[[paste("/gene_ix", cell_idx, sep = "/")]][], error = function(e) { FALSE})
-  if (!class(flag) %in% "logical")
-  {
-    E[flag + 1] = infile[[paste("/counts", cell_idx, sep = "/")]][]
-    E = E[-length(E)]
-    return(E)
-  } else {
-    return("Error: could not find cell idx in file")
-  }
-}
-
-cor.test.p <- function(x){
-  FUN <- function(x, y) cor.test(x, y)[["p.value"]]
-  z <- outer(
-    colnames(x), 
-    colnames(x), 
-    Vectorize(function(i,j) FUN(x[,i], x[,j]))
-  )
-  dimnames(z) <- list(colnames(x), colnames(x))
-  z
-}
-
-#' Run DEG analysis with Seurat wrapper
-#'
-#' @param spring.dir Path to "categorical_coloring_data.json" from SPRING pipeline.
-#' @param fn Filename, default is 'categorical_coloring_data.json'.
-#' @return An additional list element called "Manual_Annotation" added to the file "fn" in spring.dir
-#' @export
-CID.AddManualTrack <- function(spring.dir, fn = 'categorical_coloring_data.json')
-{
-  # load JSON
-  json_data <- rjson::fromJSON(file=paste(spring.dir,fn,sep = ""))
-  
-  myls <- vector("list", length = length(json_data$Sample$label_list))
-  
-  for(i in 1:length(myls)) { myls[[i]] <- "None" } ;
-  
-  # create tracks for annotation
-  P = create_tracks(json_data, list(Manual_Annotation = myls))
-  
-  # write JSON
-  json_out = jsonlite::toJSON(P, auto_unbox = TRUE)
-  write(json_out,paste0(spring.dir, 'categorical_coloring_data_new.json'))
-}
-
-create_tracks <- function(x, y)
-{
-  qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
-  col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
-  L = lapply(y, function(z)
-  {
-    Ntypes = length(unique(z))
-    label_colors = as.list(col_vector[1:Ntypes])
-    names(label_colors) <- unique(z)
-    list(label_list = z, label_colors = label_colors)
-  })
-  Z = c(L, x)
-  Z[order(names(Z))]
-  # pie(rep(1,Ntypes), col=(col_vector[1:Ntypes]))
 }

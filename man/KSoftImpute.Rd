@@ -4,14 +4,18 @@
 \alias{KSoftImpute}
 \title{K soft imputation}
 \usage{
-KSoftImpute(E, dM = NULL, genes.to.use = NULL, do.save = F)
+KSoftImpute(E, dM = NULL, genes.to.use = NULL, do.save = F, verbose = T)
 }
 \arguments{
 \item{E}{A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.}
 
-\item{data.dir}{directory of SPRING files "edges.csv" and "categorical_coloring_data.json"}
+\item{dM}{see ?CID.GetDistMat}
 
-\item{genes}{a character vector of genes to impute}
+\item{genes.to.use}{a character vector of genes to impute. Default is NULL.}
+
+\item{do.save}{If TRUE, imputed matrix is saved in directory. Default is FALSE.}
+
+\item{verbose}{If TRUE, code reports outputs.}
 }
 \value{
 Imputed values for every gene

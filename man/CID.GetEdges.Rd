@@ -4,7 +4,12 @@
 \alias{CID.GetEdges}
 \title{Get edges that are either pre-computed, or generate new edges}
 \usage{
-CID.GetEdges(...)
+CID.GetEdges(E = NULL, data.dir = NULL)
+}
+\arguments{
+\item{E}{see Signac}
+
+\item{data.dir}{directory}
 }
 \value{
 edges for cell-cell similarity network

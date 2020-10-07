@@ -4,10 +4,12 @@
 \alias{CID.Impute}
 \title{Imputation wrapper}
 \usage{
-CID.Impute(E, data.dir = NULL, do.par = TRUE)
+CID.Impute(E, genes.to.use, data.dir = NULL, do.par = TRUE)
 }
 \arguments{
 \item{E}{A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols.}
+
+\item{genes.to.use}{Genes for imputation}
 
 \item{data.dir}{directory for saving "matrix_saver_imputed.mtx" for future loading.}
 

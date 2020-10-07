@@ -10,6 +10,8 @@ CID.GetTrainingSet(E, data.dir = NULL, method.use = "max.genes.detected")
 \item{E}{A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.}
 
 \item{data.dir}{if default, uses the standard Signac markers (see ?CID.SeeMarkers).}
+
+\item{method.use}{either 'max.genes.detected' or 'min.entropy'}
 }
 \value{
 a list of cell indices and names to use for training set

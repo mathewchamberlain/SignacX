@@ -8,6 +8,8 @@ CID.LoadData(data.dir, mfn = "matrix.mtx")
 }
 \arguments{
 \item{data.dir}{Directory containing matrix.mtx and genes.txt.}
+
+\item{mfn}{file name; default is 'matrix.mtx'}
 }
 \value{
 A sparse matrix with rownames equivalent to the names in genes.txt

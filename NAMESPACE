@@ -6,3 +6,4 @@ importFrom("utils", "data", "read.csv", "read.delim", "read.table",
 importFrom("methods", "new")
 importFrom("graphics", "hist")
 importFrom("stats", "optimize", "quantile","cor.test", "cutree", "dist", "hclust", "median")
+importFrom("stats", "anova", "as.formula", "binomial", "model.matrix")
