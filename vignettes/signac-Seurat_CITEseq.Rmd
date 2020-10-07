@@ -1,0 +1,143 @@
+---
+title: 'CITE-seq 5k PBMCs (10X) analyzed with Seurat'
+author: 'Mathew Chamberlain'
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: sandstone
+    toc: true
+    includes:
+      after_body: footer.html
+---
+
+## Load Signac and Seurat
+
+```{r setup}
+library(Signac)
+library(Seurat)
+```
+
+## Perform standard pre-processing steps with Seurat
+
+```{r Seurat, eval = F}
+# load dataset
+E = Read10X_h5(filename = "../../Data/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/rawdata/Sample1/pbmc_10k_protein_v3_raw_feature_bc_matrix.h5")
+pbmc <- CreateSeuratObject(counts = E$`Gene Expression`, project = "pbmc5k", min.cells = 3, min.features = 200)
+pbmc[["percent.mt"]] <- PercentageFeatureSet(pbmc, pattern = "^MT-")
+pbmc <- subset(pbmc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 10)
+pbmc <- NormalizeData(object = pbmc, verbose = F)
+pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000)
+pbmc <- ScaleData(pbmc)
+pbmc <- RunPCA(pbmc, verbose = F)
+pbmc <- FindNeighbors(pbmc, dims = 1:25)
+pbmc <- FindClusters(pbmc, resolution = 0.8)
+pbmc <- RunUMAP(pbmc, dims = 1:10)
+```
+
+## Generate Signac labels for the Seurat object
+
+```{r Signac, eval = F}
+# Run Signac
+data("Reference_sim")
+labels <- Signac(pbmc, R = Reference_sim) # optionally do parallel computing by setting num.cores > 1
+celltypes = Generate_lbls(labels, E = pbmc)
+```
+
+## Immune cells
+
+```{r Seurat Visualization 0}
+pbmc <- Seurat::AddMetaData(pbmc, metadata=celltypes$Immune, col.name = "immmune")
+pbmc <- Seurat::SetIdent(pbmc, value='immmune')
+DimPlot(pbmc)
+```
+
+## Lymphocytes and myeloid cells
+
+```{r Seurat Visualization 1}
+pbmc <- Seurat::AddMetaData(pbmc, metadata=celltypes$L2, col.name = "celltypes")
+pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
+DimPlot(pbmc)
+```
+
+## Broad cell types
+
+```{r Seurat Visualization 2}
+lbls = factor(celltypes$CellTypes)
+levels(lbls) <- sort(unique(lbls))
+pbmc <- Seurat::AddMetaData(pbmc, metadata=lbls, col.name = "celltypes")
+pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
+DimPlot(pbmc)
+```
+
+## Immune phenotypes
+
+```{r Seurat Visualization 3}
+lbls = factor(celltypes$CellStates)
+levels(lbls) <- sort(unique(lbls))
+pbmc <- Seurat::AddMetaData(pbmc, metadata=lbls, col.name = "celltypes")
+pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
+DimPlot(pbmc)
+```
+
+Add protein expression information
+
+```{r Seurat add protein, eval = F}
+pbmc[["ADT"]] <- CreateAssayObject(counts = E$`Antibody Capture`[,colnames(E$`Antibody Capture`) %in% colnames(pbmc)])
+pbmc <- NormalizeData(pbmc, assay = "ADT", normalization.method = "CLR")
+pbmc <- ScaleData(pbmc, assay = "ADT")
+```
+
+## Visualize protein information on the RNA clustering result
+
+```{r Seurat visualize protein}
+FeaturePlot(pbmc, features = c("CD8a-TotalSeqB", "CD8A"), min.cutoff = "q05", max.cutoff = "q95", ncol = 2)
+```
+
+```{r Seurat visualize protein 2}
+RidgePlot(pbmc, features = c("CD8a-TotalSeqB", "CD4-TotalSeqB"), ncol = 2)
+```
+
+## Identify differentially expressed proteins between clusters
+
+```{r Seurat visualize protein 3}
+# Downsample the clusters to a maximum of 500 cells each (makes the heatmap easier to see for
+# small clusters)
+pbmc.small <- subset(pbmc, downsample = 500)
+
+# Find protein markers for all clusters, and draw a heatmap
+adt.markers <- FindAllMarkers(pbmc.small, assay = "ADT", only.pos = TRUE, verbose = F)
+DoHeatmap(pbmc.small, features = unique(adt.markers$gene), assay = "ADT", angle = 90) + NoLegend()
+DefaultAssay(pbmc) <- "ADT"
+```
+
+## Cluster the data based on protein expression information.
+
+```{r Seurat cluster on protein, eval = F}
+pbmc <- FindVariableFeatures(pbmc, selection.method = "vst")
+pbmc <- ScaleData(pbmc)
+pbmc <- RunPCA(pbmc, verbose = F)
+pbmc <- FindNeighbors(pbmc)
+pbmc <- FindClusters(pbmc, resolution = 0.8)
+pbmc <- RunUMAP(pbmc, dims = 1:10)
+```
+
+## Visualize Signac cell types on protein clusters
+```{r Seurat protein clusters vis 1}
+lbls = factor(celltypes$CellTypes)
+levels(lbls) <- sort(unique(lbls))
+pbmc <- Seurat::AddMetaData(pbmc, metadata=lbls, col.name = "celltypes")
+pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
+DimPlot(pbmc)
+```
+
+```{r Seurat protein clusters vis 2}
+lbls = factor(celltypes$CellStates)
+levels(lbls) <- sort(unique(lbls))
+pbmc <- Seurat::AddMetaData(pbmc, metadata=lbls, col.name = "celltypes")
+pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
+DimPlot(pbmc)
+```
+
+```{r Seurat protein clusters vis 3}
+FeaturePlot(pbmc, features = c("CD8a-TotalSeqB", "CD8A"), min.cutoff = "q05", max.cutoff = "q95")
+```

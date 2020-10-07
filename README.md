@@ -17,10 +17,10 @@
   <p align="center">
     Get the most out of your single cell data.
     <br />
-    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/signac/blob/master/vignettes/human-mouse.html"><strong>Explore the docs »</strong></a>
+    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/signac/blob/master/vignettes/signac-Seurat_CITEseq.html"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/signac/blob/master/vignettes/human-mouse.html">View Demo</a>
+    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/signac/blob/master/vignettes/signac-Seurat_CITEseq.html">View Demo</a>
     ·
     <a href="https://github.com/mathewchamberlain/signac/issues">Report Bug</a>
     ·
@@ -79,7 +79,7 @@ devtools::install_github("mathewchamberlain/signac")
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Running signac is simple. [Here is an example vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/signac/blob/master/vignettes/human-mouse.html) for processing a 1:1 mixture of human and mouse cells hosted on 10X. More to come.
+Running signac is simple. [Here is an example vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/signac/blob/master/vignettes/signac-Seurat_CITEseq.html) for processing a 1:1 mixture of human and mouse cells hosted on 10X. More to come.
 
 <!-- ROADMAP -->
 ## Roadmap
