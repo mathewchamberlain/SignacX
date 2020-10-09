@@ -420,9 +420,10 @@ Signac_Solo <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.c
 #' @param verbose if TRUE, code will report outputs. Default is TRUE.
 #' @param do.normalize if TRUE, cells are normalized to the mean library size. Default is TRUE.
 #' @param probability if TRUE, returns the probability associated with each cell type label. Default is TRUE.
+#' @param hidden Number of hidden layers in the neural network. Default is 1.
 #' @return annotations
 #' @export
-Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T, do.normalize = T, probability = F)
+Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T, do.normalize = T, probability = F, hidden = 1)
 {
 
   flag = class(E) == "Seurat"
@@ -520,7 +521,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
     # train a neural network (N times)
     if (model.use == "nn"){
       res = parallel::mclapply(1:N, function(x) {
-        nn=neuralnet::neuralnet(celltypes~.,hidden=2,data=df, act.fct = 'logistic', linear.output = F)
+        nn=neuralnet::neuralnet(celltypes~.,hidden=hidden,data=df, act.fct = 'logistic', linear.output = F)
         Predict = stats::predict(nn, Matrix::t(Z))
         colnames(Predict) <- sort(nn$model.list$response)
         return(Predict)
@@ -533,7 +534,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
       celltypes[kmax < threshold] = "Other"
-      df = data.frame(celltypes = celltypes, probability = kmax, error = res.sd[xx], percent_features_detected = round(Matrix::colSums(Z != 0) / nrow(Z), digits = 3) * 100)
+      df = data.frame(celltypes = celltypes, probability = kmax, error = res.sd[xx], percent_features_detected = round(Matrix::colSums(Z != 0) / nrow(Z), digits = 3) * 100, genes_detected = round(Matrix::colSums(E != 0), digits = 3) * 100)
       df$celltypes = as.character(df$celltypes)
     }
     # if desired, run svm
@@ -592,7 +593,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
 #' @export
 Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
 {
-
+  
   if (!is.null(spring.dir)){
     edges = CID.LoadEdges(data.dir = spring.dir)
     dM = CID.GetDistMat(edges)
@@ -608,6 +609,10 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
   
   res = list("")
   
+  if ("probability" %in% names(cr[[1]])){
+    cr = lapply(cr, function(x) {x$celltypes})
+  }
+  
   for (j in 1:length(cr))
   {
     if (names(cr)[j] == "All"){
@@ -622,10 +627,10 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
   
   cellstates = res[[length(res)]]
   celltypes = cellstates
-  celltypes[celltypes %in% c("B.cells.memory", "B.cells.naive")] = "B.cells"
+  celltypes[celltypes %in% c("B.memory", "B.naive")] = "B"
   celltypes[celltypes %in% c("DC", "Mon.Classical", "Mon.NonClassical", "Neutrophils", "Monocytes", "Macrophages")] = "MPh"
-  celltypes[celltypes %in% c("NK", "T.cells.CD4.naive", "T.cells.CD4.memory", "T.cells.CD8", "T.regs", "T.cells.CD8.naive", "T.cells.CD8.memory", "T.cells.CD8.cm","T.cells.CD8.em" , "T.cells.cyto")] = "TNK"
-  celltypes[celltypes %in% c("Endothelial.cells", "Fibroblasts", "HSC", "Epithelial.cells")] = "NonImmune"
+  celltypes[celltypes %in% c("NK", "T.CD4.naive", "T.CD4.memory", "T.CD8", "T.regs", "T.CD8.naive", "T.CD8.memory", "T.CD8.cm","T.CD8.em" , "T.cyto")] = "TNK"
+  celltypes[celltypes %in% c("Endothelial", "Fibroblasts", "HSC", "Epithelial")] = "NonImmune"
   immune = res[[1]]  
 
   # assign Others
@@ -651,7 +656,6 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
   do = data.frame(table(louvain[cellstates == "Other"]))
   df = data.frame(table(louvain[louvain %in% do$Var1]))
   logik = (1 - phyper(do$Freq, df$Freq , length(cellstates) - do$Freq, sum(cellstates == "Other"))) < 0.01;
-  #logik = F
   if (any(logik)){
     do = do[logik,]
     logik = do$Freq > 3; # require at least 3 cell communities
@@ -662,19 +666,13 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
       lbls = rep("All", ncol(E))
       logik = louvain %in% do$Var1[logik] & cellstates == "Other";
       lbls[logik] = louvain[logik]
-      colnames(full.dataset) <- lbls
-      # FF = apply(full.dataset, 1, sd)^2 / Matrix::rowMeans(full.dataset)
-      # full.dataset = full.dataset[FF > median(FF), ]
-      new_lbls = CID.PosMarkers2(full.dataset, cellstates)
+      colnames(E) <- lbls
+      new_lbls = CID.PosMarkers2(E, cellstates)
       cellstates_novel = new_lbls$lbls
       celltypes_novel[grepl("^[+]", cellstates_novel)] = new_lbls$lbls[grepl("^[+]", cellstates_novel)]
-    } else {
-      res$CellTypes_novel = celltypes
-      res$CellStates_novel = cellstates
-    }
-  } else {
-    res$CellTypes_novel = celltypes_novel
-    res$CellStates_novel = cellstates_novel
+      res$CellTypes_novel = celltypes_novel
+      res$CellStates_novel = cellstates_novel
+    } 
   }
   }
 
@@ -917,33 +915,6 @@ CID.Normalize <- function(E)
       colnames(E) <- xx
   }
   return(E)
-}
-
-#' Imputation wrapper
-#'
-#' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols.
-#' @param data.dir directory for saving "matrix_saver_imputed.mtx" for future loading.
-#' @param do.par Boolean. If true, imputation is performed in parallel on half of the machines available cores. Default = FALSE.
-#' @param genes.to.use Genes for imputation
-#' @return imputed expression matrix with only marker genes in rows.
-#' @export
-#'
-CID.Impute <- function(E, genes.to.use, data.dir = NULL, do.par = TRUE)
-{
-  genes.ind <- which(rownames(E) %in% genes.to.use)
-  if (do.par)
-  { 
-    numCores = parallel::detectCores()
-  } else {
-    numCores = 2;
-  }
-  I = SAVER::saver(E, pred.genes = genes.ind, pred.genes.only = T, ncores = numCores - 1, estimates.only = T)
-  if (!is.null(data.dir))
-  {
-    Matrix::writeMM(Matrix::Matrix(I, sparse = TRUE), file = paste(data.dir, "matrix_saver_imputed.mtx", sep = "/"))
-    write.table(rownames(E)[genes.ind], file = paste(data.dir, "genes_saver_imputed.txt", sep = "/"))
-  }
-  return(I)
 }
 
 #' K soft imputation
@@ -1218,149 +1189,51 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", data.
     names(col_palette) <- unique(Q)
     json_data$ClustersWT$label_colors = col_palette
   }
-  if ("celltypes" %in% names(cr))
+  if ("CellTypes" %in% names(cr))
   {
-    Q = cr$celltypes
-    json_data$CellTypesID$label_list = Q
+    Q = cr$CellTypes
+    json_data$CellTypes$label_list = Q
     C = get_colors(Q)
-    json_data$CellTypesID$label_colors = as.list(C[[1]])
+    json_data$CellTypes$label_colors = as.list(C[[1]])
   }
-  if ("cellstates" %in% names(cr))
+  if ("CellStates" %in% names(cr))
   {
-    Q = cr$cellstates
-    json_data$CellStatesID$label_list = Q
+    Q = cr$CellStates
+    json_data$CellStates$label_list = Q
     C = get_colors(Q)
-    json_data$CellStatesID$label_colors = as.list(C[[1]])
+    json_data$CellStates$label_colors = as.list(C[[1]])
   }
-  if ("celltypes_novel" %in% names(cr))
+  if ("CellTypes_novel" %in% names(cr))
   {
-    Q = cr$celltypes_novel
-    json_data$CellTypesID_Novel$label_list = Q
+    Q = cr$CellTypes_novel
+    json_data$CellTypes_novel$label_list = Q
     C = get_colors(Q)
     Ntypes = sum(C[[1]] == "")
     qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
     col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
     #pie(rep(1,num_col), col=(col_vector[1:num_col]))
     C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
-    json_data$CellTypesID_Novel$label_colors = as.list(C[[1]])
+    json_data$CellTypes_novel$label_colors = as.list(C[[1]])
   }
-  if ("cellstates_novel" %in% names(cr))
+  if ("CellStates_novel" %in% names(cr))
   {
-    Q = cr$cellstates_novel
-    json_data$CellStatesID_Novel$label_list = Q
+    Q = cr$CellStates_novel
+    json_data$CellStates_novel$label_list = Q
     C = get_colors(Q)
     Ntypes = sum(C[[1]] == "")
     qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
     col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
     #pie(rep(1,num_col), col=(col_vector[1:num_col]))
     C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
-    json_data$CellStatesID_Novel$label_colors = as.list(C[[1]])
-  }
-  if ("cellstates_merged" %in% names(cr))
-  {
-    Q = cr$cellstates_merged
-    json_data$CellStatesID_merged$label_list = Q
-    C = get_colors(Q)
-    json_data$CellStatesID_merged$label_colors = as.list(C[[1]])
-  }
-  if ("cellstates_merged_novel" %in% names(cr))
-  {
-    Q = cr$cellstates_merged_novel
-    json_data$CellStatesID_novel_merged$label_list = Q
-    C = get_colors(Q)
-    Ntypes = sum(C[[1]] == "")
-    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
-    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
-    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
-    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
-    json_data$CellStatesID_novel_merged$label_colors = as.list(C[[1]])
+    json_data$CellStates_novel$label_colors = as.list(C[[1]])
   }
   if ("Immune" %in% names(cr))
   {
     Q = cr$Immune
     json_data$Immune$label_list = Q
     C = get_colors(Q)
-    Ntypes = sum(C[[1]] == "")
-    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
-    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
-    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
-    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
     json_data$Immune$label_colors = as.list(C[[1]])
   }
-  if ("Immune_Vidi" %in% names(cr))
-  {
-    Q = cr$Immune_Vidi
-    json_data$Immune_Vidi$label_list = Q
-    C = get_colors(Q)
-    Ntypes = sum(C[[1]] == "")
-    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
-    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
-    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
-    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
-    json_data$Immune_Vidi$label_colors = as.list(C[[1]])
-  }
-  if ("CellTypes_Vidi" %in% names(cr))
-  {
-    Q = cr$CellTypes_Vidi
-    json_data$CellTypes_Vidi$label_list = Q
-    C = get_colors(Q)
-    Ntypes = sum(C[[1]] == "")
-    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
-    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
-    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
-    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
-    json_data$CellTypes_Vidi$label_colors = as.list(C[[1]])
-  }
-  if ("CellTypes_Vidi_novel" %in% names(cr))
-  {
-    Q = cr$CellTypes_Vidi_novel
-    json_data$CellTypes_Vidi_novel$label_list = Q
-    C = get_colors(Q)
-    Ntypes = sum(C[[1]] == "")
-    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
-    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
-    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
-    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
-    json_data$CellTypes_Vidi_novel$label_colors = as.list(C[[1]])
-  }
-  if ("CellStates_Vidi" %in% names(cr))
-  {
-    Q = cr$CellStates_Vidi
-    json_data$CellStates_Vidi$label_list = Q
-    C = get_colors(Q)
-    Ntypes = sum(C[[1]] == "")
-    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
-    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
-    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
-    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
-    json_data$CellStates_Vidi$label_colors = as.list(C[[1]])
-  }
-  if ("CellStates_Vidi_novel" %in% names(cr))
-  {
-    Q = cr$CellStates_Vidi_novel
-    json_data$CellStates_Vidi_novel$label_list = Q
-    C = get_colors(Q)
-    Ntypes = sum(C[[1]] == "")
-    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
-    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
-    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
-    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
-    json_data$CellStates_Vidi_novel$label_colors = as.list(C[[1]])
-  }
-  if ("immunestates" %in% names(cr))
-  {
-    Q = cr$immunestates
-    json_data$ImmuneStates$label_list = Q
-    C = get_colors(Q)
-    Ntypes = sum(C[[1]] == "")
-    qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
-    col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
-    #pie(rep(1,num_col), col=(col_vector[1:num_col]))
-    C[[1]][C[[1]] == ""] <- col_vector[1:Ntypes]; # or sample if you wish
-    json_data$ImmuneStates$label_colors = as.list(C[[1]])
-  }
-  json_data$CellTypesID$label_colors = replace(json_data$CellTypesID$label_colors, json_data$CellTypesID$label_colors == "", json_data$Immune_L0$label_colors[match(names(json_data$CellTypesID$label_colors), names(json_data$Immune_L0$label_colors))][json_data$CellTypesID$label_colors == ""])
-  json_data$CellStatesID$label_colors = replace(json_data$CellStatesID$label_colors, json_data$CellStatesID$label_colors == "", json_data$Immune_L0$label_colors[match(names(json_data$CellStatesID$label_colors), names(json_data$Immune_L0$label_colors))][json_data$CellStatesID$label_colors == ""])
   json_data = json_data[order(names(json_data))]
   json_data_backup = json_data;
   fn = json_new
@@ -1391,13 +1264,11 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", data.
         }
         json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
         write(json_out,paste(new.dirs[j],fn,sep="/"))
-        #cat(paste(new.dirs[j],fn,sep="/"), "has been written to directory! \n")
         json_data = json_data_backup;
       }        
     }
     json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
     write(json_out,paste(new.dirs[j],fn,sep="/"))
-    #cat(paste(new.dirs[j],fn,sep="/"), "has been written to directory! \n")
     json_data = json_data_backup;
   }
   return(json_data)
@@ -1412,54 +1283,18 @@ get_colors <- function(P)
   colorcount = length(unique(P))
   cs = character(colorcount)
   # main cell type categories will be consistently labeled:
-  main_types = c("B.cells"     ,     "Epithelial", "Fibroblasts"        ,
-                 "Granulocytes",     "MPh"       , "Plasma.cells"       ,
-                 "Secretory"   ,     "TNK"       , "Epithelial.Urinary" ,
-                 "Other"       ,     "HSC"       , "pDCs"               ,
-                 "Erythro"     ,     "Platelets" , "NonImmune"          ,
+  main_types = c("B"     ,     "Epithelial", "Fibroblasts"        ,
+                 "MPh"         , "Plasma.cells"  , "Endothelial",
+                 "TNK"         ,     "Other"     , "NonImmune"          ,
                  "Immune")
-  main_colors = c("#aa3596", "#387f50", "#a3ba37",
-                  "#D3D3D3", "#f0ff51", "#d878de",
-                  "#8c933e", "#90c5f4", "#90b771",
-                  "#C0C0C0", "#dbd0d0", "#e1f7d5",
-                  "#ffbdbd", "#c9c9ff", "#7fc97f",
-                  "#bb7fc7")
+  main_colors = c("#aa3596"     ,     "#387f50"   , "#a2ba37" ,
+                  "#f1ff51"     ,     "#d778de"   , "#73de97" ,
+                  "#90c5f4"     ,     "#c0c0c0"   , "#bb7fc7" ,
+                  "#7fc97f")
   
   # sub cell types will be consistently labeled:
-  sub_types = c( "Dendritic.cells.activated"  ,  "Dendritic.cells.resting"     , "Eosinophils"       ,
-                 "Macrophages.M0"             ,  "Macrophages.M1"              , "Macrophages.M2"    ,
-                 "Mast.Progenitors"           ,  "Monocytes"                   , "Neutrophils"       ,
-                 "NK"                         ,  "T.cells.CD4.memory.activated", "T.cells.CD4.naive" ,
-                 "T.cells.CD8"                ,  "T.cells.FH"                  , "T.regs"            ,
-                 "Mast.cells.activated"       ,  "T.cells.CD4.CD8"             , "B.cells.memory"    ,
-                 "B.cells.naive"              ,  "T.cells"                     , "T.cells.CD4"       ,
-                 "T.cells.CD8"                ,  "T.cells.CD4.FH.regs"         , "Not.Mast"          , 
-                 "Mast"                       ,  "Mast.cells.activated"        , "Mast.cells.resting",
-                 "Macrophages"                ,  "Dendritic"                   , "T.cells.follicular.helper",
-                 "NK.cells"                   ,  "Mon.NonClassical"                , "Mon.Classical"    ,
-                 "DCs.Resting"                ,  "DCs.Activated"               , "T.cells.CD4.naive"     ,
-                 "T.cells.CD4.memory"          ,  "Mon.NonClass"                , "Neutro.inflam"    ,
-                 "T.cells"                    ,  "T.CD4.FH"                    , "T.cells.gd"       ,
-                 "Neutrophil"                 ,  "T.cells.cyto"                ,  "T.cells.CD8naive"    ,
-                 "T.cells.CD8em"               ,  "T.cells.CD8.CD4"             ,  "NK.CD56.bright"  ,
-                 "NK.CD56.dim")
-  sub_colors =c( "#a3b300"                    ,  "#f9d801"                     , "#d0e4e5"          ,
-                 "#F9A602"                    ,  "#f97501"                     , "#d6b171"          ,
-                 "#d4e881"                    ,  "#f0ff51"                     , "#f7f2b2"          ,
-                 "#ad9bf2"                    ,  "#4ebdbd"                     , "#8c9ee1"          ,
-                 "#4e59bd"                    ,  "#d4e881"                     , "#2038b0"          ,
-                 "#e2e8c9"                    ,  "#def9f9"                     , "#aa3596"          ,
-                 "#edc5e6"                    ,  "#4e59bd"                     , "#8c9ee1"          ,
-                 "#90c5f4"                    ,  "#90c5f4"                     , "#D3D3D3"          ,
-                 "#d4e881"                    ,  "#d4e881"                     , "#f7f2b2"          ,
-                 "#F9A602"                    ,  "#f93a01"                     , "#d4e881"          ,
-                 "#ad9bf2"                    , "#7fc97f"                      , "#bb7fc7"          ,
-                 "#d4e881"                    , "#ad9bf2"                      , "#db1bbe"          ,
-                 "#bb7fc7"                    , "#e68181"                      , "#ebbf8a"          ,
-                 "#f7f2b2"                    , "#c75e4c"                      , "#92c74c"          , 
-                 "#f7f2b2"                    , "#f9d801"                      , "#386CB0"          ,
-                 "#E0FFFF"                    , "#d4e881"                      , "#F9A602"          ,
-                 "#d4e881") 
+  sub_types  = c("B.memory", "B.naive", "DC"    , "Macrophages", "Mon.Classical", "Mon.NonClassical", "Monocytes", "Neutrophils", "NK", "T.CD4.memory", "T.CD4.naive", "T.CD8.cm", "T.CD8.em", "T.CD8.naive", "T.gd", "T.regs" )
+  sub_colors  = c("#aa3596", "#edc5e6", "#f9a702" , "#f97501", "#d6b171", "#9e4c05", "#f1ff51", "#f7f2b2", "#ac9bf2", "#bb7fc7", "#8a5e83", "#c9c9ff", "#8c9fe1", "#90c5f4", "#64058a", "#2038b0" )
   
   for (i in 1:length(sub_types))
   {
@@ -1539,19 +1374,6 @@ get_celltypes <- function(R) {
 
 }
 
-#' Split large data into smaller chunks
-#'
-#' @param E Count matrix
-#' @param number_of_chunks Number of chunks to divide the data
-#' @return list where each element is a chunk of the original matrix
-#' @export
-array_split <- function(E, number_of_chunks) {
-  if (number_of_chunks > ncol(E))
-    number_of_chunks = ncol(E)
-  colIdx <- seq_len(ncol(E))
-  lapply(split(colIdx, cut(colIdx, pretty(colIdx, number_of_chunks))), function(x) E[, x ])
-}
-
 #' Extract unique elements
 #'
 #' @param x A character vector 
@@ -1585,14 +1407,6 @@ CID.PosMarkers2 <- function(D, acn)
   # remove MT- and RP genes
   logik = grepl("^MT-", rownames(D)) | grepl("^RP", rownames(D))
   D = D[!logik,]
-  
-  # CV filter; keep top 2000 genes
-  #kmu = Matrix::rowMeans(D)
-  #ksd = apply(D,1,sd)
-  #cv = ksd / (kmu + 10)
-  #idx = sort(cv, decreasing = T)
-  #D = D[rownames(D) %in% names(idx)[1:2000],]
-  
   
   # establish all means
   if ("All" %in% colnames(D))
@@ -1650,8 +1464,6 @@ CID.PosMarkers2 <- function(D, acn)
     for (j in 1:length(new_lbls))
       Y[colnames(D) == names(new_lbls)[j]] = new_lbls[[j]]
   }
-  
-  
   
   return(list(lbls = Y, mrks = mrks))
 }

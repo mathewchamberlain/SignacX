@@ -8,5 +8,5 @@
 #'   \item{Reference}{different training datasets for binary cell type classification}
 #'   ...
 #' }
-"Reference_sim"
+"training_HPCA"
 

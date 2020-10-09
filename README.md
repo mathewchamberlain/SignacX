@@ -17,10 +17,10 @@
   <p align="center">
     Get the most out of your single cell data.
     <br />
-    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/blob/master/vignettes/signac-Seurat_CITEseq.html"><strong>Explore the docs »</strong></a>
+    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/blob/master/vignettes/signac-Seurat_CITEseq.html">View Demo</a>
+    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html">View Demo</a>
     ·
     <a href="https://github.com/mathewchamberlain/Signac/issues">Report Bug</a>
     ·
@@ -61,9 +61,7 @@ This package currently has publicly available only some of these features. I'll 
 
 * [Seurat](https://satijalab.org/seurat/)
 * [rhdf5](https://www.bioconductor.org/packages/release/bioc/html/rhdf5.html)
-* [RcppArmadillo](https://cran.r-project.org/web/packages/RcppArmadillo/index.html)
 * [parallel](https://stat.ethz.ch/R-manual/R-devel/library/parallel/doc/parallel.pdf)
-* [visnetwork](https://datastorm-open.github.io/visNetwork/)
 
 <!-- GETTING STARTED -->
 ## Getting Started
