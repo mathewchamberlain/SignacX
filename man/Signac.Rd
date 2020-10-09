@@ -16,7 +16,8 @@ Signac(
   impute = T,
   verbose = T,
   do.normalize = T,
-  probability = F
+  probability = F,
+  hidden = 1
 )
 }
 \arguments{
@@ -43,6 +44,8 @@ Signac(
 \item{do.normalize}{if TRUE, cells are normalized to the mean library size. Default is TRUE.}
 
 \item{probability}{if TRUE, returns the probability associated with each cell type label. Default is TRUE.}
+
+\item{hidden}{Number of hidden layers in the neural network. Default is 1.}
 }
 \value{
 annotations
