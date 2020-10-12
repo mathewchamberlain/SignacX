@@ -8,7 +8,6 @@ ProbabilityPlot = function(df)
   ggplot(df, aes(x=genes_detected, y=probability, color=celltypes)) + geom_point() + geom_errorbar(aes(ymin=probability-error, ymax=probability+error), width=.2) + xlab("Genes detected") + ylab("Probability")
 }
 
-
 #' Get genes from xCell publication
 #'
 #' @param dataset default is NULL
@@ -81,30 +80,40 @@ GetMarkers <- function(R)
 #' Jackknife Differential Expression Analysis
 #'
 #' @param E A gene by cell expression matrix
-#' @param Samples A character vector of samples
+#' @param Samples A character vector of samples.
 #' @param Identities A character vector of cell type or cluster labels
 #' @param Disease A character vector of disease labels
-#' @param do.par if TRUE, code is run in parallel on all available cores minus one
 #' @param num.cores optionally, user can hard set the number of cores to use
+#' @param omit Any samples to omit. Default is "none" and "empty"
 #' @return a DEG table Jackknifed
 #' @export
-JackD <- function(E, Samples, Disease, Identities, do.par = F, num.cores = 1)
+JackD <- function(E, Samples = NULL, Disease = NULL, Identities, num.cores = 1, omit = c("none", "Empty"))
 {
   cat(" ..........  Entry in JackD: \n");
   ta = proc.time()[3];
   cat("             Number of cells:", ncol(E), "\n");
   cat("             Number of genes:", nrow(E), "\n");
-  u = as.character(unique(Samples))
-  cat("             Number of samples:", length(u), "\n");
-  
-  if (do.par)
-    num.cores = parallel::detectCores() - 1
   
   colnames(E) <- 1:ncol(E)
   
+  if (! is.null(Disease))
+  {
+  logik = !Samples %in% omit
+  E = E[,logik]
+  Disease = Disease[logik]
+  Identities = Identities[logik]
+  Samples = Samples[logik]
+  u = as.character(unique(Samples))
+  cat("             Number of samples:", length(u), "\n");
+  
   outs = parallel::mclapply(u, function(x){
     # dropout one sample
-    logik = Samples != x;
+    if (length(u) > 1)
+    {
+      logik = Samples != x;
+    } else {
+      logik = Samples == x;
+    }
     E_dummy          = E[,logik]
     Disease_dummy    = Disease[logik]
     Identities_dummy = Identities[logik]
@@ -124,7 +133,216 @@ JackD <- function(E, Samples, Disease, Identities, do.par = F, num.cores = 1)
     names(qq) <- y
     qq
   }, mc.cores =  num.cores)
-  return(outs)
+  
+  ## pool together DE results
+  res = list("")
+  for (j in 1:length(unique(Identities)))
+  {
+    xx = unlist(lapply(outs, function(x) {
+      x[[j]]$gene
+    }))
+    df = data.frame(table(xx))
+    logik = df$Freq == max(df$Freq)
+    gns_stable = sort(unique(as.character(df$xx)[logik]))
+    xx = lapply(outs,function(x){
+      x[[j]][x[[j]]$gene %in% gns_stable,]
+    })
+    xx = xx[sapply(xx, function(x) {nrow(x) == length(gns_stable)})]
+    xx = lapply(xx, function(x) {x[order(x$gene),]})
+  ## merge the numeric
+    df = data.frame(
+      p_val =  Reduce(lapply(xx, function(x) {x$p_val}), f = '+') / length(xx),
+      avg_logFC =  Reduce(lapply(xx, function(x) {x$avg_logFC}), f = '+') / length(xx),
+      pct.1 = Reduce(lapply(xx, function(x) {x$pct.1}), f = '+') / length(xx),
+      pct.2 = Reduce(lapply(xx, function(x) {x$pct.2}), f = '+') / length(xx),
+      p_val_adj = Reduce(lapply(xx, function(x) {x$p_val_adj}), f = '+') / length(xx),
+      disease = xx[[1]]$cluster,
+      gene = xx[[1]]$gene
+    )
+    df = df[order(df$disease),]
+    df$celltype = unique(Identities)[j]
+    df$pct.1 = round(df$pct.1, digits = 2) * 100
+    df$pct.2 = round(df$pct.2, digits = 2) * 100
+    df$p_val = round(df$p_val, digits = 4)
+    df$avg_logFC = round(df$avg_logFC, digits = 2)
+    df$p_val_adj = round(df$p_val_adj, digits = 4)
+    res[[j]] = df
+  }
+  res = do.call(rbind, res)
+  return(res)
+  } else {
+    logik = !Samples %in% omit
+    E = E[,logik]
+    Identities = Identities[logik]
+    Samples = Samples[logik]
+    u = as.character(unique(Samples))
+    cat("             Number of samples:", length(u), "\n");
+    
+    outs = parallel::mclapply(u, function(x){
+      # dropout one sample
+      if (length(u) > 1)
+      {
+        logik = Samples != x;
+      } else {
+        logik = Samples == x;
+      }
+      E_dummy          = E[,logik]
+      Identities_dummy = Identities[logik]
+      ctrl <- Seurat::CreateSeuratObject(counts = E_dummy)
+      ctrl <- Seurat::NormalizeData(object = ctrl)
+      ctrl <- Seurat::AddMetaData(ctrl, metadata=Identities_dummy, col.name = "Identities")
+      ctrl <- Seurat::SetIdent(ctrl, value='Identities')
+      Seurat::FindAllMarkers(ctrl, only.pos = T)
+    }, mc.cores =  num.cores)
+    
+    outs = lapply(outs, function(x) {split.data.frame(x, f = x$cluster )})
+    outs = lapply(outs, function(x) {x[order(names(x))]})
+    
+    ## pool together DE results
+    res = list("")
+    for (j in 1:length(unique(Identities)))
+    {
+      xx = unlist(lapply(outs, function(x) {
+        x[[j]]$gene
+      }))
+      df = data.frame(table(xx))
+      logik = df$Freq == max(df$Freq)
+      gns_stable = sort(unique(as.character(df$xx)[logik]))
+      xx = lapply(outs,function(x){
+        x[[j]][x[[j]]$gene %in% gns_stable,]
+      })
+      xx = xx[sapply(xx, function(x) {nrow(x) == length(gns_stable)})]
+      xx = lapply(xx, function(x) {x[order(x$gene),]})
+      ## merge the numeric
+      df = data.frame(
+        p_val =  Reduce(lapply(xx, function(x) {x$p_val}), f = '+') / length(xx),
+        avg_logFC =  Reduce(lapply(xx, function(x) {x$avg_logFC}), f = '+') / length(xx),
+        pct.1 = Reduce(lapply(xx, function(x) {x$pct.1}), f = '+') / length(xx),
+        pct.2 = Reduce(lapply(xx, function(x) {x$pct.2}), f = '+') / length(xx),
+        p_val_adj = Reduce(lapply(xx, function(x) {x$p_val_adj}), f = '+') / length(xx),
+        celltype = xx[[1]]$cluster,
+        gene = xx[[1]]$gene
+      )
+      df$pct.1 = round(df$pct.1, digits = 2) * 100
+      df$pct.2 = round(df$pct.2, digits = 2) * 100
+      df$p_val = round(df$p_val, digits = 6)
+      df$avg_logFC = round(df$avg_logFC, digits = 2)
+      df$p_val_adj = round(df$p_val_adj, digits = 2)
+      df = df[order(df$avg_logFC, decreasing = T),]
+      res[[j]] = df
+    }
+    res = do.call(rbind, res)
+    return(res)
+  }
+}
+
+#' Differential Expression Analysis
+#'
+#' @param E A gene by cell expression matrix
+#' @param Samples A character vector of samples.
+#' @param Identities A character vector of cell type or cluster labels
+#' @param Disease A character vector of disease labels
+#' @param omit Any samples to omit. Default is "none" and "Empty"
+#' @return a DEG table
+#' @export
+GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = c("none", "Empty"))
+{
+  cat(" ..........  Entry in GetAllMarkers: \n");
+  ta = proc.time()[3];
+  cat("             Number of cells:", ncol(E), "\n");
+  cat("             Number of genes:", nrow(E), "\n");
+  
+  colnames(E) <- 1:ncol(E)
+  
+  if (! is.null(Disease))
+  {
+    if (!is.null(Samples)) {
+      logik = !Samples %in% omit
+      E = E[,logik]
+      Disease = Disease[logik]
+      Identities = Identities[logik]
+    }
+
+      # create Seurat object for each cell type; run differential expression
+      y = as.character(sort(unique(Identities)))
+      qq = lapply(y, function(z){
+        logik = Identities == z;
+        E.          = E[,logik]
+        Disease.    = Disease[logik]
+        Identities. = Identities[logik]
+        ctrl <- Seurat::CreateSeuratObject(E.)
+        ctrl <- Seurat::NormalizeData(object = ctrl)
+        ctrl <- Seurat::AddMetaData(ctrl, metadata=Disease., col.name = "Disease")
+        ctrl <- Seurat::SetIdent(ctrl, value='Disease')
+        dummy = Seurat::FindAllMarkers(ctrl, only.pos = T)
+        dummy$celltype = z
+        dummy
+      })
+      names(qq) <- y
+    
+    ## pool together DE results
+    df = do.call(rbind, qq)
+    names(df) <- c("p_val", "avg_logFC", "pct.1", "pct.2", "p_val_adj", "disease", "gene", "identity")
+    df = df[order(df$disease),]
+    df$pct.1 = round(df$pct.1, digits = 2) * 100
+    df$pct.2 = round(df$pct.2, digits = 2) * 100
+    df$avg_logFC = round(df$avg_logFC, digits = 2)
+    df$p_val = formatC(df$p_val, format = "e", digits = 2)
+    df$p_val_adj = formatC(df$p_val_adj, format = "e", digits = 2)
+    rownames(df) <- NULL
+    df = data.frame(
+      gene = df$gene,
+      identity = df$identity,
+      disease = df$disease,
+      avg_logFC = df$avg_logFC,
+      pct.1 = df$pct.1,
+      pct.2 = df$pct.2,
+      p_val = df$p_val,
+      p_val_adj = df$p_val_adj
+    )
+    df = split.data.frame(df, f = df$celltype)
+    df = lapply(df, function(x){x[order(x$avg_logFC, decreasing = T),]})
+    df = do.call(rbind, df)
+    rownames(df) <- NULL
+    return(df) 
+  } else {
+    if (!is.null(Samples)) {
+      logik = !Samples %in% omit
+      E = E[,logik]
+      Identities = Identities[logik]
+    }
+    
+    # create Seurat object for each cell type; run differential expression
+    ctrl <- Seurat::CreateSeuratObject(E)
+    ctrl <- Seurat::NormalizeData(object = ctrl)
+    ctrl <- Seurat::AddMetaData(ctrl, metadata=Identities, col.name = "Identities")
+    ctrl <- Seurat::SetIdent(ctrl, value='Identities')
+    df = Seurat::FindAllMarkers(ctrl, only.pos = T)
+    
+    ## pool together DE results
+    names(df) <- c("p_val", "avg_logFC", "pct.1", "pct.2", "p_val_adj", "identity", "gene")
+    df = df[order(df$celltype),]
+    df$pct.1 = round(df$pct.1, digits = 2) * 100
+    df$pct.2 = round(df$pct.2, digits = 2) * 100
+    df$avg_logFC = round(df$avg_logFC, digits = 2)
+    df$p_val = formatC(df$p_val, format = "e", digits = 2)
+    df$p_val_adj = formatC(df$p_val_adj, format = "e", digits = 2)
+    rownames(df) <- NULL
+    df = data.frame(
+      gene = df$gene,
+      identity = df$identity,
+      avg_logFC = df$avg_logFC,
+      pct.1 = df$pct.1,
+      pct.2 = df$pct.2,
+      p_val = df$p_val,
+      p_val_adj = df$p_val_adj
+    )
+    df = split.data.frame(df, f = df$celltype)
+    df = lapply(df, function(x){x[order(x$avg_logFC, decreasing = T),]})
+    df = do.call(rbind, df)
+    rownames(df) <- NULL
+    return(df) 
+  }
 }
 
 
@@ -208,14 +426,14 @@ MASC <- function(dataset, cluster, contrast, random_effects = NULL, fixed_effect
     # Run null and full mixed-effects models
     null_model <- lme4::glmer(formula = null_fm, data = dataset,
                               family = binomial, nAGQ = 1, verbose = 0,
-                              control = glmerControl(optimizer = "bobyqa"))
+                              control = lme4::glmerControl(optimizer = "bobyqa"))
     full_model <- lme4::glmer(formula = full_fm, data = dataset,
                               family = binomial, nAGQ = 1, verbose = 0,
-                              control = glmerControl(optimizer = "bobyqa"))
+                              control = lme4::glmerControl(optimizer = "bobyqa"))
     model_lrt <- anova(null_model, full_model)
     # calculate confidence intervals for contrast term beta
     contrast_lvl2 <- paste0(contrast, levels(dataset[[contrast]])[2])
-    contrast_ci <- confint.merMod(full_model, method = "Wald",
+    contrast_ci <- lme4::confint.merMod(full_model, method = "Wald",
                                   parm = contrast_lvl2)
     # Save model objects to list
     cluster_models[[i]]$null_model <- null_model
@@ -240,10 +458,10 @@ MASC <- function(dataset, cluster, contrast, random_effects = NULL, fixed_effect
     return(output)
 }
 
-#' Main function for classification
+#' Main function for solo-decision classification
 #'
 #' @param E a sparse gene (rows) by cell (column) matrix, or a Seurat object. Rows are HUGO symbols.
-#' @param R Reference data; see data("Reference_sim").
+#' @param R Reference dataset; user should do data("Reference_sim") and then set R to Refernence_sim.
 #' @param spring.dir If using SPRING, directory to categorical_coloring_data.json. Default is NULL.
 #' @param model.use Machine learning model to use. Default option is neural network. Can also be set to 'svm' or 'rf'.
 #' @param N Number of machine learning models to train (for nn and svm). Default is 25.
@@ -252,77 +470,81 @@ MASC <- function(dataset, cluster, contrast, random_effects = NULL, fixed_effect
 #' @param smooth if TRUE, smooths the cell type classifications. Default is TRUE.
 #' @param impute if TRUE, gene expression values are imputed prior to cell type classification. Default is TRUE.
 #' @param verbose if TRUE, code will report outputs. Default is TRUE.
-#' @return cell type annotations.
+#' @param do.normalize if TRUE, cells are normalized to the mean library size. Default is TRUE.
+#' @param probability if TRUE, returns the probability associated with each cell type label. Default is TRUE.
+#' @param hidden Number of hidden layers in the neural network. Default is 1.
+#' @return annotations
 #' @export
-Signac_Solo <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T)
+Signac_Solo <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T, do.normalize = T, probability = F, hidden = 1)
 {
   
   flag = class(E) == "Seurat"
-
-    if (flag & impute)
-      edges = E@graphs$RNA_nn
+  
+  if (flag & impute)
+    edges = E@graphs$RNA_nn
+  
+  if (verbose)
+  {
+    cat(" ..........  Entry in Signac_Solo \n");
+    ta = proc.time()[3];
     
-    if (verbose)
+    # main function
+    if (!flag)
     {
-      cat(" ..........  Entry in Signac \n");
-      ta = proc.time()[3];
-      
-      # main function
-      if (!flag)
-      {
-        cat(" ..........  Running Signac on input data matrix :\n");
-      } else {
-        cat(" ..........  Running Signac on Seurat object :\n");
-      }
-      cat("             nrow = ", nrow(E), "\n", sep = "");
-      cat("             ncol = ", ncol(E), "\n", sep = "");
+      cat(" ..........  Running Signac_Solo on input data matrix :\n");
+    } else {
+      cat(" ..........  Running Signac_Solo on Seurat object :\n");
     }
-    
-    # keep only unique row names
-    logik = CID.IsUnique(rownames(E))
-    E = E[logik,]
-    
-    # intersect genes with reference set
-    gns = intersect(rownames(E), colnames(R))
-    V = E[rownames(E) %in% gns, ]
-    
-    # make sure data are in the same order
-    V = V[order(rownames(V)),]
-    
-    if (class(V) %in% "data.frame")
-      V = Matrix::Matrix(as.matrix(V), sparse = T)
-    
-    # normalize to the mean library size
+    cat("             nrow = ", nrow(E), "\n", sep = "");
+    cat("             ncol = ", ncol(E), "\n", sep = "");
+  }
+  
+  # keep only unique row names
+  logik = CID.IsUnique(rownames(E))
+  E = E[logik,]
+  
+  # intersect genes with reference set
+  gns = intersect(rownames(E), colnames(R))
+  V = E[rownames(E) %in% gns, ]
+  
+  # make sure data are in the same order
+  V = V[order(rownames(V)),]
+  
+  if (class(V) %in% "data.frame")
+    V = Matrix::Matrix(as.matrix(V), sparse = T)
+  
+  # normalize to the mean library size
+  if (do.normalize)
+  {
     if (!flag)
     {
       V = CID.Normalize(V)
     } else {
-     V = CID.Normalize(V@assays$RNA@counts)
+      V = CID.Normalize(V@assays$RNA@counts)
     }
-    
-    # normalization function for gene expression scaling
-    normalize <- function(x) {
-      return ((x - min(x)) / (max(x) - min(x)))
-    }
-    # normalize V
-    V = t(apply(V, 1, function(x){
-      normalize(x)
-    }))
-    logik = apply(V, 1, function(x) {any(is.na(x))})
-    V = V[!logik,]
-    
-    # set up imputation matrices
-    if (impute){
-      if (flag) {
-        dM = CID.GetDistMat(edges)
-        louvain = CID.Louvain(edges = edges)
-      } else {
-        edges = CID.LoadEdges(data.dir = spring.dir)
-        dM = CID.GetDistMat(edges)
-        louvain = CID.Louvain(edges = edges)
-      }
-    }
-    
+  }
+  
+  # normalization function for gene expression scaling
+  normalize <- function(x) {
+    return ((x - min(x)) / (max(x) - min(x)))
+  }
+  # normalize V
+  V = t(apply(V, 1, function(x){
+    normalize(x)
+  }))
+  logik = apply(V, 1, function(x) {any(is.na(x))})
+  V = V[!logik,]
+  
+  # set up imputation matrices
+  if (flag) {
+    dM = CID.GetDistMat(edges)
+    louvain = CID.Louvain(edges = edges)
+  } else {
+    edges = CID.LoadEdges(data.dir = spring.dir)
+    dM = CID.GetDistMat(edges)
+    louvain = CID.Louvain(edges = edges)
+  }
+  
     # keep same gene names
     gns = sort(intersect(rownames(V), colnames(R)))
     Z = V[rownames(V) %in% gns, ]
@@ -350,17 +572,26 @@ Signac_Solo <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.c
     # train a neural network (N times)
     if (model.use == "nn"){
       res = parallel::mclapply(1:N, function(x) {
-        nn=neuralnet::neuralnet(celltypes~.,hidden = 1,data=df, act.fct = 'logistic', linear.output = F)
+        nn=neuralnet::neuralnet(celltypes~.,hidden=hidden,data=df, act.fct = 'logistic', linear.output = F)
         Predict = stats::predict(nn, Matrix::t(Z))
         colnames(Predict) <- sort(nn$model.list$response)
         return(Predict)
       }, mc.cores = num.cores)
       
+      # compute standard deviation of predictions
+      err = do.call(cbind, lapply(res, function(x) {x[,1]}))
+      res.sd <- apply(err, 1, sd)
+      err = do.call(cbind, lapply(res, function(x) {x[,2]}))
+      res.sd <- cbind(res.sd, apply(err, 1, sd))
+      
+      ## compute average probability
       res = Reduce(res, f = '+') / N
       xx = apply(res, 1, which.max)
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
       celltypes[kmax < threshold] = "Other"
+      df = data.frame(celltypes = celltypes, probability = kmax, error = res.sd[xx], percent_features_detected = round(Matrix::colSums(Z != 0) / nrow(Z), digits = 3) * 100, genes_detected = round(Matrix::colSums(E != 0), digits = 3) * 100)
+      df$celltypes = as.character(df$celltypes)
     }
     # if desired, run svm
     if (model.use == "svm") {
@@ -371,6 +602,8 @@ Signac_Solo <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.c
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
       celltypes[kmax < threshold] = "Other"
+      df = data.frame(celltypes = celltypes, probability = kmax)
+      df$celltypes = as.character(df$celltypes)
     }
     # if desired, run RF
     if (model.use == "rf") {
@@ -383,29 +616,28 @@ Signac_Solo <- function(E, R, spring.dir = NULL, model.use = "nn", N = 25, num.c
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
       celltypes[kmax < threshold] = "Other"
+      df = data.frame(celltypes = celltypes, probability = kmax)
+      df$celltypes = as.character(df$celltypes)
     }
-    
     # smooth the output classifications
     if (smooth)
-      celltypes = CID.smooth(celltypes, dM[[1]])
-    
-    if (flag){
-      E <- Seurat::AddMetaData(E, metadata=celltypes, col.name = "celltypes")
-      E <- Seurat::SetIdent(E, value='celltypes')
-    }
-    
-    if (verbose) {
-      tb = proc.time()[3] - ta;
-      cat("\n ..........  Exit Signac.\n");
-      cat("             Execution time = ", tb, " s.\n", sep = "");
-    }
-    if (flag){
-      return(E)
-    } else {
-      return(celltypes)
-    }
-}
+      df$celltypes = CID.smooth(df$celltypes, dM[[1]])
 
+  
+  if (verbose) {
+    tb = proc.time()[3] - ta;
+    cat("\n ..........  Exit Signac_Solo. \n");
+    cat("             Execution time = ", tb, " s.\n", sep = "");
+  }
+    
+    # return probabilities and cell type classifications
+    if (probability){
+      return(df)
+    } else {
+      return(df$celltypes)
+    }
+    
+}
 #' Main function for classification
 #'
 #' @param E a sparse gene (rows) by cell (column) matrix, or a Seurat object. Rows are HUGO symbols.
@@ -575,6 +807,8 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
     }
     })
   
+  res$louvain = louvain
+  
   if (verbose) {
     tb = proc.time()[3] - ta;
     cat("\n ..........  Exit Signac.\n");
@@ -597,18 +831,17 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
   if (!is.null(spring.dir)){
     edges = CID.LoadEdges(data.dir = spring.dir)
     dM = CID.GetDistMat(edges)
-    louvain = CID.Louvain(edges = edges)
   }
   
   flag = class(E) == "Seurat"
   if (flag) {
     edges = E@graphs$RNA_nn
     dM = CID.GetDistMat(edges)
-    louvain = CID.Louvain(edges = edges)
   }
   
   res = list("")
-  
+  louvain = cr$louvain
+  cr = cr[-which(names(cr) == "louvain")]
   if ("probability" %in% names(cr[[1]])){
     cr = lapply(cr, function(x) {x$celltypes})
   }
@@ -681,6 +914,8 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
 
   names(res)[names(res) == ""] = paste0("L", 1:sum(names(res) == ""))
   
+  res$clusters = louvain
+
   return(res)
 }
 
@@ -1177,17 +1412,17 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", data.
       write(json_out,paste(data.dir,'categorical_coloring_data_legacy.json',sep="/"))
     }
   }
-  if ("louvain" %in% names(cr))
+  if ("clusters" %in% names(cr))
   {
-    Q = as.character(cr$louvain)
-    json_data$ClustersWT$label_list = Q
+    Q = as.character(cr$clusters)
+    json_data$Clusters_Louvain$label_list = Q
     Ntypes = length(unique(Q))
     qual_col_pals = RColorBrewer::brewer.pal.info[RColorBrewer::brewer.pal.info$category == 'qual',]
     col_vector = unlist(mapply(RColorBrewer::brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals))) #len = 74
     #pie(rep(1,num_col), col=(col_vector[1:num_col]))
     col_palette <- as.list(col_vector[1:Ntypes]); # or sample if you wish
     names(col_palette) <- unique(Q)
-    json_data$ClustersWT$label_colors = col_palette
+    json_data$Clusters_Louvain$label_colors = col_palette
   }
   if ("CellTypes" %in% names(cr))
   {

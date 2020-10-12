@@ -2,7 +2,7 @@
 % Please edit documentation in R/CID.R
 \name{Signac_Solo}
 \alias{Signac_Solo}
-\title{Main function for classification}
+\title{Main function for solo-decision classification}
 \usage{
 Signac_Solo(
   E,
@@ -14,13 +14,16 @@ Signac_Solo(
   threshold = 0.5,
   smooth = T,
   impute = T,
-  verbose = T
+  verbose = T,
+  do.normalize = T,
+  probability = F,
+  hidden = 1
 )
 }
 \arguments{
 \item{E}{a sparse gene (rows) by cell (column) matrix, or a Seurat object. Rows are HUGO symbols.}
 
-\item{R}{Reference data; see data("Reference_sim").}
+\item{R}{Reference dataset; user should do data("Reference_sim") and then set R to Refernence_sim.}
 
 \item{spring.dir}{If using SPRING, directory to categorical_coloring_data.json. Default is NULL.}
 
@@ -37,10 +40,16 @@ Signac_Solo(
 \item{impute}{if TRUE, gene expression values are imputed prior to cell type classification. Default is TRUE.}
 
 \item{verbose}{if TRUE, code will report outputs. Default is TRUE.}
+
+\item{do.normalize}{if TRUE, cells are normalized to the mean library size. Default is TRUE.}
+
+\item{probability}{if TRUE, returns the probability associated with each cell type label. Default is TRUE.}
+
+\item{hidden}{Number of hidden layers in the neural network. Default is 1.}
 }
 \value{
-cell type annotations.
+annotations
 }
 \description{
-Main function for classification
+Main function for solo-decision classification
 }
