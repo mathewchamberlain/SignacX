@@ -1,3 +1,72 @@
+#' Generate a network with Graphical LASSO
+#'
+#' @param E Sparse expression matrix with rows genes and columns cells (see ?Signac)
+#' @param gns_of_int <10,000 gene list of genes for network reconstruction
+#' @param rho sparsity parameter for graphical LASSO
+#' @param metadata data frame with metadata for each cell after signac classification
+#' @return network object
+#' @export
+GenerateNetwork = function(E, gns_of_int, rho = c(0.3, 0.4, 0.5, 0.6), metadata)
+{
+  # subset expression matrix
+  E = E[rownames(E) %in% gns_of_int,]
+  
+  # build networks around rho
+  res = lapply(rho, function(z){
+    
+    ## seperate two matrices by cell state
+    Q = lapply(unique(metadata$CellTypes), function(x) {
+      Matrix::t(E[,metadata$CellTypes == x])
+    })
+    
+    ## remove any genes with zero expression
+    Q = lapply(Q, function(x) {x[,Matrix::colSums(x) != 0]})
+    
+    ## remove any cells with zero expression
+    Q = lapply(Q, function(x) {x[Matrix::rowSums(x) != 0,]})
+    
+    # Graphical LASSO using QUIC
+    Covs = lapply(Q, function(x){
+      cov(as.matrix(x))
+    })
+    
+    Nets = lapply(Covs, function(x){
+      glasso::glasso(x, rho = z)
+    })
+    
+    # apply rownames
+    Nets = lapply(Nets, function(x) {x$wi})
+    Nets = mapply(function(x,y) {
+      rownames(x) <- colnames(y)
+      colnames(x) <- colnames(y)
+      x
+    }, x = Nets, y = Q)
+    
+    names(Nets) <-unique(metadata$CellTypes)
+    Nets
+  })
+  
+  # keep stable networks
+  N = lapply(res, function(x) {
+    lapply(x, function(z){
+      1*(z != 0)})
+    })
+
+  outs = list("")
+  for (j in 1:length(res[[1]])){
+    outs[[j]] = Reduce("+", lapply(N, function(x){x[[j]]}))
+    logik = outs[[j]] == length(rho)
+    outs[[j]][logik] = 1
+    outs[[j]][!logik] = 0
+    outs[[j]] = Matrix::Matrix(outs[[j]], sparse = T)
+  }
+  
+  names(outs) <- names(N[[1]])
+  
+  # return networks
+  return(outs)
+}
+
 #' Generate a probability plot
 #'
 #' @param df one element of the list returned by Signac function call (see ?Signac)
@@ -245,7 +314,7 @@ JackD <- function(E, Samples = NULL, Disease = NULL, Identities, num.cores = 1, 
 #' @param omit Any samples to omit. Default is "none" and "Empty"
 #' @return a DEG table
 #' @export
-GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = c("none", "Empty"))
+GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = c("none", "Empty", "Double200-0109&200-0611"))
 {
   cat(" ..........  Entry in GetAllMarkers: \n");
   ta = proc.time()[3];
@@ -261,6 +330,7 @@ GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = 
       E = E[,logik]
       Disease = Disease[logik]
       Identities = Identities[logik]
+      Samples = Samples[logik]
     }
 
       # create Seurat object for each cell type; run differential expression
@@ -270,15 +340,26 @@ GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = 
         E.          = E[,logik]
         Disease.    = Disease[logik]
         Identities. = Identities[logik]
-        ctrl <- Seurat::CreateSeuratObject(E.)
-        ctrl <- Seurat::NormalizeData(object = ctrl)
-        ctrl <- Seurat::AddMetaData(ctrl, metadata=Disease., col.name = "Disease")
-        ctrl <- Seurat::SetIdent(ctrl, value='Disease')
-        dummy = Seurat::FindAllMarkers(ctrl, only.pos = T)
-        dummy$celltype = z
-        dummy
+        if (length(unique(Disease.))!=1) { 
+          ctrl <- suppressWarnings(Seurat::CreateSeuratObject(E.))
+          ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
+          ctrl <- Seurat::AddMetaData(ctrl, metadata=Disease., col.name = "Disease")
+          ctrl <- Seurat::SetIdent(ctrl, value='Disease')
+          dummy = Seurat::FindAllMarkers(ctrl, only.pos = T, verbose = F, min.cells.group = 0)
+          if (nrow(dummy) != 0)
+          {
+            dummy$celltype = z
+            dummy
+          } else {
+            NULL
+          }
+        } else {
+          NULL
+          }
       })
       names(qq) <- y
+      
+      qq = qq[sapply(qq, function(x){!is.null(x)})]
     
     ## pool together DE results
     df = do.call(rbind, qq)
@@ -300,7 +381,7 @@ GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = 
       p_val = df$p_val,
       p_val_adj = df$p_val_adj
     )
-    df = split.data.frame(df, f = df$celltype)
+    df = split.data.frame(df, f = df$identity)
     df = lapply(df, function(x){x[order(x$avg_logFC, decreasing = T),]})
     df = do.call(rbind, df)
     rownames(df) <- NULL
@@ -313,15 +394,15 @@ GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = 
     }
     
     # create Seurat object for each cell type; run differential expression
-    ctrl <- Seurat::CreateSeuratObject(E)
-    ctrl <- Seurat::NormalizeData(object = ctrl)
+    ctrl <- suppressWarnings(Seurat::CreateSeuratObject(E))
+    ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
     ctrl <- Seurat::AddMetaData(ctrl, metadata=Identities, col.name = "Identities")
     ctrl <- Seurat::SetIdent(ctrl, value='Identities')
-    df = Seurat::FindAllMarkers(ctrl, only.pos = T)
+    df = Seurat::FindAllMarkers(ctrl, only.pos = T, verbose = F, min.cells.group = 0)
     
     ## pool together DE results
     names(df) <- c("p_val", "avg_logFC", "pct.1", "pct.2", "p_val_adj", "identity", "gene")
-    df = df[order(df$celltype),]
+    df = df[order(df$identity),]
     df$pct.1 = round(df$pct.1, digits = 2) * 100
     df$pct.2 = round(df$pct.2, digits = 2) * 100
     df$avg_logFC = round(df$avg_logFC, digits = 2)
@@ -337,12 +418,16 @@ GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = 
       p_val = df$p_val,
       p_val_adj = df$p_val_adj
     )
-    df = split.data.frame(df, f = df$celltype)
+    df = split.data.frame(df, f = df$identity)
     df = lapply(df, function(x){x[order(x$avg_logFC, decreasing = T),]})
     df = do.call(rbind, df)
     rownames(df) <- NULL
     return(df) 
   }
+  
+  tb = proc.time()[3] - ta;
+  cat("\n ..........  Exit GetAllMarkers.\n");
+  cat("             Execution time = ", tb, " s.\n", sep = "");
 }
 
 
@@ -870,7 +955,6 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
   if (!is.null(spring.dir)){
   celltypes = CID.entropy(celltypes, dM)
   immune = CID.entropy(immune, dM)
-  cellstates = CID.entropy(cellstates, dM)
   # smooth 
   if (smooth) {
     celltypes= CID.smooth(celltypes, dM[[1]])
@@ -1870,4 +1954,133 @@ get_knn_graph2 <- function(X, k=4, np, genes_to_use)
   ctrl <- Seurat::RunPCA(ctrl, features = genes_to_use, pcs.compute = np, do.print = F)
   ctrl <- Seurat::FindNeighbors(object = ctrl, reduction = "pca", dims = 1:min(c(np, 50)), k.param = k)
   return(ctrl@graphs$RNA_nn)
+}
+
+#' Save network h5 files
+#'
+#' @param A an adjacency matrix with row names and columns names genes (gene by gene)
+#' @param data.dir directory where the networks are saved
+#' @return a saved network file
+#' @export
+SaveNetworksH5 <- function(A, data.dir)
+{
+    
+data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
+    
+if (!dir.exists(data.dir))
+  dir.create(data.dir)
+    
+if (!"list" %in% class(A))
+  A = list(A)
+    
+    cat(" ..........  Entry in SaveNetworkH5: \n");
+    ta = proc.time()[3];
+    cat("             Number of genes:", nrow(A[[1]]), "\n");
+    cat("             Number of networks:", length(A), "\n");
+    
+    if (is.null(names(A)))
+      names(A) <- paste0("Network", seq_along(1:length(D)))
+    
+    data.dirs = paste(data.dir, names(A), sep = "/")
+    
+    q = lapply(data.dirs, function(x){
+      if (!dir.exists(x))
+        dir.create(x)})
+    
+    d = suppressWarnings(
+      mapply(function(x,y){
+        fn = "network_sparse_genes.h5"
+        fn = paste(y, fn, sep = "/")
+        rhdf5::h5createFile(fn)
+        rhdf5::h5createGroup(fn, "edges")
+        lapply(rownames(x), function(y){
+          edges = which(x[rownames(x) == y,] != 0)
+          rhdf5::h5write.default(edges, file = fn, name = paste0("edges/", y))
+        })
+        rhdf5::h5write.default(dim(x), file = fn, name="shape")
+      }, x = A, y = data.dirs)
+    )
+    
+    d = suppressWarnings(
+      mapply(function(x,y){
+        fn = "network_total.h5"
+        fn = paste(y, fn, sep = "/")
+        rhdf5::h5createFile(fn)
+        rhdf5::h5write.default(x@Dimnames[[2]], file = fn, name = "genes")
+        rhdf5::h5write.default(x@x, file = fn, name = "data")
+        rhdf5::h5write.default(dim(x), file = fn, name="shape")
+        rhdf5::h5write.default(x@i, file = fn, name="indices") # already zero-indexed.
+        rhdf5::h5write.default(x@p, file = fn, name="indptr")
+      }, x = A, y = data.dirs))
+    
+    rhdf5::h5closeAll()
+    tb = proc.time()[3] - ta;
+    cat(" ..........  Exit SaveNetworksH5 \n");
+    cat("             Execution time = ", tb, " s.\n", sep = "");
+}
+
+#' Load gene from network h5 file
+#'
+#' @param gene A gene to query from the network
+#' @param filename file name of network. Default is "network.hdf5"
+#' @return a saved network file
+#' @export
+GetGeneFromNetwork <- function(gene, filename = "network_sparse_genes.h5")
+{
+  if (!requireNamespace("hdf5r", quietly = TRUE))
+    stop("Please install hdf5r to read HDF5 files")
+  if (!file.exists(filename))
+    stop("File not found")
+  infile = hdf5r::H5File$new(filename)
+  E = Matrix::Matrix(0, ncol = 1, nrow = infile[["shape"]][][1], sparse = T)
+  nodes <- infile[[paste("edges/", gene, sep = "/")]][]
+  E[nodes] = 1
+  #E = as.matrix(E)
+  rownames(E) <- names(infile[["edges"]])
+  return(E)
+}
+
+#' Load gene from network h5 file
+#'
+#' @param filename file name of network. Default is "network.hdf5"
+#' @return a saved network file
+#' @export
+GetGeneListFromNetwork <- function(filename = "network.h5")
+{
+  if (!requireNamespace("hdf5r", quietly = TRUE))
+    stop("Please install hdf5r to read HDF5 files")
+  if (!file.exists(filename))
+    stop("File not found")
+  infile = hdf5r::H5File$new(filename)
+  return(names(infile[["edges"]]))
+}
+
+#' Load gene from network h5 file
+#'
+#' @param filename file name of network. Default is "network.hdf5"
+#' @return a saved network file
+#' @export
+LoadNetwork <- function(filename = "network_total.h5")
+{
+  if (!requireNamespace("hdf5r", quietly = TRUE)) {
+    stop("Please install hdf5r to read HDF5 files")
+  }
+  if (!file.exists(filename)) {
+    stop("File not found")
+  }
+  infile <- hdf5r::H5File$new(filename)
+  
+  counts <- infile[["data"]]
+  indices <- infile[["indices"]]
+  indptr <- infile[["indptr"]]
+  shp <- infile[["shape"]]
+  features <- infile[["genes"]][]
+  sparse.mat <- Matrix::sparseMatrix(i = indices[] + 1, p = indptr[],
+                                     x = as.numeric(counts[]), dims = shp[], giveCsparse = FALSE)
+  rownames(sparse.mat) <- features
+  colnames(sparse.mat) <- features
+  sparse.mat <- as(object = sparse.mat, Class = "dgCMatrix")
+ 
+  return(sparse.mat)
+  
 }

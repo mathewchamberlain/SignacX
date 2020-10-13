@@ -9,7 +9,7 @@ GetAllMarkers(
   Samples = NULL,
   Disease = NULL,
   Identities,
-  omit = c("none", "Empty")
+  omit = c("none", "Empty", "Double200-0109&200-0611")
 )
 }
 \arguments{
