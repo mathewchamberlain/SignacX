@@ -4,7 +4,14 @@
 \alias{Generate_lbls}
 \title{Generate labels from classifications}
 \usage{
-Generate_lbls(cr, spring.dir = NULL, E = NULL, smooth = T)
+Generate_lbls(
+  cr,
+  spring.dir = NULL,
+  E = NULL,
+  smooth = T,
+  new_populations = NULL,
+  new_categories = NULL
+)
 }
 \arguments{
 \item{cr}{list returned by Signac function call.}
@@ -14,6 +21,10 @@ Generate_lbls(cr, spring.dir = NULL, E = NULL, smooth = T)
 \item{E}{a sparse gene (rows) by cell (column) matrix, or a Seurat object. Rows are HUGO symbols.}
 
 \item{smooth}{if TRUE, smooths the cell type classifications. Default is TRUE.}
+
+\item{new_populations}{Character vector specifying any new cell types that were learned by Signac. Default is NULL.}
+
+\item{new_categories}{If new_populations are set to a cell type, new_category is a corresponding character vector indicating the population that the new population belongs to. Default is NULL.}
 }
 \value{
 cell type labels (list) for each level of the hierarchy.

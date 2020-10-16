@@ -1,0 +1,39 @@
+---
+title: 'CITE-seq 5k PBMCs (10X) analyzed with Signac x SPRING'
+author: 'Mathew Chamberlain'
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    theme: sandstone
+    toc: true
+    includes:
+      after_body: footer.html
+---
+
+## Load Signac
+
+```{r setup, message = F, eval = T}
+library(Signac)
+```
+
+## Load expression data from SPRING
+
+```{r Signac load, message = T, eval = T}
+# load data from SPRING
+data.dir = '/site/ne/data/bh-results/C/CHAMBERLAIN.Mat/manuscripts/Vidi/Data/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein/'
+E = CID.LoadData(data.dir = data.dir)
+```
+## Generate Signac labels
+```{r Signac run, message = T, eval = T}
+# Run Signac
+data("training_HPCA")
+labels = Signac(E = E, R = training_HPCA, spring.dir = data.dir)
+celltypes = Generate_lbls(labels, spring.dir = data.dir, E = E)
+```
+
+## Write to SPRING JSON
+```{r Signac write, message = T, eval = F}
+dat = CID.writeJSON(celltypes, data.dir = data.dir)
+```
+
+Now the cell type classifications from Signac can be visualized in SPRING.

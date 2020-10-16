@@ -49,19 +49,14 @@
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
 
-Although Seurat is useful for performing basic visualization and quantification of single cell RNA-seq data, it does not perform statistical analyses that are crucial for clinical applications. We wrote Signac to help solve that problem. Here are the benefits of Signac:
+Signac is an algorithm that addresses the classification problem in single cell RNA sequencing. We often have an expression matrix and we need to classify the cells into their cell types and cell states based on gene expression patterns.
 
-* Signac implements regression-based ambient RNA correction, which corrects for a known confounding factor in droplet-based technologies.
-* Often, a single sample in a dataset contributes >10-fold more cells than any other sample in the dataset. This one sample can dominate standard downstream analysis steps such as clustering, differential expression, cell type classification, differential abundance and gene co-expression network analysis. Signac implements jackknifing to solve this problem, which removes single-sample artifacts from clustering, differential gene expression analysis and gene co-expression analysis.
-* Unlike Seurat, Signac is memory optimized to handle >100 datasets in R simultaneously. Signac utilizes sparse hdf5 files to load individual genes and cells from datasets rather than the entire expression matrix.
+* Signac implements an average neural network-based strategy.
+* Signac has been used to classify over 1 million cells from dozens of datasets.
+* The main functions are clear and well-documented.
+* Signac is integrated with Seurat and SPRING, and we provide vignettes for either software package.
 
-This package currently has publicly available only some of these features. I'll be adding more in the near future. You may also suggest changes by forking this repo and creating a pull request or opening an issue.
-
-### Built With
-
-* [Seurat](https://satijalab.org/seurat/)
-* [rhdf5](https://www.bioconductor.org/packages/release/bioc/html/rhdf5.html)
-* [parallel](https://stat.ethz.ch/R-manual/R-devel/library/parallel/doc/parallel.pdf)
+You may suggest changes by forking this repo and creating a pull request or opening an issue.
 
 <!-- GETTING STARTED -->
 ## Getting Started
@@ -77,7 +72,7 @@ devtools::install_github("mathewchamberlain/Signac")
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Running Signac is simple. [Here is an example vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/blob/master/vignettes/Signac-Seurat_CITEseq.html) for processing a 1:1 mixture of human and mouse cells hosted on 10X. More to come.
+Running Signac is simple. [Here is an example vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/blob/master/vignettes/Signac-Seurat_CITEseq.html) for classifying an example 10X CITE-seq dataset using Seurat.
 
 <!-- ROADMAP -->
 ## Roadmap

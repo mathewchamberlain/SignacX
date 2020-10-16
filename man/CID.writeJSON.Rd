@@ -4,7 +4,13 @@
 \alias{CID.writeJSON}
 \title{Write JSON file for SPRING visualization}
 \usage{
-CID.writeJSON(cr, json_new = "categorical_coloring_data.json", data.dir = NULL)
+CID.writeJSON(
+  cr,
+  json_new = "categorical_coloring_data.json",
+  data.dir,
+  new_populations = NULL,
+  new_colors = NULL
+)
 }
 \arguments{
 \item{cr}{Output from CID.CellID. See ?CID.CellID}
@@ -12,6 +18,10 @@ CID.writeJSON(cr, json_new = "categorical_coloring_data.json", data.dir = NULL)
 \item{json_new}{Filename for new SPRING visualization. Default is json_new = "categorical_coloring_data_new.json".}
 
 \item{data.dir}{Directory where file 'categorical_coloring_data.json' is located. If supplied, it will append this file to contain tracks for cell type / state classifications.}
+
+\item{new_populations}{Character vector specifying any new cell types that Signac has learned. Default is NULL.}
+
+\item{new_colors}{Character vector specifying the HEX color codes for new cell types. Default is NULL.}
 }
 \value{
 Smoothed cell type or cell state assignments

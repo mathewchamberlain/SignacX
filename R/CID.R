@@ -146,165 +146,6 @@ GetMarkers <- function(R)
   return(outs)
 }
 
-#' Jackknife Differential Expression Analysis
-#'
-#' @param E A gene by cell expression matrix
-#' @param Samples A character vector of samples.
-#' @param Identities A character vector of cell type or cluster labels
-#' @param Disease A character vector of disease labels
-#' @param num.cores optionally, user can hard set the number of cores to use
-#' @param omit Any samples to omit. Default is "none" and "empty"
-#' @return a DEG table Jackknifed
-#' @export
-JackD <- function(E, Samples = NULL, Disease = NULL, Identities, num.cores = 1, omit = c("none", "Empty"))
-{
-  cat(" ..........  Entry in JackD: \n");
-  ta = proc.time()[3];
-  cat("             Number of cells:", ncol(E), "\n");
-  cat("             Number of genes:", nrow(E), "\n");
-  
-  colnames(E) <- 1:ncol(E)
-  
-  if (! is.null(Disease))
-  {
-  logik = !Samples %in% omit
-  E = E[,logik]
-  Disease = Disease[logik]
-  Identities = Identities[logik]
-  Samples = Samples[logik]
-  u = as.character(unique(Samples))
-  cat("             Number of samples:", length(u), "\n");
-  
-  outs = parallel::mclapply(u, function(x){
-    # dropout one sample
-    if (length(u) > 1)
-    {
-      logik = Samples != x;
-    } else {
-      logik = Samples == x;
-    }
-    E_dummy          = E[,logik]
-    Disease_dummy    = Disease[logik]
-    Identities_dummy = Identities[logik]
-    # create Seurat object for each cell type; run differential expression
-    y = as.character(unique(Identities_dummy))
-    qq = lapply(y, function(z){
-      logik = Identities_dummy == z;
-      E.          = E_dummy[,logik]
-      Disease.    = Disease_dummy[logik]
-      Identities. = Identities_dummy[logik]
-      ctrl <- Seurat::CreateSeuratObject(counts = E.)
-      ctrl <- Seurat::NormalizeData(object = ctrl)
-      ctrl <- Seurat::AddMetaData(ctrl, metadata=Disease., col.name = "Disease")
-      ctrl <- Seurat::SetIdent(ctrl, value='Disease')
-      Seurat::FindAllMarkers(ctrl, only.pos = T)
-    })
-    names(qq) <- y
-    qq
-  }, mc.cores =  num.cores)
-  
-  ## pool together DE results
-  res = list("")
-  for (j in 1:length(unique(Identities)))
-  {
-    xx = unlist(lapply(outs, function(x) {
-      x[[j]]$gene
-    }))
-    df = data.frame(table(xx))
-    logik = df$Freq == max(df$Freq)
-    gns_stable = sort(unique(as.character(df$xx)[logik]))
-    xx = lapply(outs,function(x){
-      x[[j]][x[[j]]$gene %in% gns_stable,]
-    })
-    xx = xx[sapply(xx, function(x) {nrow(x) == length(gns_stable)})]
-    xx = lapply(xx, function(x) {x[order(x$gene),]})
-  ## merge the numeric
-    df = data.frame(
-      p_val =  Reduce(lapply(xx, function(x) {x$p_val}), f = '+') / length(xx),
-      avg_logFC =  Reduce(lapply(xx, function(x) {x$avg_logFC}), f = '+') / length(xx),
-      pct.1 = Reduce(lapply(xx, function(x) {x$pct.1}), f = '+') / length(xx),
-      pct.2 = Reduce(lapply(xx, function(x) {x$pct.2}), f = '+') / length(xx),
-      p_val_adj = Reduce(lapply(xx, function(x) {x$p_val_adj}), f = '+') / length(xx),
-      disease = xx[[1]]$cluster,
-      gene = xx[[1]]$gene
-    )
-    df = df[order(df$disease),]
-    df$celltype = unique(Identities)[j]
-    df$pct.1 = round(df$pct.1, digits = 2) * 100
-    df$pct.2 = round(df$pct.2, digits = 2) * 100
-    df$p_val = round(df$p_val, digits = 4)
-    df$avg_logFC = round(df$avg_logFC, digits = 2)
-    df$p_val_adj = round(df$p_val_adj, digits = 4)
-    res[[j]] = df
-  }
-  res = do.call(rbind, res)
-  return(res)
-  } else {
-    logik = !Samples %in% omit
-    E = E[,logik]
-    Identities = Identities[logik]
-    Samples = Samples[logik]
-    u = as.character(unique(Samples))
-    cat("             Number of samples:", length(u), "\n");
-    
-    outs = parallel::mclapply(u, function(x){
-      # dropout one sample
-      if (length(u) > 1)
-      {
-        logik = Samples != x;
-      } else {
-        logik = Samples == x;
-      }
-      E_dummy          = E[,logik]
-      Identities_dummy = Identities[logik]
-      ctrl <- Seurat::CreateSeuratObject(counts = E_dummy)
-      ctrl <- Seurat::NormalizeData(object = ctrl)
-      ctrl <- Seurat::AddMetaData(ctrl, metadata=Identities_dummy, col.name = "Identities")
-      ctrl <- Seurat::SetIdent(ctrl, value='Identities')
-      Seurat::FindAllMarkers(ctrl, only.pos = T)
-    }, mc.cores =  num.cores)
-    
-    outs = lapply(outs, function(x) {split.data.frame(x, f = x$cluster )})
-    outs = lapply(outs, function(x) {x[order(names(x))]})
-    
-    ## pool together DE results
-    res = list("")
-    for (j in 1:length(unique(Identities)))
-    {
-      xx = unlist(lapply(outs, function(x) {
-        x[[j]]$gene
-      }))
-      df = data.frame(table(xx))
-      logik = df$Freq == max(df$Freq)
-      gns_stable = sort(unique(as.character(df$xx)[logik]))
-      xx = lapply(outs,function(x){
-        x[[j]][x[[j]]$gene %in% gns_stable,]
-      })
-      xx = xx[sapply(xx, function(x) {nrow(x) == length(gns_stable)})]
-      xx = lapply(xx, function(x) {x[order(x$gene),]})
-      ## merge the numeric
-      df = data.frame(
-        p_val =  Reduce(lapply(xx, function(x) {x$p_val}), f = '+') / length(xx),
-        avg_logFC =  Reduce(lapply(xx, function(x) {x$avg_logFC}), f = '+') / length(xx),
-        pct.1 = Reduce(lapply(xx, function(x) {x$pct.1}), f = '+') / length(xx),
-        pct.2 = Reduce(lapply(xx, function(x) {x$pct.2}), f = '+') / length(xx),
-        p_val_adj = Reduce(lapply(xx, function(x) {x$p_val_adj}), f = '+') / length(xx),
-        celltype = xx[[1]]$cluster,
-        gene = xx[[1]]$gene
-      )
-      df$pct.1 = round(df$pct.1, digits = 2) * 100
-      df$pct.2 = round(df$pct.2, digits = 2) * 100
-      df$p_val = round(df$p_val, digits = 6)
-      df$avg_logFC = round(df$avg_logFC, digits = 2)
-      df$p_val_adj = round(df$p_val_adj, digits = 2)
-      df = df[order(df$avg_logFC, decreasing = T),]
-      res[[j]] = df
-    }
-    res = do.call(rbind, res)
-    return(res)
-  }
-}
-
 #' Differential Expression Analysis
 #'
 #' @param E A gene by cell expression matrix
@@ -851,8 +692,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
       celltypes[kmax < threshold] = "Other"
-      df = data.frame(celltypes = celltypes, probability = kmax, error = res.sd[xx], percent_features_detected = round(Matrix::colSums(Z != 0) / nrow(Z), digits = 3) * 100, genes_detected = round(Matrix::colSums(E != 0), digits = 3) * 100)
-      df$celltypes = as.character(df$celltypes)
+      df = data.frame(celltypes = celltypes, probability = kmax, error = res.sd[xx], percent_features_detected = round(Matrix::colSums(Z != 0) / nrow(Z), digits = 3) * 100)
     }
     # if desired, run svm
     if (model.use == "svm") {
@@ -908,9 +748,11 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
 #' @param E a sparse gene (rows) by cell (column) matrix, or a Seurat object. Rows are HUGO symbols.
 #' @param spring.dir If using SPRING, directory to categorical_coloring_data.json. Default is NULL.
 #' @param smooth if TRUE, smooths the cell type classifications. Default is TRUE.
+#' @param new_populations Character vector specifying any new cell types that were learned by Signac. Default is NULL.
+#' @param new_categories If new_populations are set to a cell type, new_category is a corresponding character vector indicating the population that the new population belongs to. Default is NULL.
 #' @return cell type labels (list) for each level of the hierarchy.
 #' @export
-Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
+Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T, new_populations = NULL, new_categories = NULL)
 {
   
   if (!is.null(spring.dir)){
@@ -930,6 +772,8 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
   if ("probability" %in% names(cr[[1]])){
     cr = lapply(cr, function(x) {x$celltypes})
   }
+  
+  cr = lapply(cr, function(x) {as.character(x)})
   
   for (j in 1:length(cr))
   {
@@ -951,8 +795,14 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
   celltypes[celltypes %in% c("Endothelial", "Fibroblasts", "HSC", "Epithelial")] = "NonImmune"
   immune = res[[1]]  
 
+  if (!is.null(new_populations))
+  {
+    for (j in 1:length(new_populations))
+      celltypes[celltypes %in% new_populations[j]] = new_categories[j]
+  }
+  
   # assign Others
-  if (!is.null(spring.dir)){
+  if (!is.null(spring.dir) | flag){
   celltypes = CID.entropy(celltypes, dM)
   immune = CID.entropy(immune, dM)
   # smooth 
@@ -968,7 +818,7 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
   immune[logik] = "Other"
   
   res$Immune = immune
-  if (!is.null(spring.dir))
+  if (!is.null(spring.dir) | flag)
   {
   do = data.frame(table(louvain[cellstates == "Other"]))
   df = data.frame(table(louvain[louvain %in% do$Var1]))
@@ -983,12 +833,19 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T)
       lbls = rep("All", ncol(E))
       logik = louvain %in% do$Var1[logik] & cellstates == "Other";
       lbls[logik] = louvain[logik]
-      colnames(E) <- lbls
-      new_lbls = CID.PosMarkers2(E, cellstates)
-      cellstates_novel = new_lbls$lbls
-      celltypes_novel[grepl("^[+]", cellstates_novel)] = new_lbls$lbls[grepl("^[+]", cellstates_novel)]
-      res$CellTypes_novel = celltypes_novel
-      res$CellStates_novel = cellstates_novel
+      if (!flag) {
+        colnames(E) <- lbls
+        new_lbls = CID.PosMarkers2(E, cellstates)
+        cellstates_novel = new_lbls$lbls
+        celltypes_novel[grepl("^[+]", cellstates_novel)] = new_lbls$lbls[grepl("^[+]", cellstates_novel)]
+        res$CellTypes_novel = celltypes_novel
+        res$CellStates_novel = cellstates_novel
+      } else {
+        cellstates_novel[lbls != "All"] = paste0("+ Novel cluster", lbls[lbls != "All"])
+        celltypes_novel[lbls != "All"] = paste0("+ Novel cluster", lbls[lbls != "All"])
+        res$CellTypes_novel = celltypes_novel
+        res$CellStates_novel = cellstates_novel
+      }
     } 
   }
   }
@@ -1097,6 +954,7 @@ SignacLearn <- function (E, learned_types, labels, size = 1000, impute = T, spri
       normalize(x)
     })
   boot = data.frame(N2, celltypes = c(rep(names(cts)[1], size), rep(names(cts)[2], size)))
+  colnames(boot) <- gsub(pattern = "\\.", replacement = "-", x = colnames(boot))
    # pca <- prcomp(x = boot[,-ncol(boot)], center = T, scale. = T) 
    # autoplot(pca, data = boot, colour = 'celltypes')
   #library(ggplot2)
@@ -1474,9 +1332,11 @@ CID.entropy <- function(ac,distM)
 #' @param cr Output from CID.CellID. See ?CID.CellID
 #' @param json_new Filename for new SPRING visualization. Default is json_new = "categorical_coloring_data_new.json".
 #' @param data.dir Directory where file 'categorical_coloring_data.json' is located. If supplied, it will append this file to contain tracks for cell type / state classifications.
+#' @param new_populations Character vector specifying any new cell types that Signac has learned. Default is NULL.
+#' @param new_colors Character vector specifying the HEX color codes for new cell types. Default is NULL.
 #' @return Smoothed cell type or cell state assignments
 #' @export
-CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", data.dir = NULL)
+CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", data.dir, new_populations = NULL, new_colors = NULL)
 {
   if (!is.null(data.dir))
   {
@@ -1555,41 +1415,17 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", data.
   }
   json_data = json_data[order(names(json_data))]
   json_data_backup = json_data;
-  fn = json_new
-  if (is.null(data.dir))
-  {
-    fn = json_new;
-    data.dir = getwd()
-    data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
+  if (!is.null(new_populations)) {
+    json_data = lapply(json_data, function(x) {
+        for (j in 1:length(new_populations))
+          x$label_colors[names(x$label_colors) == new_populations[j]] = new_colors[j]
+        x
+    })
   }
+  fn = json_new
   json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
   write(json_out,paste(data.dir,fn,sep="/"))
   cat(paste(data.dir,fn,sep="/"), "has been written to directory! \n")
-  new.dirs = list.dirs(dirname(data.dir))
-  if (length(new.dirs) != 1)
-  {
-    for (j in 1:length(new.dirs))
-    {
-      txt = list.files(new.dirs[j])
-      flag = "cell_filter.txt" %in% list.files(new.dirs);
-      new.dirs = new.dirs[flag]
-      if ("cell_filter.txt" %in% txt)
-      {
-        idx = read.table(paste(new.dirs[j], "cell_filter.txt", sep = "/"), quote="\"", comment.char="", stringsAsFactors=FALSE)$V1 + 1;
-        for (k in 1:length(json_data))
-        {
-          json_data[[k]]$label_list = json_data[[k]]$label_list[idx]
-          json_data[[k]]$label_colors=json_data[[k]]$label_colors[names(json_data[[k]]$label_colors) %in% unique(json_data[[k]]$label_list)]
-        }
-        json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
-        write(json_out,paste(new.dirs[j],fn,sep="/"))
-        json_data = json_data_backup;
-      }        
-    }
-    json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
-    write(json_out,paste(new.dirs[j],fn,sep="/"))
-    json_data = json_data_backup;
-  }
   return(json_data)
 }
 
@@ -1608,8 +1444,8 @@ get_colors <- function(P)
                  "Immune")
   main_colors = c("#aa3596"     ,     "#387f50"   , "#a2ba37" ,
                   "#f1ff51"     ,     "#d778de"   , "#73de97" ,
-                  "#90c5f4"     ,     "#c0c0c0"   , "#bb7fc7" ,
-                  "#7fc97f")
+                  "#90c5f4"     ,     "#c0c0c0"   , "#7fc97f" ,
+                  "#bb7fc7" )
   
   # sub cell types will be consistently labeled:
   sub_types  = c("B.memory", "B.naive", "DC"    , "Macrophages", "Mon.Classical", "Mon.NonClassical", "Monocytes", "Neutrophils", "NK", "T.CD4.memory", "T.CD4.naive", "T.CD8.cm", "T.CD8.em", "T.CD8.naive", "T.gd", "T.regs" )
