@@ -27,7 +27,7 @@ GenerateNetwork = function(E, gns_of_int, rho = c(0.3, 0.4, 0.5, 0.6), metadata)
     
     # Graphical LASSO using QUIC
     Covs = lapply(Q, function(x){
-      cov(as.matrix(x))
+      stats::cov(as.matrix(x))
     })
     
     Nets = lapply(Covs, function(x){
@@ -65,48 +65,6 @@ GenerateNetwork = function(E, gns_of_int, rho = c(0.3, 0.4, 0.5, 0.6), metadata)
   
   # return networks
   return(outs)
-}
-
-#' Generate a probability plot
-#'
-#' @param df one element of the list returned by Signac function call (see ?Signac)
-#' @return ggplot object
-#' @export
-ProbabilityPlot = function(df)
-{
-  ggplot(df, aes(x=genes_detected, y=probability, color=celltypes)) + geom_point() + geom_errorbar(aes(ymin=probability-error, ymax=probability+error), width=.2) + xlab("Genes detected") + ylab("Probability")
-}
-
-#' Get genes from xCell publication
-#'
-#' @param dataset default is NULL
-#' @return a list of gene signatures
-#' @export
-getxCellGenes <- function(dataset = NULL)
-{
-  ## load signatures from xCell
-  # devtools::install_github('dviraran/xCell')
-  data("xCell.data", package = 'xCell')
-  # get gene IDs
-  signatures = lapply(xCell.data$signatures@.Data, function(x) {x@geneIds})
-  
-  # get celltypes
-  celltypes = lapply(xCell.data$signatures@.Data, function(x) {sub("\\%.*", "", x@setName)})
-  
-  # get technologies
-  datasets = lapply(xCell.data$signatures@.Data, function(x) {gsub(".*[%]([^.]+)[%].*", "\\1", x@setName)})
-  
-  if (!is.null(dataset)){
-    logik = sapply(datasets, function(x) {x %in% dataset})
-    celltypes = unlist(celltypes[logik])
-    signatures = signatures[logik]
-  } else {
-    celltypes = unlist(celltypes)
-  }
-  
-  names(signatures) = celltypes 
-  
-  return(signatures)   
 }
 
 #' Differential Expression Analysis for reference dataset
@@ -372,7 +330,7 @@ MASC <- function(dataset, cluster, contrast, random_effects = NULL, fixed_effect
   output <- data.frame(cluster = attributes(designmat)$dimnames[[2]],
                        size = colSums(designmat))
   output$model.pvalue <- sapply(cluster_models, function(x) x$model_lrt[["Pr(>Chisq)"]][2])
-  output[[paste(contrast_lvl2, "OR", sep = ".")]] <- sapply(cluster_models, function(x) exp(fixef(x$full)[[contrast_lvl2]]))
+  output[[paste(contrast_lvl2, "OR", sep = ".")]] <- sapply(cluster_models, function(x) exp(lme4::fixef(x$full)[[contrast_lvl2]]))
   output[[paste(contrast_lvl2, "OR", "95pct.ci.lower", sep = ".")]] <- sapply(cluster_models, function(x) exp(x$confint[contrast_lvl2, "2.5 %"]))
   output[[paste(contrast_lvl2, "OR", "95pct.ci.upper", sep = ".")]] <- sapply(cluster_models, function(x) exp(x$confint[contrast_lvl2, "97.5 %"]))
   
@@ -586,7 +544,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
 
   flag = class(E) == "Seurat"
   
-  if (flag & impute)
+  if (flag)
     edges = E@graphs$RNA_nn
   
   if (verbose)
@@ -642,14 +600,14 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
   V = V[!logik,]
   
   # set up imputation matrices
-    if (flag) {
-      dM = CID.GetDistMat(edges)
-      louvain = CID.Louvain(edges = edges)
-    } else {
+      if (flag) {
+        dM = CID.GetDistMat(edges)
+        louvain = CID.Louvain(edges = edges)
+      } else {
       edges = CID.LoadEdges(data.dir = spring.dir)
       dM = CID.GetDistMat(edges)
       louvain = CID.Louvain(edges = edges)
-    }
+      }
   
   res = lapply(R$Reference, function(x){
     # keep same gene names
@@ -1133,12 +1091,12 @@ KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F, verbose
   # if is null data.dir, run PCA + KNN
   if (is.null(dM))
   {
-    dM = CID.GetNeighbors(E, normalize = normalize, min_counts = 3, min_cells = 3, min_vscore_pctl = 85, num_pc = 30, k_neigh = 3)
+    dM = CID.GetNeighbors(E, normalize = T, min_counts = 3, min_cells = 3, min_vscore_pctl = 85, num_pc = 30, k_neigh = 3)
     dM = CID.GetDistMat(dM)
   }
   
-  # g = dM[[1]] %*% bas + 1/2 * dM[[2]] %*% bas
-  g = dM[[1]] %*% bas
+  #g = dM[[1]] %*% bas + 1/2 * dM[[2]] %*% bas
+  g = dM[[1]] %*% bas 
   dd = g / (Matrix::rowSums(g) + 1)
   diag(dd) <- 1
   E_new = E %*% dd;
@@ -1800,7 +1758,8 @@ get_knn_graph2 <- function(X, k=4, np, genes_to_use)
 #' @export
 SaveNetworksH5 <- function(A, data.dir)
 {
-    
+  if (!requireNamespace("rhdf5", quietly = TRUE))
+    stop("Please install rhdf5 to save HDF5 files")
 data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
     
 if (!dir.exists(data.dir))
@@ -1815,7 +1774,7 @@ if (!"list" %in% class(A))
     cat("             Number of networks:", length(A), "\n");
     
     if (is.null(names(A)))
-      names(A) <- paste0("Network", seq_along(1:length(D)))
+      names(A) <- paste0("Network", seq_along(1:length(A)))
     
     data.dirs = paste(data.dir, names(A), sep = "/")
     
@@ -1868,7 +1827,7 @@ GetGeneFromNetwork <- function(gene, filename = "network_sparse_genes.h5")
   if (!file.exists(filename))
     stop("File not found")
   infile = hdf5r::H5File$new(filename)
-  E = Matrix::Matrix(0, ncol = 1, nrow = infile[["shape"]][][1], sparse = T)
+  E = Matrix::Matrix(0, ncol = 1, nrow = length(names(infile[["edges"]])), sparse = T)
   nodes <- infile[[paste("edges/", gene, sep = "/")]][]
   E[nodes] = 1
   #E = as.matrix(E)
@@ -1909,10 +1868,9 @@ LoadNetwork <- function(filename = "network_total.h5")
   counts <- infile[["data"]]
   indices <- infile[["indices"]]
   indptr <- infile[["indptr"]]
-  shp <- infile[["shape"]]
   features <- infile[["genes"]][]
   sparse.mat <- Matrix::sparseMatrix(i = indices[] + 1, p = indptr[],
-                                     x = as.numeric(counts[]), dims = shp[], giveCsparse = FALSE)
+                                     x = as.numeric(counts[]), dims = c(length(features), length(features)), giveCsparse = FALSE)
   rownames(sparse.mat) <- features
   colnames(sparse.mat) <- features
   sparse.mat <- as(object = sparse.mat, Class = "dgCMatrix")
