@@ -10,7 +10,8 @@ Generate_lbls(
   E = NULL,
   smooth = T,
   new_populations = NULL,
-  new_categories = NULL
+  new_categories = NULL,
+  min.cells = 10
 )
 }
 \arguments{
@@ -25,6 +26,8 @@ Generate_lbls(
 \item{new_populations}{Character vector specifying any new cell types that were learned by Signac. Default is NULL.}
 
 \item{new_categories}{If new_populations are set to a cell type, new_category is a corresponding character vector indicating the population that the new population belongs to. Default is NULL.}
+
+\item{min.cells}{If desired, any cell population with equal to or less than N cells is set to "Unclassified." Default is 10 cells.}
 }
 \value{
 cell type labels (list) for each level of the hierarchy.

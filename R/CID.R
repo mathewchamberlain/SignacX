@@ -473,7 +473,7 @@ Signac_Solo <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.
       xx = apply(res, 1, which.max)
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
-      celltypes[kmax < threshold] = "Other"
+      celltypes[kmax < threshold] = "Unclassified"
       df = data.frame(celltypes = celltypes, probability = kmax, error = res.sd[xx], percent_features_detected = round(Matrix::colSums(Z != 0) / nrow(Z), digits = 3) * 100, genes_detected = round(Matrix::colSums(E != 0), digits = 3) * 100)
       df$celltypes = as.character(df$celltypes)
     }
@@ -485,7 +485,7 @@ Signac_Solo <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.
       xx = apply(res, 1, which.max)
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
-      celltypes[kmax < threshold] = "Other"
+      celltypes[kmax < threshold] = "Unclassified"
       df = data.frame(celltypes = celltypes, probability = kmax)
       df$celltypes = as.character(df$celltypes)
     }
@@ -499,7 +499,7 @@ Signac_Solo <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.
       xx = apply(res, 1, which.max)
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
-      celltypes[kmax < threshold] = "Other"
+      celltypes[kmax < threshold] = "Unclassified"
       df = data.frame(celltypes = celltypes, probability = kmax)
       df$celltypes = as.character(df$celltypes)
     }
@@ -649,8 +649,9 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
       xx = apply(res, 1, which.max)
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
-      celltypes[kmax < threshold] = "Other"
-      df = data.frame(celltypes = celltypes, probability = kmax, error = res.sd[xx], percent_features_detected = round(Matrix::colSums(Z != 0) / nrow(Z), digits = 3) * 100)
+      celltypes[kmax < threshold] = "Unclassified"
+      errors = round(sapply(1:length(xx), function(x){res.sd[x, xx[x]]}), digits = 4)
+      df = data.frame(celltypes = celltypes, probability = round(kmax, digits = 3), sd = errors, percent_features_detected = round(Matrix::colSums(Z != 0) / nrow(Z), digits = 3) * 100)
     }
     # if desired, run svm
     if (model.use == "svm") {
@@ -660,7 +661,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
       xx = apply(res, 1, which.max)
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
-      celltypes[kmax < threshold] = "Other"
+      celltypes[kmax < threshold] = "Unclassified"
       df = data.frame(celltypes = celltypes, probability = kmax)
       df$celltypes = as.character(df$celltypes)
     }
@@ -674,12 +675,12 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
       xx = apply(res, 1, which.max)
       celltypes = colnames(res)[xx]
       kmax = apply(res, 1, max)
-      celltypes[kmax < threshold] = "Other"
+      celltypes[kmax < threshold] = "Unclassified"
       df = data.frame(celltypes = celltypes, probability = kmax)
       df$celltypes = as.character(df$celltypes)
     }
       # smooth the output classifications
-      if (smooth)
+      if (smooth & any(as.character(unique(x$celltypes)) %in% c("Immune", "Myeloid", "NonImmune", "Lymphocytes", "Monocytes.Neutrophils", "Monocytes", "Fibroblasts", "Epithelial")))
         df$celltypes = CID.smooth(df$celltypes, dM[[1]])
     
     # return probabilities and cell type classifications
@@ -708,9 +709,10 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
 #' @param smooth if TRUE, smooths the cell type classifications. Default is TRUE.
 #' @param new_populations Character vector specifying any new cell types that were learned by Signac. Default is NULL.
 #' @param new_categories If new_populations are set to a cell type, new_category is a corresponding character vector indicating the population that the new population belongs to. Default is NULL.
+#' @param min.cells If desired, any cell population with equal to or less than N cells is set to "Unclassified." Default is 10 cells.
 #' @return cell type labels (list) for each level of the hierarchy.
 #' @export
-Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T, new_populations = NULL, new_categories = NULL)
+Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T, new_populations = NULL, new_categories = NULL, min.cells = 10)
 {
   
   if (!is.null(spring.dir)){
@@ -759,28 +761,28 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T, new_popula
       celltypes[celltypes %in% new_populations[j]] = new_categories[j]
   }
   
-  # assign Others
+  # assign Unclassifieds
   if (!is.null(spring.dir) | flag){
   celltypes = CID.entropy(celltypes, dM)
   immune = CID.entropy(immune, dM)
   # smooth 
   if (smooth) {
     celltypes= CID.smooth(celltypes, dM[[1]])
-    cellstates = CID.smooth(cellstates, dM[[1]])
+    #cellstates = CID.smooth(cellstates, dM[[1]])
     immune = CID.smooth(immune, dM[[1]])
   }
   }
-  logik = immune == "Other" | celltypes == "Other" | cellstates == "Other"
-  cellstates[logik] = "Other"
-  celltypes[logik] = "Other"
-  immune[logik] = "Other"
+  logik = immune == "Unclassified" | celltypes == "Unclassified" | cellstates == "Unclassified"
+  cellstates[logik] = "Unclassified"
+  celltypes[logik] = "Unclassified"
+  immune[logik] = "Unclassified"
   
   res$Immune = immune
   if (!is.null(spring.dir) | flag)
   {
-  do = data.frame(table(louvain[cellstates == "Other"]))
+  do = data.frame(table(louvain[cellstates == "Unclassified"]))
   df = data.frame(table(louvain[louvain %in% do$Var1]))
-  logik = (1 - phyper(do$Freq, df$Freq , length(cellstates) - do$Freq, sum(cellstates == "Other"))) < 0.01;
+  logik = (1 - phyper(do$Freq, df$Freq , length(cellstates) - do$Freq, sum(cellstates == "Unclassified"))) < 0.01;
   if (any(logik)){
     do = do[logik,]
     logik = do$Freq > 3; # require at least 3 cell communities
@@ -789,7 +791,7 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T, new_popula
       cellstates_novel = cellstates;
       cat("             Signac found", sum(logik), "novel celltypes!\n");
       lbls = rep("All", ncol(E))
-      logik = louvain %in% do$Var1[logik] & cellstates == "Other";
+      logik = louvain %in% do$Var1[logik] & cellstates == "Unclassified";
       lbls[logik] = louvain[logik]
       if (!flag) {
         colnames(E) <- lbls
@@ -808,6 +810,16 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T, new_popula
   }
   }
 
+  df = data.frame(table(celltypes))
+  logik = df$Freq < (min.cells + 1)
+  if (any(logik))
+    celltypes[celltypes %in% as.character(df[,1][logik])] <- "Unclassified"
+  
+  df = data.frame(table(cellstates))
+  logik = df$Freq < (min.cells + 1)
+  if (any(logik))
+    cellstates[cellstates %in% as.character(df[,1][logik])] <- "Unclassified"
+  
   res$CellTypes = celltypes
   res$CellStates = cellstates
 
@@ -1052,6 +1064,86 @@ CID.Normalize <- function(E)
   return(E)
 }
 
+#' Reactome Pathway Enrichment
+#'
+#' @param genes A character vector of gene symbols (ENTREZ gene symbols).
+#' @param verbose Code speaks. Default is TRUE.
+#' @return Pathway enrichment results
+#' @export
+PathwayEnrichment <- function(genes, verbose = T)
+{
+  # check 
+  if (verbose)
+  {
+    cat(" ..........  Entry in PathwayEnrichment \n");
+    ta = proc.time()[3];
+  }
+  
+  res = ReactomePA::enrichPathway(genes)
+  
+  if (verbose)
+  {
+  tb = proc.time()[3] - ta;
+  cat("\n ..........  Exit PathwayEnrichment.\n");
+  cat("             Execution time = ", tb, " s.\n", sep = "");
+  }
+  
+  return(res)
+}
+
+#' Reactome Pathway Enrichment plotting
+#'
+#' @param X results of ?PathwayEnrichment 
+#' @param N number of pathways to plot
+#' @param color Color of dot plot. Default is red.
+#' @param qvalueCutoff FDR cutoff. Default is 0.05.
+#' @param adj.pvalCutoff Adjusted p-value cutoff. Default is 0.05.
+#' @return Pathway enrichment plot
+#' @export
+PathwayEnrichmentPlot <- function(X, N = 40, color = "red", qvalueCutoff = 0.05, adj.pvalCutoff = 0.05)
+{
+  data = X@result
+  data = data[data$p.adjust < adj.pvalCutoff & data$qvalue < qvalueCutoff, ]
+  
+  if (N > nrow(data))
+    N = nrow(data)
+  data = data[1:N, ]
+  data$log10FDR = -log10(data$qvalue)
+  data = data[order(data$p.adjust, decreasing = T),]
+  data$Description = factor(data$Description, levels = data$Description[order(data$p.adjust, decreasing = T)])
+  # Plot
+  ggplot2::ggplot(data, ggplot2::aes_string(x="Description", y="log10FDR")) + 
+    ggplot2::geom_point(stat='identity', ggplot2::aes_string(size="Count"), color = color)  +
+    ggplot2::ylab("-log10 FDR") + ggplot2::xlab("Pathway") +
+    ggplot2::geom_hline(yintercept = 1.3, linetype = "dashed") + 
+    ggplot2::coord_flip() + ggplot2::theme_bw()
+}
+
+#' Convert gene ids
+#'
+#' @param genestoconvert A character vector of N gene names (HUGO gene symbols)
+#' @param from Default is hugo gene symbols. Anything besides "hugo" will assune ENTREZ gene symbols.
+#' @return A data frame containing the converted gene names
+#' @export
+geneconversion <- function(genestoconvert, from = "hugo") {
+  
+  hs <- org.Hs.eg.db::org.Hs.eg.db
+  if (from == "hugo")
+  {
+    convertedgenes = suppressMessages(dplyr::select(hs, 
+                            keys = genestoconvert,
+                            columns = c("ENTREZID", "SYMBOL"),
+                            keytype = "SYMBOL"))
+  } else {
+    convertedgenes = suppressMessages(dplyr::select(hs, 
+                            keys = genestoconvert,
+                            columns = c("ENTREZID", "SYMBOL"),
+                            keytype = "ENTREZID"))
+  }
+
+  return(convertedgenes)
+}
+
 #' K soft imputation
 #'
 #' @param E A gene-by-sample count matrix (sparse matrix, matrix, or data.frame) with genes identified by their HUGO symbols (see ?CID.geneconversion), or a list of such matrices, see ?CID.BatchMode.
@@ -1078,7 +1170,6 @@ KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F, verbose
     cat("             nrow = ", nrow(E), "\n", sep = "");
     cat("             ncol = ", ncol(E), "\n", sep = "");
   }
-
   
   if (!is.null(genes.to.use))
     E = E[rownames(E) %in% genes.to.use,]
@@ -1187,7 +1278,7 @@ CID.GetTrainingSet <- function(E, data.dir = NULL, method.use = "max.genes.detec
     })
     names(q) <- unique(df$cells)
     
-    idx = which(names(q) == "Other")
+    idx = which(names(q) == "Unclassified")
     q[-idx]
   }
   
@@ -1243,7 +1334,7 @@ CID.smooth <- function(ac,dM)
 #' @export
 CID.entropy <- function(ac,distM)
 {
-  # "Y" labels will be ac but with some "Others"
+  # "Y" labels will be ac but with some "Unclassifieds"
   Y   = ac
   
   # Calculate normalized shannon entropy for each cell j for all connections with shortest path < N
@@ -1277,7 +1368,7 @@ CID.entropy <- function(ac,distM)
   # hist(q)
   # use Gaussian
   
-  Y[shannon > 2 * sd(q)] = "Other"
+  Y[shannon > 2 * sd(q)] = "Unclassified"
   
   #df = data.frame(cells = Y, entropy = shannon)
   #ggplot(df, aes(x=cells, y=entropy, fill = cells)) + geom_boxplot()
@@ -1398,7 +1489,7 @@ get_colors <- function(P)
   # main cell type categories will be consistently labeled:
   main_types = c("B"     ,     "Epithelial", "Fibroblasts"        ,
                  "MPh"         , "Plasma.cells"  , "Endothelial",
-                 "TNK"         ,     "Other"     , "NonImmune"          ,
+                 "TNK"         ,     "Unclassified"     , "NonImmune"          ,
                  "Immune")
   main_colors = c("#aa3596"     ,     "#387f50"   , "#a2ba37" ,
                   "#f1ff51"     ,     "#d778de"   , "#73de97" ,
