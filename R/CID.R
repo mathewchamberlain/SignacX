@@ -528,18 +528,20 @@ Signac_Solo <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.
 #' @param R Reference dataset; user should do data("Reference_sim") and then set R to Refernence_sim.
 #' @param spring.dir If using SPRING, directory to categorical_coloring_data.json. Default is NULL.
 #' @param model.use Machine learning model to use. Default option is neural network. Can also be set to 'svm' or 'rf'.
-#' @param N Number of machine learning models to train (for nn and svm). Default is 25.
+#' @param N Number of machine learning models to train (for nn and svm). Default is 100.
 #' @param num.cores Number of cores to use. Default is 1.
-#' @param threshold Probability threshold for assigning cells to "Unclassified." Default is 0.5.
+#' @param threshold Probability threshold for assigning cells to "Unclassified." Default is 0.
 #' @param smooth if TRUE, smooths the cell type classifications. Default is TRUE.
 #' @param impute if TRUE, gene expression values are imputed prior to cell type classification. Default is TRUE.
 #' @param verbose if TRUE, code will report outputs. Default is TRUE.
 #' @param do.normalize if TRUE, cells are normalized to the mean library size. Default is TRUE.
-#' @param probability if TRUE, returns the probability associated with each cell type label. Default is TRUE.
+#' @param return.probability if TRUE, returns the probability associated with each cell type label. Default is TRUE.
 #' @param hidden Number of hidden layers in the neural network. Default is 1.
-#' @return annotations
+#' @param set.seed If true, seed is set to ensure reproducibility of these results. Default is TRUE.
+#' @param seed if set.seed is TRUE, seed is set to 42.
+#' @return cell type annotations
 #' @export
-Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T, do.normalize = T, probability = F, hidden = 1)
+Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.cores = 1, threshold = 0, smooth = T, impute = T, verbose = T, do.normalize = T, return.probability = F, hidden = 1, set.seed = T, seed = '42')
 {
 
   flag = class(E) == "Seurat"
@@ -571,9 +573,6 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
   gns = intersect(rownames(E), R$genes)
   V = E[rownames(E) %in% gns, ]
   
-  # make sure data are in the same order
-  V = V[order(rownames(V)),]
-  
   if (class(V) %in% "data.frame")
     V = Matrix::Matrix(as.matrix(V), sparse = T)
   
@@ -592,6 +591,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
   normalize <- function(x) {
     return ((x - min(x)) / (max(x) - min(x)))
   }
+  
   # normalize V
   V = t(apply(V, 1, function(x){
     normalize(x)
@@ -636,6 +636,11 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
     
     # train a neural network (N times)
     if (model.use == "nn"){
+      if (set.seed)
+      {
+        RNGkind("L'Ecuyer-CMRG")
+        set.seed(seed = seed)
+      }
       res = parallel::mclapply(1:N, function(x) {
         nn=neuralnet::neuralnet(celltypes~.,hidden=hidden,data=df, act.fct = 'logistic', linear.output = F)
         Predict = stats::predict(nn, Matrix::t(Z))
@@ -684,7 +689,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores
         df$celltypes = CID.smooth(df$celltypes, dM[[1]])
     
     # return probabilities and cell type classifications
-    if (probability){
+    if (return.probability){
       return(df)
     } else {
       return(df$celltypes)
@@ -1130,12 +1135,12 @@ geneconversion <- function(genestoconvert, from = "hugo") {
   hs <- org.Hs.eg.db::org.Hs.eg.db
   if (from == "hugo")
   {
-    convertedgenes = suppressMessages(dplyr::select(hs, 
+    convertedgenes = suppressMessages(AnnotationDbi::select(hs, 
                             keys = genestoconvert,
                             columns = c("ENTREZID", "SYMBOL"),
                             keytype = "SYMBOL"))
   } else {
-    convertedgenes = suppressMessages(dplyr::select(hs, 
+    convertedgenes = suppressMessages(AnnotationDbi::select(hs, 
                             keys = genestoconvert,
                             columns = c("ENTREZID", "SYMBOL"),
                             keytype = "ENTREZID"))

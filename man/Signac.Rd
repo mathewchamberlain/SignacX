@@ -9,15 +9,17 @@ Signac(
   R,
   spring.dir = NULL,
   model.use = "nn",
-  N = 25,
+  N = 100,
   num.cores = 1,
-  threshold = 0.5,
+  threshold = 0,
   smooth = T,
   impute = T,
   verbose = T,
   do.normalize = T,
-  probability = F,
-  hidden = 1
+  return.probability = F,
+  hidden = 1,
+  set.seed = T,
+  seed = "42"
 )
 }
 \arguments{
@@ -29,11 +31,11 @@ Signac(
 
 \item{model.use}{Machine learning model to use. Default option is neural network. Can also be set to 'svm' or 'rf'.}
 
-\item{N}{Number of machine learning models to train (for nn and svm). Default is 25.}
+\item{N}{Number of machine learning models to train (for nn and svm). Default is 100.}
 
 \item{num.cores}{Number of cores to use. Default is 1.}
 
-\item{threshold}{Probability threshold for assigning cells to "Unclassified." Default is 0.5.}
+\item{threshold}{Probability threshold for assigning cells to "Unclassified." Default is 0.}
 
 \item{smooth}{if TRUE, smooths the cell type classifications. Default is TRUE.}
 
@@ -43,12 +45,16 @@ Signac(
 
 \item{do.normalize}{if TRUE, cells are normalized to the mean library size. Default is TRUE.}
 
-\item{probability}{if TRUE, returns the probability associated with each cell type label. Default is TRUE.}
+\item{return.probability}{if TRUE, returns the probability associated with each cell type label. Default is TRUE.}
 
 \item{hidden}{Number of hidden layers in the neural network. Default is 1.}
+
+\item{set.seed}{If true, seed is set to ensure reproducibility of these results. Default is TRUE.}
+
+\item{seed}{if set.seed is TRUE, seed is set to 42.}
 }
 \value{
-annotations
+cell type annotations
 }
 \description{
 Main function for classification
