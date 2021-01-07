@@ -144,7 +144,7 @@ GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = 
           ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
           ctrl <- Seurat::AddMetaData(ctrl, metadata=Disease., col.name = "Disease")
           ctrl <- Seurat::SetIdent(ctrl, value='Disease')
-          dummy = Seurat::FindAllMarkers(ctrl, only.pos = T, verbose = F, min.cells.group = 0)
+          dummy = Seurat::FindAllMarkers(ctrl, only.pos = T, verbose = F, min.cells.group = 0, max.cells.per.ident = 500)
           if (nrow(dummy) != 0)
           {
             dummy$celltype = z
@@ -197,7 +197,7 @@ GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = 
     ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
     ctrl <- Seurat::AddMetaData(ctrl, metadata=Identities, col.name = "Identities")
     ctrl <- Seurat::SetIdent(ctrl, value='Identities')
-    df = Seurat::FindAllMarkers(ctrl, only.pos = T, verbose = F, min.cells.group = 0)
+    df = Seurat::FindAllMarkers(ctrl, only.pos = T, verbose = F, min.cells.group = 0, max.cells.per.ident = 500)
     
     ## pool together DE results
     names(df) <- c("p_val", "avg_logFC", "pct.1", "pct.2", "p_val_adj", "identity", "gene")
