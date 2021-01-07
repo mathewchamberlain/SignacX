@@ -9,7 +9,7 @@ Signac_Solo(
   R,
   spring.dir = NULL,
   model.use = "nn",
-  N = 25,
+  N = 100,
   num.cores = 1,
   threshold = 0.5,
   smooth = T,

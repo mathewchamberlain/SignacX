@@ -359,7 +359,7 @@ MASC <- function(dataset, cluster, contrast, random_effects = NULL, fixed_effect
 #' @param hidden Number of hidden layers in the neural network. Default is 1.
 #' @return annotations
 #' @export
-Signac_Solo <- function(E, R , spring.dir = NULL, model.use = "nn", N = 25, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T, do.normalize = T, probability = F, hidden = 1)
+Signac_Solo <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.cores = 1, threshold = 0.5, smooth = T, impute = T, verbose = T, do.normalize = T, probability = F, hidden = 1)
 {
   
   flag = class(E) == "Seurat"
@@ -842,64 +842,62 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T, new_popula
 #' @param labels cell type labels for the columns of E.
 #' @param size Number of bootstrapped samples for machine learning. Default is 1,000.
 #' @param logfc.threshold Cutoff for feature selection. Default is 0.25.
+#' @param p.val.adj Cutoff for feature selection. Default is 0.05.
 #' @param spring.dir if using SPRING, directory to categorical_coloring_data.json. Default is NULL.
 #' @param impute if TRUE, performs imputation prior to bootstrapping. Default is TRUE.
+#' @param verbose if TRUE, code speaks. Default is TRUE.
 #' @return training data frame to be added to a new reference training set
 #' @export
-SignacLearn <- function (E, learned_types, labels, size = 1000, impute = T, spring.dir = NULL, logfc.threshold = 0.25)
+SignacLearn <- function (E, learned_types, labels, size = 1000, impute = T, spring.dir = NULL, logfc.threshold = 0.25, p.val.adj = 0.05, verbose = T)
 {
+  if (verbose)
+  {
+    cat(" ..........  Entry in SignacLearn \n");
+    ta = proc.time()[3];
+    
+    # main function
+    cat(" ..........  Running SignacLearn on input data matrix :\n");
+    cat("             nrow = ", nrow(E), "\n", sep = "");
+    cat("             ncol = ", ncol(E), "\n", sep = "");
+  }
+  
+  # set up imputation matrices
+  if (impute){
+    edges = CID.LoadEdges(data.dir = spring.dir)
+    dM = CID.GetDistMat(edges)
+    louvain = CID.Louvain(edges = edges)
+  }
+  
   # keep only unique row names
   logik = CID.IsUnique(rownames(E))
   E = E[logik,]
   colnames(E) <- 1:ncol(E)
-  
-  # run differential expression to find features
-  logik = grepl("TotalSeq", rownames(E))
-  E = E[!logik,]
 
   # run feature selection  
-  ctrl <- Seurat::CreateSeuratObject(counts = E, project = "CID", min.cells = 0)
+  ctrl <- Seurat::CreateSeuratObject(counts = E[,labels %in% learned_types], project = "Signac", min.cells = 0)
   ctrl <- Seurat::NormalizeData(ctrl)
-  ctrl <- Seurat::AddMetaData(ctrl, metadata=labels, col.name = "celltypes")
+  ctrl <- Seurat::AddMetaData(ctrl, metadata=labels[labels %in% learned_types], col.name = "celltypes")
   ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
   mrks = Seurat::FindMarkers(ctrl, ident.1 = learned_types[1], ident.2 = learned_types[2], only.pos = F, logfc.threshold = logfc.threshold)
-  # E = E[rownames(E) %in% rownames(mrks),]
-  
-  # down sample the cells
-  #subs = round(sqrt(table(labels)))
-  #subsample = unlist(sapply(unique(labels), function(x){
-  #      idx = match(x, names(subs))
-  #      paste(labels[labels == x], sample(letters[1:subs[idx]], size = sum(labels == x), replace = T), sep = "_")
-  #    }))
-  #tt = aggregate(Matrix::t(E),by=list(subsample),mean)
-  #xx = tt[,1]
-  #tt = as.matrix(tt[,-1])
-  xx = labels
-  
-  # set up imputation matrices
-  if (impute){
-      edges = CID.LoadEdges(data.dir = spring.dir)
-      dM = CID.GetDistMat(edges)
-      louvain = CID.Louvain(edges = edges)
-  }
-  
+  mrks = mrks[mrks$p_val_adj < p.val.adj,]
   # bootstrap data
-  #mrks2 = mrks[mrks$pct.1 > 0.5 | mrks$pct.2 > 0.5,]
   dat = E[rownames(E) %in% rownames(mrks),]
   mrks$cluster = learned_types[1]
   mrks$cluster[mrks$avg_logFC < 0] = learned_types[2]
   mrks$gene = rownames(mrks)
+  
+  xx = labels
   
   # run imputation (if desired)
   if (impute)
     Z = KSoftImpute(E = dat, dM = dM, verbose = F)
   
   cts = split.data.frame(mrks, f = mrks$cluster)
-    N = lapply(cts, function(x){
+  N = lapply(cts, function(x){
       # first sample from cells in cluster 1, size cells
       logik = rownames(dat) %in% x$gene
       dummy = dat[logik,]
-      logik = grepl(as.character(x$cluster[1]), labels)
+      logik = as.character(x$cluster[1]) == labels
       dummy = dummy[,logik]
       dd = t(apply(dummy, 1, function(z) {
         sample(z, size = size, replace = T)}))
@@ -909,7 +907,7 @@ SignacLearn <- function (E, learned_types, labels, size = 1000, impute = T, spri
       # now sample from cells in cluster 2, size cells with True Negative Expr.
       logik = !rownames(dat) %in% x$gene
       dummy = dat[logik,]
-      logik = grepl(as.character(x$cluster[1]), labels)
+      logik = as.character(x$cluster[1]) == labels
       dummy = dummy[,logik]
       dd2 = t(apply(dummy, 1, function(z) {
         sample(z, size = size, replace = T)}))
@@ -930,10 +928,19 @@ SignacLearn <- function (E, learned_types, labels, size = 1000, impute = T, spri
     })
   boot = data.frame(N2, celltypes = c(rep(names(cts)[1], size), rep(names(cts)[2], size)))
   colnames(boot) <- gsub(pattern = "\\.", replacement = "-", x = colnames(boot))
-   # pca <- prcomp(x = boot[,-ncol(boot)], center = T, scale. = T) 
-   # autoplot(pca, data = boot, colour = 'celltypes')
+   #pca <- prcomp(x = boot[,-ncol(boot)], center = T, scale. = T) 
+   #library(ggfortify)
+   #autoplot(pca, data = boot, colour = 'celltypes')
   #library(ggplot2)
-  #ggplot(boot, aes(x=TRGC1, y=TRDC, color=celltypes)) + geom_point()
+  #ggplot(boot, aes(x=FCGR3A, y=GZMH, color=celltypes)) + geom_point()
+  #ggplot(boot, aes(x=XCL1, y=XCL2, color=celltypes)) + geom_point()
+  
+  if (verbose) {
+    tb = proc.time()[3] - ta;
+    cat("\n ..........  Exit SignacLearn.\n");
+    cat("             Execution time = ", tb, " s.\n", sep = "");
+  }
+  
   return(boot)
 }
 
@@ -1161,7 +1168,7 @@ geneconversion <- function(genestoconvert, from = "hugo") {
 KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F, verbose = T)
 {
   # check inputs
-  stopifnot(class(E) %in% c("dgCMatrix","dgTMatrix", "matrix", "data.frame"))
+  stopifnot(any(class(E) %in% c("dgCMatrix","dgTMatrix", "matrix", "data.frame")))
   stopifnot(!is.null(rownames(E)));
   if (class(E) %in% c("matrix", "data.frame"))
     E = Matrix::Matrix(as.matrix(E), sparse = T)
@@ -1399,13 +1406,13 @@ CID.writeJSON <- function(cr, json_new = "categorical_coloring_data.json", data.
     {
       json_file = 'categorical_coloring_data.json'
       gJ <- paste(data.dir,json_file,sep = "/")
-      json_data <- rjson::fromJSON(file=gJ)
+      json_data <- RJSONIO::fromJSON(gJ)
       json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
       write(json_out,paste(data.dir,'categorical_coloring_data_legacy.json',sep="/"))
     } else {
       json_file = 'categorical_coloring_data_old.json'
       gJ <- paste(data.dir,json_file,sep = "/")
-      json_data <- rjson::fromJSON(file=gJ)
+      json_data <- RJSONIO::fromJSON(gJ)
       json_out = jsonlite::toJSON(json_data, auto_unbox = TRUE)
       write(json_out,paste(data.dir,'categorical_coloring_data_legacy.json',sep="/"))
     }

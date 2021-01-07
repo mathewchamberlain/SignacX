@@ -11,7 +11,9 @@ SignacLearn(
   size = 1000,
   impute = T,
   spring.dir = NULL,
-  logfc.threshold = 0.25
+  logfc.threshold = 0.25,
+  p.val.adj = 0.05,
+  verbose = T
 )
 }
 \arguments{
@@ -28,6 +30,10 @@ SignacLearn(
 \item{spring.dir}{if using SPRING, directory to categorical_coloring_data.json. Default is NULL.}
 
 \item{logfc.threshold}{Cutoff for feature selection. Default is 0.25.}
+
+\item{p.val.adj}{Cutoff for feature selection. Default is 0.05.}
+
+\item{verbose}{if TRUE, code speaks. Default is TRUE.}
 }
 \value{
 training data frame to be added to a new reference training set
