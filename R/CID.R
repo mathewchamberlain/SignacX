@@ -455,12 +455,12 @@ Signac_Solo <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num
     
     # train a neural network (N times)
     if (model.use == "nn"){
-      res = parallel::mclapply(1:N, function(x) {
+      res = suppressWarnings(parallel::mclapply(1:N, function(x) {
         nn=neuralnet::neuralnet(celltypes~.,hidden=hidden,data=df, act.fct = 'logistic', linear.output = F)
         Predict = stats::predict(nn, Matrix::t(Z))
         colnames(Predict) <- sort(nn$model.list$response)
         return(Predict)
-      }, mc.cores = num.cores)
+      }, mc.cores = num.cores))
       
       # compute standard deviation of predictions
       err = do.call(cbind, lapply(res, function(x) {x[,1]}))
@@ -641,14 +641,15 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.core
         RNGkind("L'Ecuyer-CMRG")
         set.seed(seed = seed)
       }
-      res = parallel::mclapply(1:N, function(x) {
+      res = suppressWarnings(parallel::mclapply(1:N, function(x) {
         nn=neuralnet::neuralnet(celltypes~.,hidden=hidden,data=df, act.fct = 'logistic', linear.output = F)
         Predict = stats::predict(nn, Matrix::t(Z))
         colnames(Predict) <- sort(nn$model.list$response)
         return(Predict)
-      }, mc.cores = num.cores)
-      res.squared.mean <- Reduce("+", lapply(res, "^", 2)) / N
-      res = Reduce(res, f = '+') / N
+      }, mc.cores = num.cores))
+      res = res[sapply(res, function(x) !is.null(x))]
+      res.squared.mean <- Reduce("+", lapply(res, "^", 2)) / length(res)
+      res = Reduce(res, f = '+') / length(res)
       res.variance <- res.squared.mean - res^2
       res.sd <- sqrt(res.variance)
       xx = apply(res, 1, which.max)
@@ -1168,8 +1169,6 @@ geneconversion <- function(genestoconvert, from = "hugo") {
 KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F, verbose = T)
 {
   # check inputs
-  stopifnot(any(class(E) %in% c("dgCMatrix","dgTMatrix", "matrix", "data.frame")))
-  stopifnot(!is.null(rownames(E)));
   if (class(E) %in% c("matrix", "data.frame"))
     E = Matrix::Matrix(as.matrix(E), sparse = T)
   if (verbose)
