@@ -49,14 +49,11 @@
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
 
-Signac is an algorithm that addresses the classification problem in single cell RNA sequencing. We often have an expression matrix and we need to classify the cells into their cell types and cell states based on gene expression patterns.
+Signac is an algorithm that addresses the cell type classification problem in single cell RNA sequencing: We often have an expression matrix and we need to classify the cells into their cell types. Signac classifies the cells.
 
-* Signac implements an average neural network-based strategy.
 * Signac has been used to classify over 1 million cells from dozens of datasets.
-* The main functions are clear and well-documented.
 * Signac is integrated with Seurat and SPRING, and we provide vignettes for either software package.
-
-You may suggest changes by forking this repo and creating a pull request or opening an issue.
+* The main functions are clear and well-documented.
 
 <!-- GETTING STARTED -->
 ## Getting Started
@@ -72,7 +69,7 @@ devtools::install_github("mathewchamberlain/Signac")
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Running Signac is simple. [Here is an example vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/blob/master/vignettes/Signac-Seurat_CITEseq.html) for classifying an example 10X CITE-seq dataset using Seurat.
+Running Signac is simple. [Here is an example vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html) for classifying an example 10X CITE-seq dataset using Seurat.
 
 <!-- ROADMAP -->
 ## Roadmap
