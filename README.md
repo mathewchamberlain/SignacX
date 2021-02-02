@@ -49,7 +49,7 @@
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
 
-Signac helps solve the cell type classification problem in single cell RNA sequencing: We often have an expression matrix and we need to classify the cellular phenotypes. Signac classifies them using neural networks trained with sorted bulk data. Check out our pre-print here.
+Signac helps to solve the cell type classification problem in single cell RNA sequencing: We often have an expression matrix and we need to classify the cellular phenotypes. Signac classifies them using neural networks trained with sorted bulk data. Check out our pre-print here.
 
 <!-- GETTING STARTED -->
 ## Getting Started
@@ -72,14 +72,13 @@ labels = Signac(your_data_here, R = training_HPCA) # Seurat object or expression
 celltypes = Generate_lbls(labels, your_data_here) # celltypes will have the cellular phenotype labels for each cell in your data.
 ```
 
-The easiest way to use Signac is to integrate it with Seurat or with SPRING.
-
 <!-- USAGE EXAMPLES -->
 ## Usage
 
 Running Signac is simple. We provide a few vignettes:
 
-* [Signac and Seurat: Multi-modal analysis of CITE-seq PBMCs from 10X Genomics (https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html).
+* [Signac and Seurat: Multi-modal analysis of CITE-seq PBMCs from 10X Genomics.] (https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)
+* [SPRING pre-processing of data] (https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/spring_notebook_celseq.ipynb)
 
 <!-- ROADMAP -->
 ## Roadmap
