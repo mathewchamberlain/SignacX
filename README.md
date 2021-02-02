@@ -49,11 +49,7 @@
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
 
-Signac helps solve the cell type classification problem in single cell RNA sequencing: We often have an expression matrix and we need to classify the cellular phenotypes.
-
-* Signac has been used to classify over 1 million cells from dozens of datasets.
-* Signac is integrated with Seurat and SPRING, and we provide vignettes for either software package.
-* The main functions are clear and well-documented.
+Signac helps solve the cell type classification problem in single cell RNA sequencing: We often have an expression matrix and we need to classify the cellular phenotypes. Signac classifies them using neural networks trained with sorted bulk data. Check out our pre-print here.
 
 <!-- GETTING STARTED -->
 ## Getting Started
@@ -66,14 +62,14 @@ To install Signac in R, simply do:
 devtools::install_github("mathewchamberlain/Signac")
 ```
 
-### Quick start guide
+### Quick start
 
 The main functions in Signac are:
 
 ```r
 data(training_HPCA)
-labels = Signac(your_data_here) # Seurat object or expression matrix
-celltypes = Generate_lbls(labels)
+labels = Signac(your_data_here, R = training_HPCA) # Seurat object or expression matrix
+celltypes = Generate_lbls(labels, your_data_here) # celltypes will have the cellular phenotype labels for each cell in your data.
 ```
 
 The easiest way to use Signac is to integrate it with Seurat or with SPRING.
@@ -81,7 +77,9 @@ The easiest way to use Signac is to integrate it with Seurat or with SPRING.
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-Running Signac is simple. [Here is an example vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html) for classifying an example 10X CITE-seq dataset using Seurat.
+Running Signac is simple. We provide a few vignettes:
+
+* [Signac and Seurat: Multi-modal analysis of CITE-seq PBMCs from 10X Genomics (https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html).
 
 <!-- ROADMAP -->
 ## Roadmap
