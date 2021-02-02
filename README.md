@@ -49,7 +49,9 @@
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
 
-Signac helps to solve the cell type classification problem in single cell RNA sequencing: We often have an expression matrix and we need to classify the cellular phenotypes. Signac classifies them using neural networks trained with sorted bulk data. Check out our pre-print here.
+Signac helps solve the cell type classification problem in single cell RNA sequencing: We sequenced the RNA for each individual cell, but we do not know the identity of each cellular phenotype. Signac classifies each cell in scRNA-seq data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). Check out our pre-print here: LINK.
+
+To make life easier, Signac is integrated with [Seurat](https://satijalab.org/seurat/) (versions 3 and 4), [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) and [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), allowing for easy downstream analysis of Signac annotations.
 
 <!-- GETTING STARTED -->
 ## Getting Started
