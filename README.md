@@ -77,8 +77,11 @@ celltypes = Generate_lbls(labels, your_data_here) # celltypes will have the cell
 
 Running Signac is simple. We provide a few vignettes:
 
-* [Signac and Seurat: Multi-modal analysis of CITE-seq PBMCs from 10X Genomics.](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)
-* [SPRING pre-processing of data](https://github.com/mathewchamberlain/Signac/master/vignettes/spring_notebook_celseq.ipynb)
+* [Signac and Seurat: Multi-modal analysis of CITE-seq PBMCs from 10X Genomics in R.](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)
+* [Signac and SPRING: Analysis of PBMCs from 10X Genomics in python with a Jupyter notebook](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_celseq.ipynb)
+* [Signac classification of another species (Crab-eating macaque)](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_celseq.ipynb)
+* [Signac classification of human synovium with data from the Accelerating Medicines Partnership (AMP)](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_celseq.ipynb)
+
 
 <!-- ROADMAP -->
 ## Roadmap
