@@ -543,11 +543,12 @@ Signac_Solo <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num
 #' @export
 Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.cores = 1, threshold = 0, smooth = T, impute = T, verbose = T, do.normalize = T, return.probability = F, hidden = 1, set.seed = T, seed = '42')
 {
-
   flag = class(E) == "Seurat"
   
-  if (flag)
-    edges = E@graphs$RNA_nn
+  if (flag){
+    default.assay <- DefaultAssay(E)
+    edges = E@graphs[[which(grepl(paste0(default.assay, "_nn"), names(E@graphs)))]]
+  }
   
   if (verbose)
   {
@@ -583,7 +584,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.core
     {
       V = CID.Normalize(V)
     } else {
-      V = CID.Normalize(V@assays$RNA@counts)
+      V = CID.Normalize(V@assays[[default.assay]]@counts)
     }
   }
 
@@ -608,7 +609,6 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.core
       dM = CID.GetDistMat(edges)
       louvain = CID.Louvain(edges = edges)
       }
-  
   res = lapply(R$Reference, function(x){
     # keep same gene names
     gns = sort(intersect(rownames(V), colnames(x)))
@@ -728,7 +728,8 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T, new_popula
   
   flag = class(E) == "Seurat"
   if (flag) {
-    edges = E@graphs$RNA_nn
+    default.assay <- DefaultAssay(E)
+    edges = E@graphs[[which(grepl(paste0(default.assay, "_nn"), names(E@graphs)))]]
     dM = CID.GetDistMat(edges)
   }
   
@@ -1169,8 +1170,6 @@ geneconversion <- function(genestoconvert, from = "hugo") {
 KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F, verbose = T)
 {
   # check inputs
-  if (class(E) %in% c("matrix", "data.frame"))
-    E = Matrix::Matrix(as.matrix(E), sparse = T)
   if (verbose)
   {
     cat(" ..........  Entry in KSoftImpute \n");
@@ -1202,7 +1201,7 @@ KSoftImpute <- function(E,  dM = NULL, genes.to.use = NULL, do.save = F, verbose
   dd = g / (Matrix::rowSums(g) + 1)
   diag(dd) <- 1
   E_new = E %*% dd;
-  E_new = CID.Normalize(E_new)
+  # E_new = CID.Normalize(E_new)
   
   if (do.save)
   {

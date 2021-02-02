@@ -1,5 +1,5 @@
 ---
-title: 'CITE-seq 5k PBMCs (10X) analyzed with Signac x Seurat'
+title: 'Signac and Seurat: Multi-modal analysis of CITE-seq PBMCs from 10X Genomics'
 author: 'Mathew Chamberlain'
 date: "`r Sys.Date()`"
 output:
@@ -10,31 +10,61 @@ output:
       after_body: footer.html
 ---
 
-## Load Signac and Seurat
+This vignette shows how to use Signac with Seurat. There are three parts: Seurat, Signac and then visualization. We use an example CITE-seq data set from 10X Genomics.
 
-```{r setup, message = F, eval = F}
-library(Signac)
+## Seurat 
+
+Start with the standard pre-processing steps for a Seurat object.
+
+```{r setupSeurat, message = F, eval = F}
 library(Seurat)
 ```
 
-## Perform standard pre-processing steps with Seurat
+Download data from 10X Genomics.
 
-```{r Seurat, message = F, eval = F}
-# load dataset
-E = Read10X_h5(filename = "../../Data/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/rawdata/Sample1/pbmc_10k_protein_v3_raw_feature_bc_matrix.h5")
-pbmc <- CreateSeuratObject(counts = E$`Gene Expression`, project = "pbmc5k", min.cells = 3, min.features = 200)
-pbmc[["percent.mt"]] <- PercentageFeatureSet(pbmc, pattern = "^MT-")
-pbmc <- subset(pbmc, subset = nFeature_RNA > 200 & nFeature_RNA < 2500 & percent.mt < 10)
-pbmc <- NormalizeData(object = pbmc, verbose = F)
-pbmc <- FindVariableFeatures(pbmc, selection.method = "vst", nfeatures = 2000)
-pbmc <- ScaleData(pbmc)
-pbmc <- RunPCA(pbmc, verbose = F)
-pbmc <- FindNeighbors(pbmc, dims = 1:25)
-pbmc <- FindClusters(pbmc, resolution = 0.8)
-pbmc <- RunUMAP(pbmc, dims = 1:10)
+```{r setup, message = F, eval = F}
+download.file("https://cf.10xgenomics.com/samples/cell-exp/3.0.0/pbmc_10k_protein_v3/pbmc_10k_protein_v3_filtered_feature_bc_matrix.h5", destfile = "pbmc_10k_protein_v3_filtered_feature_bc_matrix.h5")
 ```
 
-## Generate Signac labels for the Seurat object
+Create a Seurat object, and then perform SCTransform normalization. Note:
+
+* You can use the legacy functions here (i.e., NormalizeData, ScaleData, etc.) or use SCTransform.
+* We think that it is best practice to use SCTransform, but it is not a necessary step. Signac will work fine without it.
+
+```{r Seurat, message = T, eval = F}
+# load dataset
+E = Read10X_h5(filename = "pbmc_10k_protein_v3_filtered_feature_bc_matrix.h5")
+pbmc <- CreateSeuratObject(counts = E$`Gene Expression`, project = "pbmc")
+
+# store mitochondrial percentage in object meta data
+pbmc <- PercentageFeatureSet(pbmc, pattern = "^MT-", col.name = "percent.mt")
+
+# run sctransform
+pbmc <- SCTransform(pbmc,vars.to.regress = "percent.mt", verbose = FALSE)
+```
+
+Perform dimensionality reduction by PCA and UMAP embedding. Note: Signac actually needs these commands to be run, since it uses the nearest neighbor graph.
+```{r Seurat 2, message = T, eval = F}
+# These are now standard steps in the Seurat workflow for visualization and clustering
+pbmc <- RunPCA(pbmc, verbose = FALSE)
+pbmc <- RunUMAP(pbmc, dims = 1:30, verbose = FALSE)
+pbmc <- FindNeighbors(pbmc, dims = 1:30, verbose = FALSE)
+DimPlot(pbmc, label = TRUE) + NoLegend()
+```
+
+## Signac
+
+Now, make sure you have the Signac package installed.
+
+```{r setup2, message = F, eval = F}
+devtools::install_github("mathewchamberlain/Signac")
+library(Signac)
+```
+
+Generate Signac labels for the Seurat object. Note:
+* This is the main function for Signac.
+* Optionally, you can do parallel computing by setting num.cores > 1 in the Signac function.
+* Run time is ~minutes for ~10,000 cells.
 
 ```{r Signac, message = T, eval = F}
 # Run Signac
@@ -43,23 +73,21 @@ labels <- Signac(pbmc, R = training_HPCA) # optionally do parallel computing by 
 celltypes = Generate_lbls(labels, E = pbmc)
 ```
 
-## Immune cells
+## Visualizations
 
+Now we can visualize the cell type classifications at many different levels:
+Immune and nonimmune
 ```{r Seurat Visualization 0, message = F}
 pbmc <- Seurat::AddMetaData(pbmc, metadata=celltypes$Immune, col.name = "immmune")
 pbmc <- Seurat::SetIdent(pbmc, value='immmune')
 DimPlot(pbmc)
 ```
 
-## Lymphocytes and myeloid cells
-
 ```{r Seurat Visualization 1, message = F}
 pbmc <- Seurat::AddMetaData(pbmc, metadata=celltypes$L2, col.name = "celltypes")
 pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
 DimPlot(pbmc)
 ```
-
-## Broad cell types
 
 ```{r Seurat Visualization 2, message = F}
 lbls = factor(celltypes$CellTypes)
@@ -69,8 +97,6 @@ pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
 DimPlot(pbmc)
 ```
 
-## Immune phenotypes
-
 ```{r Seurat Visualization 3, message = F}
 lbls = factor(celltypes$CellStates)
 levels(lbls) <- sort(unique(lbls))
@@ -78,8 +104,6 @@ pbmc <- Seurat::AddMetaData(pbmc, metadata=lbls, col.name = "celltypes")
 pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
 DimPlot(pbmc)
 ```
-
-## Immune phenotypes with novel cell type discovery
 
 ```{r Seurat Visualization 4, message = F}
 lbls = factor(celltypes$CellStates_novel)
@@ -97,17 +121,17 @@ pbmc <- NormalizeData(pbmc, assay = "ADT", normalization.method = "CLR")
 pbmc <- ScaleData(pbmc, assay = "ADT")
 ```
 
-## Visualize protein information on the RNA clustering result
+Visualize protein information on the RNA clustering result
 
 ```{r Seurat visualize protein, message = F}
 FeaturePlot(pbmc, features = c("CD8a-TotalSeqB", "CD8A"), ncol = 2)
 ```
 
 ```{r Seurat visualize protein 2, message = F}
-RidgePlot(pbmc, features = c("CD8a-TotalSeqB", "CD4-TotalSeqB"), ncol = 2)
+RidgePlot(pbmc, features = c("CD8a-TotalSeqB"))
 ```
 
-## Identify differentially expressed proteins between clusters
+Identify differentially expressed proteins between clusters
 
 ```{r Seurat visualize protein 3, message = F}
 # Downsample the clusters to a maximum of 500 cells each (makes the heatmap easier to see for
@@ -120,7 +144,7 @@ DoHeatmap(pbmc.small, features = unique(adt.markers$gene), assay = "ADT", angle 
 DefaultAssay(pbmc) <- "ADT"
 ```
 
-## Cluster the data based on protein expression information.
+Cluster the data based on protein expression information.
 
 ```{r Seurat cluster on protein, message = F}
 pbmc <- FindVariableFeatures(pbmc, selection.method = "vst")
@@ -131,7 +155,7 @@ pbmc <- FindClusters(pbmc, resolution = 0.8)
 pbmc <- RunUMAP(pbmc, dims = 1:10)
 ```
 
-## Visualize Signac cell types on protein clusters
+Visualize Signac cell types on protein clusters
 ```{r Seurat protein clusters vis 1, message = F}
 lbls = factor(celltypes$CellTypes)
 levels(lbls) <- sort(unique(lbls))
@@ -150,4 +174,10 @@ DimPlot(pbmc)
 
 ```{r Seurat protein clusters vis 3, message = F}
 FeaturePlot(pbmc, features = c("CD8a-TotalSeqB", "CD8A"))
+```
+
+## Session information
+
+```{r sessioninfo, message = F, echo = F}
+sessionInfo()
 ```

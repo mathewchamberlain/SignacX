@@ -49,7 +49,7 @@
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
 
-Signac is an algorithm that addresses the cell type classification problem in single cell RNA sequencing: We often have an expression matrix and we need to classify the cells into their cell types. Signac classifies the cells.
+Signac helps solve the cell type classification problem in single cell RNA sequencing: We often have an expression matrix and we need to classify the cellular phenotypes.
 
 * Signac has been used to classify over 1 million cells from dozens of datasets.
 * Signac is integrated with Seurat and SPRING, and we provide vignettes for either software package.
@@ -65,6 +65,18 @@ To install Signac in R, simply do:
 ```r
 devtools::install_github("mathewchamberlain/Signac")
 ```
+
+### Quick start guide
+
+The main functions in Signac are:
+
+```r
+data(training_HPCA)
+labels = Signac(your_data_here) # Seurat object or expression matrix
+celltypes = Generate_lbls(labels)
+```
+
+The easiest way to use Signac is to integrate it with Seurat or with SPRING.
 
 <!-- USAGE EXAMPLES -->
 ## Usage
