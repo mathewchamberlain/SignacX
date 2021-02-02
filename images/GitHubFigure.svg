@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 23.0.4, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 600 300" style="enable-background:new 0 0 600 300;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:none;}
+	.st1{font-family:'Helvetica';}
+	.st2{font-size:20.2777px;}
+	.st3{fill:#231F20;}
+	.st4{fill:#808285;stroke:#FFFFFF;stroke-miterlimit:10;}
+	.st5{fill:#808285;stroke:#FFFFFF;stroke-miterlimit:8;}
+	.st6{fill:none;stroke:#231F20;stroke-width:0.25;stroke-miterlimit:10;}
+	.st7{fill:#010101;}
+	.st8{fill:#595A5C;stroke:#FFFFFF;stroke-miterlimit:10;}
+	.st9{fill:#00AEEF;stroke:#FFFFFF;stroke-miterlimit:8;}
+	.st10{fill:#F7941D;stroke:#FFFFFF;stroke-miterlimit:10;}
+	.st11{font-family:'MyriadPro-Regular';}
+	.st12{font-size:10.8572px;}
+</style>
+<rect x="14.7" y="52.3" class="st0" width="151.6" height="71.2"/>
+<text transform="matrix(1 0 0 1 14.6636 66.856)" class="st1 st2">scRNA-seq data</text>
+<g>
+	<polygon class="st3" points="27.3,155.3 47,155.3 47,154.4 51.7,156.3 47,158.3 47,157.3 27.3,157.3 	"/>
+	<polygon class="st3" points="27.2,157.2 27.2,137.5 26.3,137.5 28.2,132.7 30.2,137.5 29.2,137.5 29.2,157.2 	"/>
+	<polygon class="st3" points="27.3,155.8 41.2,141.8 40.5,141.2 45.2,139.2 43.3,143.9 42.6,143.2 28.7,157.2 	"/>
+</g>
+<g>
+	<circle class="st4" cx="68" cy="127" r="10.1"/>
+	<circle class="st5" cx="68" cy="127" r="10.1"/>
+	<circle class="st4" cx="84.3" cy="128" r="10.1"/>
+	<circle class="st5" cx="84.3" cy="128" r="10.1"/>
+	<circle class="st5" cx="90.3" cy="136.3" r="10.1"/>
+	
+		<ellipse transform="matrix(0.8873 -0.4612 0.4612 0.8873 -55.2288 53.6539)" class="st5" cx="82.2" cy="139.8" rx="10.1" ry="10.1"/>
+	<circle class="st4" cx="75.6" cy="131.5" r="10.1"/>
+	<circle class="st5" cx="75.6" cy="131.5" r="10.1"/>
+</g>
+<g>
+	<circle class="st4" cx="69.6" cy="95.2" r="10.1"/>
+	<circle class="st5" cx="69.6" cy="95.2" r="10.1"/>
+	<circle class="st4" cx="87" cy="98.9" r="10.1"/>
+	<circle class="st5" cx="87" cy="98.9" r="10.1"/>
+	
+		<ellipse transform="matrix(0.9997 -2.356538e-02 2.356538e-02 0.9997 -2.1495 2.367)" class="st4" cx="99.4" cy="92.4" rx="10.1" ry="10.1"/>
+	<circle class="st5" cx="99.4" cy="92.4" r="10.1"/>
+	<circle class="st4" cx="70.8" cy="83.2" r="10.1"/>
+	<circle class="st5" cx="70.8" cy="83.2" r="10.1"/>
+	<circle class="st4" cx="84.1" cy="86.3" r="10.1"/>
+	<circle class="st5" cx="84.1" cy="86.3" r="10.1"/>
+</g>
+<polygon class="st3" points="338.7,118.7 367.9,118.7 367.9,117.3 374.9,120 367.9,122.8 367.9,121.4 338.7,121.4 "/>
+<polygon class="st3" points="124.7,118.7 154,118.7 154,117.3 161,120 154,122.8 154,121.4 124.7,121.4 "/>
+<path class="st6" d="M333.7,165.1H166.8c-2.5,0-4.6-2.1-4.6-4.6V80.9c0-2.5,2.1-4.6,4.6-4.6h166.9c2.5,0,4.6,2.1,4.6,4.6v79.5
+	C338.3,163,336.2,165.1,333.7,165.1z"/>
+<rect x="162.1" y="85.5" class="st0" width="176.2" height="71"/>
+<text transform="matrix(1 0 0 1 219.21 100.127)"><tspan x="0" y="0" class="st7 st1 st2">Signac</tspan><tspan x="-49.6" y="24.3" class="st7 st1 st2">(machine learning </tspan><tspan x="-14.1" y="48.7" class="st7 st1 st2">algorithm)</tspan></text>
+<g>
+	<circle class="st8" cx="391.8" cy="127" r="10.1"/>
+	<circle class="st9" cx="391.8" cy="127" r="10.1"/>
+	<circle class="st8" cx="408.1" cy="128" r="10.1"/>
+	<circle class="st9" cx="408.1" cy="128" r="10.1"/>
+	<circle class="st9" cx="414.2" cy="136.3" r="10.1"/>
+	
+		<ellipse transform="matrix(0.8873 -0.4612 0.4612 0.8873 -18.7342 203.0083)" class="st9" cx="406" cy="139.8" rx="10.1" ry="10.1"/>
+	<circle class="st8" cx="399.5" cy="131.5" r="10.1"/>
+	<circle class="st9" cx="399.5" cy="131.5" r="10.1"/>
+</g>
+<g>
+	<circle class="st8" cx="393.4" cy="95.2" r="10.1"/>
+	<circle class="st10" cx="393.4" cy="95.2" r="10.1"/>
+	<circle class="st8" cx="410.8" cy="98.9" r="10.1"/>
+	<circle class="st10" cx="410.8" cy="98.9" r="10.1"/>
+	
+		<ellipse transform="matrix(0.9997 -2.356535e-02 2.356535e-02 0.9997 -2.0596 9.999)" class="st8" cx="423.2" cy="92.4" rx="10.1" ry="10.1"/>
+	<circle class="st10" cx="423.2" cy="92.4" r="10.1"/>
+	<circle class="st8" cx="394.6" cy="83.2" r="10.1"/>
+	<circle class="st10" cx="394.6" cy="83.2" r="10.1"/>
+	<circle class="st8" cx="408" cy="86.3" r="10.1"/>
+	<circle class="st10" cx="408" cy="86.3" r="10.1"/>
+</g>
+<rect x="330.9" y="52.3" class="st0" width="151.6" height="71.2"/>
+<text transform="matrix(1 0 0 1 362.1279 66.856)" class="st1 st2">Cell types</text>
+<text transform="matrix(1 0 0 1 60.6255 161.4639)"><tspan x="0" y="0" class="st11 st12">(each circle is</tspan><tspan x="0" y="13" class="st11 st12">the transcriptome</tspan><tspan x="0" y="26.1" class="st11 st12">of a single cell)</tspan></text>
+<polygon class="st3" points="437,118.7 466.2,118.7 466.2,117.3 473.2,120 466.2,122.8 466.2,121.4 437,121.4 "/>
+<path class="st6" d="M589.1,169.4H477.8c-2.5,0-4.6-2.1-4.6-4.6V81.3c0-2.5,2.1-4.6,4.6-4.6h111.3c2.5,0,4.6,2.1,4.6,4.6v83.4
+	C593.7,167.3,591.6,169.4,589.1,169.4z"/>
+<rect x="480.2" y="79.2" class="st0" width="105.8" height="95.8"/>
+<text transform="matrix(1 0 0 1 506.0596 93.7437)"><tspan x="0" y="0" class="st7 st1 st2">DEGs</tspan><tspan x="-11.8" y="24.3" class="st7 st1 st2">Pathway </tspan><tspan x="-23.1" y="48.7" class="st7 st1 st2">enrichment</tspan><tspan x="-2.3" y="73" class="st7 st1 st2">MASC</tspan></text>
+</svg>
