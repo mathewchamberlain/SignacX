@@ -142,7 +142,7 @@ pbmc.small <- subset(pbmc, downsample = 500)
 
 # Find protein markers for all clusters, and draw a heatmap
 adt.markers <- FindAllMarkers(pbmc.small, assay = "ADT", only.pos = TRUE, verbose = F)
-DoHeatmap(pbmc.small, features = unique(adt.markers$gene), assay = "ADT", angle = 90) + NoLegend()
+DoHeatmap(pbmc.small, features = unique(adt.markers$gene), assay = "ADT", angle = 45) + NoLegend()
 ```
 
 Save results
