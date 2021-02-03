@@ -51,7 +51,7 @@
 
 Signac helps solve the cell type classification problem in single cell RNA sequencing: We sequenced the RNA for each individual cell, but we do not know the identity of each cellular phenotype. Signac classifies each cell in scRNA-seq data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). Check out our pre-print here: LINK.
 
-To make life easier, Signac is integrated with [Seurat](https://satijalab.org/seurat/) (versions 3 and 4), [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) and [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), allowing for easy downstream analysis of Signac annotations.
+To make life easier, Signac is integrated with [Seurat](https://satijalab.org/seurat/) (versions 3 and 4), [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) and [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), allowing for easy downstream analysis of single cell data.
 
 <!-- GETTING STARTED -->
 ## Getting Started
@@ -69,8 +69,11 @@ devtools::install_github("mathewchamberlain/Signac")
 The main functions in Signac are:
 
 ```r
+# load the library
+library(Signac)
+
 # Load the reference training data set
-data(training_HPCA)
+data("training_HPCA"")
 
 # Generate initial labels
 labels = Signac(your_data_here, R = training_HPCA)
@@ -84,7 +87,7 @@ celltypes = Generate_lbls(labels, your_data_here)
 
 Running Signac is simple. We provide a few vignettes:
 
-* The easiest way to use Signac is with Seurat. This is convenient to use Seurat functions (like differential expression, nearest neighbors and visualization) with cellular phenotypes identified with Signac. [Here, we perform multi-modal analysis of CITE-seq PBMCs from 10X Genomics in R.](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)
+* The easiest way to use Signac is with Seurat because it is convenient to use Seurat functions (like differential expression, nearest neighbors and visualization) with cellular phenotypes identified with Signac. [Here, we perform multi-modal analysis of CITE-seq PBMCs from 10X Genomics in R using Seurat and Signac.](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)
 * Signac can be used with non-human data (i.e., monkey or mouse), by mapping homologous gene symbols prior to classification. [Signac classification of Crab-eating macaque PBMCs sequenced with 10X Chromium](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_celseq.ipynb)
 * Signac can be used in different tissues from different technologies. [Signac classification of human synovium with CelSeq single-cell RNA-seq data from the Accelerating Medicines Partnership (AMP).](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_celseq.ipynb)
 * A different way to use Signac is to inetgrate it with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/). Using SPRING with Signac, we can easily explore cellular phenotypes interactively. Here, we provide a Jupyter notebook for [getting a PBMCs data set from 10X Genomics and processing for visualization in SPRING](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_celseq.ipynb). Once this notebook has been run, Signac is integrated seamlessly with SPRING. Like this:
