@@ -4,6 +4,7 @@ author: 'Mathew Chamberlain'
 date: "`r Sys.Date()`"
 output:
   html_document:
+    fig_crop: no
     theme: sandstone
     toc: true
     includes:
@@ -108,7 +109,7 @@ DimPlot(pbmc)
 ```
 
 ```{r Seurat Visualization 4, message = F}
-lbls = factor(celltypes$CellStates_novel)
+lbls = factor(celltypes$CellStates)
 levels(lbls) <- sort(unique(lbls))
 pbmc <- Seurat::AddMetaData(pbmc, metadata=lbls, col.name = "celltypes")
 pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
@@ -142,7 +143,7 @@ pbmc.small <- subset(pbmc, downsample = 500)
 
 # Find protein markers for all clusters, and draw a heatmap
 adt.markers <- FindAllMarkers(pbmc.small, assay = "ADT", only.pos = TRUE, verbose = F)
-DoHeatmap(pbmc.small, features = unique(adt.markers$gene), assay = "ADT", angle = 45) + NoLegend()
+DoHeatmap(pbmc.small, features = unique(adt.markers$gene), assay = "ADT", angle = 90)
 ```
 
 Save results
