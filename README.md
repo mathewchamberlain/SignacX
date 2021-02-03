@@ -42,9 +42,6 @@
 * [Contributing](#contributing)
 * [License](#license)
 * [Contact](#contact)
-* [Acknowledgements](#acknowledgements)
-
-
 
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
@@ -89,6 +86,8 @@ Running Signac is simple. We provide a few vignettes:
 
 * The easiest way to use Signac is with Seurat; it is convenient to use Seurat functions (like differential expression, clustering and visualization) with cellular phenotypes identified with Signac. [Here, we perform multi-modal analysis of CITE-seq PBMCs from 10X Genomics in R using Seurat and Signac.](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)
 * A different way to use Signac is to inetgrate it with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/). Using SPRING with Signac, we can easily explore cellular phenotypes interactively. Here, we provide a Jupyter notebook for [downloading scRNA-seq data from 10X Genomics and processing it with SPRING in Jupyter](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_10X.ipynb). Once this notebook has been run, Signac is integrated seamlessly with the output files. Like this:
+
+
 
 ```r
 # load the Signac library

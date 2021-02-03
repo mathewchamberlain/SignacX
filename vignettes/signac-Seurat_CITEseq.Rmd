@@ -143,39 +143,6 @@ pbmc.small <- subset(pbmc, downsample = 500)
 # Find protein markers for all clusters, and draw a heatmap
 adt.markers <- FindAllMarkers(pbmc.small, assay = "ADT", only.pos = TRUE, verbose = F)
 DoHeatmap(pbmc.small, features = unique(adt.markers$gene), assay = "ADT", angle = 90) + NoLegend()
-DefaultAssay(pbmc) <- "ADT"
-```
-
-Cluster the data based on protein expression information.
-
-```{r Seurat cluster on protein, message = F}
-pbmc <- FindVariableFeatures(pbmc, selection.method = "vst")
-pbmc <- ScaleData(pbmc)
-pbmc <- RunPCA(pbmc, verbose = F)
-pbmc <- FindNeighbors(pbmc)
-pbmc <- FindClusters(pbmc, resolution = 0.8)
-pbmc <- RunUMAP(pbmc, dims = 1:10)
-```
-
-Visualize Signac cell types on protein clusters
-```{r Seurat protein clusters vis 1, message = F}
-lbls = factor(celltypes$CellTypes)
-levels(lbls) <- sort(unique(lbls))
-pbmc <- Seurat::AddMetaData(pbmc, metadata=lbls, col.name = "celltypes")
-pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
-DimPlot(pbmc)
-```
-
-```{r Seurat protein clusters vis 2, message = F}
-lbls = factor(celltypes$CellStates)
-levels(lbls) <- sort(unique(lbls))
-pbmc <- Seurat::AddMetaData(pbmc, metadata=lbls, col.name = "celltypes")
-pbmc <- Seurat::SetIdent(pbmc, value='celltypes')
-DimPlot(pbmc)
-```
-
-```{r Seurat protein clusters vis 3, message = F}
-FeaturePlot(pbmc, features = c("CD8a-TotalSeqB", "CD8A"))
 ```
 
 Save results
