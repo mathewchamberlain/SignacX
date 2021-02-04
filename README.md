@@ -117,9 +117,9 @@ dat <- CID.writeJSON(celltypes, data.dir = dir)
 
 After running these functions, cellular phenotypes and Louvain clusters are ready to be visualized with the SPRING interface, which can be setup locally as described [here](https://github.com/AllonKleinLab/SPRING_dev). 
 
-### Non-Human cell type classification
+### Classifying non-human data
 
-
+Coming soon
 
 <!-- ROADMAP -->
 ## Roadmap
