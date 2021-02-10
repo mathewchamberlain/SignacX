@@ -89,9 +89,7 @@ celltypes = Generate_lbls(labels, your_data_here)
 Running Signac is simple. We provide a few vignettes:
 
 ### SPRING
-In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we often used Signac integrated with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), which let us easily explore cellular phenotypes identified by Signac interactively using the SPRING Viewer. To reproduce our findings and generate new results with SPRING, please visit our repository of [example Jupyter notebooks for processing CITE-seq and scRNA-seq data from 10X Genomics in SPRING, followed by classification with Signac](https://github.com/mathewchamberlain/SPRING_dev/).
-
-Here, we provide an example notebook for [processing scRNA-seq data from 10X Genomics,](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_10X.ipynb) which employs the methods described in the pre-print for processing single cell data. Once this notebook has been run, Signac is integrated seamlessly with the output files in R. Like this:
+In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we often used Signac integrated with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), which let us easily explore cellular phenotypes identified by Signac interactively using the SPRING Viewer. To reproduce our findings and to generate new results with SPRING, please visit our repository of [example Jupyter notebooks for processing CITE-seq and scRNA-seq data from 10X Genomics in SPRING, followed by classification with Signac](https://github.com/mathewchamberlain/SPRING_dev/). Briefly, Signac is integrated seamlessly with the output files of SPRING in R.
 
 ```r
 # load the Signac library
@@ -114,7 +112,7 @@ celltypes = Generate_lbls(labels, E = E)
 dat <- CID.writeJSON(celltypes, data.dir = dir)
 ```
 
-After running these functions, cellular phenotypes and Louvain clusters are ready to be visualized with the SPRING interface, which can be setup locally as described [here](https://github.com/AllonKleinLab/SPRING_dev).
+After running these functions, cellular phenotypes and Louvain clusters are ready to be visualized with SPRING Viewer, which can be setup locally as described [here](https://github.com/mathewchamberlain/SPRING_dev/).
 
 ### Seurat
 Perhaps the easiest way to use Signac is with Seurat. [Here, we perform multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Seurat and Signac](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html).
