@@ -89,7 +89,9 @@ celltypes = Generate_lbls(labels, your_data_here)
 Running Signac is simple. We provide a few vignettes:
 
 ### SPRING
-In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we often used Signac integrated with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), which let us easily explore cellular phenotypes identified by Signac interactively using the SPRING user interface. Here, we provide an example notebook for [processing scRNA-seq data from 10X Genomics,](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_10X.ipynb) which employs the methods described in the pre-print for processing single cell data. Once this notebook has been run, Signac is integrated seamlessly with the output files in R. Like this:
+In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we often used Signac integrated with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), which let us easily explore cellular phenotypes identified by Signac interactively using the SPRING Viewer. To reproduce our findings and generate new results with SPRING, please visit our repository of [example Jupyter notebooks for processing CITE-seq and scRNA-seq data from 10X Genomics in SPRING, followed by classification with Signac](https://github.com/mathewchamberlain/SPRING_dev/).
+
+Here, we provide an example notebook for [processing scRNA-seq data from 10X Genomics,](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_10X.ipynb) which employs the methods described in the pre-print for processing single cell data. Once this notebook has been run, Signac is integrated seamlessly with the output files in R. Like this:
 
 ```r
 # load the Signac library
