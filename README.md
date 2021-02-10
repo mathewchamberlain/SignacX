@@ -40,8 +40,8 @@
 * [Usage](#usage)
   * [SPRING](#spring)
   * [Seurat](#seurat)
-  * [Classifying non-human data](#nonhuman)
-  * [Genes immunological / pharmacological interest](#drugs)
+  * [Nonhuman data](#Nonhuman-data)
+  * [Genes of interest](#genes-of-interest)
 * [Roadmap](#roadmap)
 * [Contributing](#contributing)
 * [License](#license)
@@ -89,7 +89,7 @@ celltypes = Generate_lbls(labels, your_data_here)
 Running Signac is simple. We provide a few vignettes:
 
 ### SPRING
-In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we often used Signac integrated with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), which let us easily explore cellular phenotypes identified by Signac interactively using the SPRING user interface. Here, we provide an example notebook for [processing scRNA-seq data from 10X Genomics,](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_10X.ipynb) which uses the methods described in the pre-print for processing single cell data. Once this notebook has been run, Signac is integrated seamlessly with the output files. Like this:
+In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we often used Signac integrated with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), which let us easily explore cellular phenotypes identified by Signac interactively using the SPRING user interface. Here, we provide an example notebook for [processing scRNA-seq data from 10X Genomics,](https://github.com/mathewchamberlain/Signac/blob/master/vignettes/spring_notebook_10X.ipynb) which employs the methods described in the pre-print for processing single cell data. Once this notebook has been run, Signac is integrated seamlessly with the output files in R. Like this:
 
 ```r
 # load the Signac library
@@ -115,26 +115,25 @@ dat <- CID.writeJSON(celltypes, data.dir = dir)
 After running these functions, cellular phenotypes and Louvain clusters are ready to be visualized with the SPRING interface, which can be setup locally as described [here](https://github.com/AllonKleinLab/SPRING_dev).
 
 ### Seurat
-Perhaps the easiest way to use Signac is with Seurat. [Here, we perform multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Seurat and Signac.](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html) 
+Perhaps the easiest way to use Signac is with Seurat. [Here, we perform multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Seurat and Signac](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html).
 
-Sometimes, we have single cell genomics data with disease information. In that case, we present [this vignette, where we analyzed healthy and lupus nephritis kidney cells from the Accelerating Medicine Partnership (AMP) sequenced with CEL-seq2.](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP.html) We used MASC to find that macrophages, plasma cells and CD8 central memory T cells were enriched for disease status.
+Sometimes, we have single cell genomics data with disease information. In that case, we present [this vignette, where we analyzed healthy and lupus nephritis kidney cells from the Accelerating Medicine Partnership (AMP) sequenced with CEL-seq2](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP.html). We used MASC to find that macrophages, plasma cells and CD8 central memory T cells were enriched for disease status.
 
-### Classifying non-human data
+### Nonhuman data
 
-In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we classified cynomolgus monkey data by mapping homologous gene symbols from the Macaca fascicularis genome to the human genome, and then using Signac (which was trained with flow-sorted human data). We demonstrate how to map the gene symbols [here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/Crabeating_vignette.html).
+In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we classified cynomolgus monkey single cell data by mapping homologous gene symbols from the Macaca fascicularis genome to the human genome, followed by Signac. [We demonstrate how we mapped the gene symbols here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/Crabeating_vignette.html).
 
-### Genes immunological / pharmacological interest
+### Genes of interest
 
-In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we established genes of interest that might elucidate known and novel drug targets from single cell data. These genes can be accessed from within Signac:
+In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we established genes of interest by compiling information from CellPhoneDB, GWAS catalog and the priority index papers. These genes can be accessed from Signac:
 
 ```r
 # load the library
 library(Signac)
 
-# data frame with five columns: Genes, CellPhoneDB, GWAS, PI_drugs and PI_GWAS. See ?Genes_Of_Interest
+# See ?Genes_Of_Interest
 data("Genes_Of_Interest")
 ```
-
 
 <!-- ROADMAP -->
 ## Roadmap
