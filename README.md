@@ -42,6 +42,8 @@
   * [Seurat](#seurat)
   * [Nonhuman data](#Nonhuman-data)
   * [Genes of interest](#genes-of-interest)
+  * [Learning from single cell data](#learning-from-single-cell-data)
+* [Benchmarking](#benchmarking) 
 * [Roadmap](#roadmap)
 * [Contributing](#contributing)
 * [License](#license)
@@ -50,7 +52,7 @@
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
 
-Signac is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. First, Signac helps solve the cell type classification problem in single cell RNA sequencing: We have gene expression profiles for each individual cell, but we do not know the cellular phenotypes. Signac classifies the cellular phenotype for each individual cell in scRNA-seq data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). Next, Signac identifies immune marker genes (IMAGES), identifies potential drug targets, and then performs mixed effect modeling to identify disease-associated cell types in single cell data. Additionally, we demonstrate that Signac can classify non-human single cell data, particularly for species that lack sorted reference gene expression data. Check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2).
+Signac is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. First, Signac helps solve the cell type classification problem in single cell RNA sequencing: We have gene expression profiles for each individual cell, but we do not know the cellular phenotypes. Signac classifies the cellular phenotype for each individual cell in scRNA-seq data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). Next, Signac identifies immune marker genes (IMAGES), identifies potential drug targets, and then performs mixed effect modeling to identify disease-associated cell types in single cell data. Additionally, we demonstrate that Signac can classify non-human single cell data, particularly for species that lack sorted reference gene expression data, and can learn from the single cell data that it classifies to identify molecularly-similar cell types across data sets. Check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2).
 
 To make life easier, Signac is integrated with [Seurat](https://satijalab.org/seurat/) (versions 3 and 4), [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) and [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), allowing for straightforward visualization and analysis of single cell data.
 
@@ -134,6 +136,25 @@ library(Signac)
 # See ?Genes_Of_Interest
 data("Genes_Of_Interest")
 ```
+
+### Learning from single cell data
+
+In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we demonstrated that we could identify CD56<sup>bright</sup> NK cells from protein expression data with CITE-seq data, and then we trained Signac to identify similar cells in other single cell data sets, labeling them "CD56<sup>bright</sup> NK cells." [Here, we provide source code and a tutorial for performing this analysis](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-SPRING_Learning.html). Notably, the data used here we processed in Python with SPRING prior to classification with Signac; those notebooks are available as examples [here](https://github.com/mathewchamberlain/SPRING_dev/).
+
+```r
+# load the library
+library(Signac)
+
+# See ?Genes_Of_Interest
+data("Genes_Of_Interest")
+```
+
+<!-- BENCHMARKING -->
+## Benchmarking
+
+There are several available automatic cell type classifiers (e.g., [SingleR](https://bioconductor.org/packages/release/bioc/html/SingleR.html), [scVI](https://www.nature.com/articles/s41592-018-0229-2), etc.). What makes Signac special? Why use Signac?
+
+Crucially, a benchmarking study of 22 cell type 
 
 <!-- ROADMAP -->
 ## Roadmap

@@ -1,0 +1,124 @@
+---
+title: 'Signac and SPRING: Learning CD56 NK cells from multi-modal analysis of CITE-seq PBMCs from 10X Genomics'
+author: 'Mathew Chamberlain'
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    fig_crop: no
+    theme: sandstone
+    toc: true
+    includes:
+      after_body: footer.html
+---
+
+This vignette shows how to use Signac with Seurat. There are three parts: Seurat, Signac and then visualization. We use an example CITE-seq data set from 10X Genomics.
+
+## Seurat 
+
+Start with the standard pre-processing steps for a Seurat object.
+
+```{r setupSeurat, message = F, eval = F}
+library(Signac)
+library(Seurat)
+library(ggplot2)
+```
+
+Load data from 10X Genomics processed with SPRING and classified with Signac already.
+
+```{r setup, message = F, eval = F}
+# load CITE-seq data
+data.dir = './CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein'
+E = CID.LoadData(data.dir = data.dir)
+
+# Load labels from Signac
+json_data = rjson::fromJSON(file=paste0(data.dir,'/categorical_coloring_data.json'))
+```
+
+Create a Seurat object for the protein expression data.
+
+```{r Seurat, message = T, eval = F}
+# separate protein and gene expression data
+logik = grepl("Total", rownames(E))
+P = E[logik,]
+E = E[!logik,]
+
+# CLR normalization in Seurat
+colnames(P) <- 1:ncol(P)
+pbmc[["ADT"]] <- CreateAssayObject(counts = P)
+pbmc <- NormalizeData(pbmc, assay = "ADT", normalization.method = "CLR")
+pbmc <- ScaleData(pbmc, assay = "ADT", features = rownames(P))
+```
+
+Identify CD56 bright NK cells based on protein expression data.
+
+```{r Seurat 2, message = T, eval = F}
+# generate labels 
+lbls = json_data$CellStates$label_list
+lbls[lbls != "NK"] = "Unclassified"
+CD16 = pbmc@assays$ADT@counts[rownames(pbmc@assays$ADT@counts) == "CD16",]
+CD56 = pbmc@assays$ADT@counts[rownames(pbmc@assays$ADT@counts) == "CD56",]
+logik = log2(CD56) > 10 & log2(CD16) < 7.5; sum(logik)
+lbls[logik] = "NK.CD56bright"
+lbls = factor(lbls)
+```
+
+## Signac
+
+First, make sure you have the Signac package installed.
+
+```{r setup2, message = F, eval = F}
+devtools::install_github("mathewchamberlain/Signac")
+library(Signac)
+```
+
+Generate a training data set and save it for later use.
+
+```{r Signac, message = T, eval = F}
+# generate bootstrapped single cell data
+R_learned = SignacLearn(E = E, spring.dir = data.dir, learned_types = c("NK", "NK.CD56bright"), labels = lbls, impute = T, logfc.threshold = 1)
+
+# save the training data
+save(R_learned, file = "../training_NKBright_v207.rda")
+```
+
+## Classify a new data set with the model
+
+Load expression data for a different data set
+```{r Seurat Visualization 0, message = F}
+# Classify another data set with new model
+# load new data
+new.data.dir = "./PBMCs_5k_10X/FullDataset_v1"
+E = CID.LoadData(data.dir = new.data.dir)
+# load cell types identified with Signac
+json_data = rjson::fromJSON(file=paste0(new.data.dir,'/categorical_coloring_data.json'))
+```
+
+Load training data, generate new labels.
+```{r Seurat Visualization 1, message = F}
+# load bootstrapped data
+load('training_NKBright_v207.rda')
+numCores = parallel::detectCores() - 2
+
+# generate new labels
+cr_learned = Signac_Solo(E = E, R = R_learned, spring.dir = new.data.dir, smooth = T, impute = T, num.cores = numCores)
+```
+Add the new labels to the existing labels, creating a new SPRING layout. 
+```{r Seurat Visualization 2, message = F}
+# modify the existing labels
+cr = lapply(json_data, function(x) x$label_list)
+logik = cr$CellStates == 'NK'
+cr$CellStates[logik] = cr_learned[logik]
+new.data.dir = paste0(data.dir, "_Learned")
+```
+
+Save results
+```{r Seurat Visualization 3, message = F}
+# save
+dat = CID.writeJSON(cr, data.dir = new.data.dir, new_colors = c('red'), new_populations = c( 'NK.CD56bright'))
+```
+
+## Session information
+
+```{r sessioninfo, message = F, echo = F}
+sessionInfo()
+```
