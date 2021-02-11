@@ -139,15 +139,7 @@ data("Genes_Of_Interest")
 
 ### Learning from single cell data
 
-In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we demonstrated that we could identify CD56<sup>bright</sup> NK cells from protein expression data with CITE-seq data, and then we trained Signac to identify similar cells in other single cell data sets, labeling them "CD56<sup>bright</sup> NK cells." [Here, we provide source code and a tutorial for performing this analysis](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-SPRING_Learning.html). Notably, the data used here we processed in Python with SPRING prior to classification with Signac; those notebooks are available as examples [here](https://github.com/mathewchamberlain/SPRING_dev/).
-
-```r
-# load the library
-library(Signac)
-
-# See ?Genes_Of_Interest
-data("Genes_Of_Interest")
-```
+In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2), we demonstrated that we could identify CD56<sup>bright</sup> NK cells from protein expression data with CITE-seq, and then identify similar cells in other single cell data sets, labeling them "CD56<sup>bright</sup> NK cells." [Here, we provide a vignette for reproducing this analysis](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-SPRING_Learning.html). Notably, the data used here we processed with SPRING prior to classification with Signac; those notebooks are available [here](https://github.com/mathewchamberlain/SPRING_dev/).
 
 <!-- BENCHMARKING -->
 ## Benchmarking
