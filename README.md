@@ -55,12 +55,19 @@
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
 
-Signac is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. First, Signac helps solve the cell type classification problem in single cell RNA sequencing: We have gene expression profiles for each individual cell, but we do not know the cellular phenotypes. Signac classifies the cellular phenotype for each individual cell in scRNA-seq data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). Additionally, we demonstrate that Signac can classify non-human single cell data, particularly for species that lack sorted reference gene expression data, and can learn from the single cell data that it classifies to identify molecularly-similar cell types across data sets. Finally, we used Signac annotations to identify potential candidate drug targets with a precision-medicine strategy for rheumatoid arthritis. Check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2).
+Signac is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. Signac helps solve the cell type classification problem in single cell RNA sequencing: We have gene expression profiles for each individual cell, but we do not know the cellular phenotypes. Signac classifies the cellular phenotype for each individual cell in single cell data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). We demonstrate that Signac can:
 
-To make life easier, Signac was integrated with [Seurat](https://satijalab.org/seurat/) (versions 3 and 4), [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) and [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), allowing for straightforward visualization and analysis of single cell data using existing tools.
+* Classify cellular phenotypes in single cell data derived from any disease, tissue or technology.
+* Classify non-human single cell data
+* Identify potentially novel cellular populations (avoiding known single-cell artifacts)
+* Learn from single cell data to map cellular phenotype labels across single cell data sets. 
+
+Finally, we used Signac annotations to identify potential opportunities for drug targets for rheumatoid arthritis using a precision-medicine strategy. Check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2).
 
 <!-- GETTING STARTED -->
 ## Getting Started
+
+To make life easier, Signac was integrated with [Seurat](https://satijalab.org/seurat/) (versions 3 and 4), [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) and [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/), allowing for straightforward visualization and analysis of single cell data using existing tools.
 
 To install Signac in R, simply do:
 
