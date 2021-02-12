@@ -8,7 +8,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
-  <a href="https://www.sanofi.com/">
+  <a href="https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full">
     <img src="images/GitHubFigure.svg" alt="Logo" width="600" height="300">
   </a>
 
@@ -46,7 +46,7 @@
 * [Benchmarking](#benchmarking) 
   * [CITE-seq](#cite-seq-pbmcs)
   * [Flow-sorted synovial cells](#flow-sorted-synovial-cells)
-  * [Pbmc Bench](#pbmc-bench)
+  * [PBMC benchmarking](#pbmc-benchmarking)
 * [Roadmap](#roadmap)
 * [Contributing](#contributing)
 * [License](#license)
@@ -55,9 +55,9 @@
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
 
-Signac is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. Signac helps solve the cell type classification problem in single cell RNA sequencing: We have gene expression profiles for each individual cell, but we do not know the cellular phenotypes. Signac classifies the cellular phenotype for each individual cell in single cell RNA-sequencing data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632).
+Signac is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. Signac helps solve the cell type classification problem in single cell RNA sequencing: We have gene expression profiles for each individual cell, but we do not know the cellular phenotypes. Signac classifies the cellular phenotype for each individual cell in single cell RNA-sequencing data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). Signac can also: integrate single cell data (mapping cells from one data set to another), classify non-human data, identify novel cell types, and classify single cell data across many tissues, diseases and technologies.
 
-Signac can also: integrate single cell data (mapping cells from one data set to another), classify non-human data, identify novel cell types, and classify single cell data across many tissues, diseases and technologies. We used Signac to identify potential gene drug targets for rheumatoid arthritis, employing a precision medicine strategy, and to identify conserved gene expression-based representations of cellular phenotypes across human samples. Check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v2).
+We used Signac to identify potential gene drug targets for rheumatoid arthritis, employing a precision medicine strategy to seek immune-modifying therapies that might have reduced side effects, and to identify conserved gene expression-based representations of cellular phenotypes. Check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full).
 
 <!-- GETTING STARTED -->
 ## Getting Started
@@ -157,7 +157,9 @@ We observed consistency of Signac cell type annotations (generated using only ge
 
 We used scRNA-seq data [generated previously](https://www.nature.com/articles/s41590-019-0378-1) from human synovium with cell types identified previously with flow cytometry to evaluate the performance of Signac, together with another automatic annotation tool, SingleR. We present [this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP_RA.html) to reproduce this analysis.
 
-### PBMCs technology benchmarking
+### PBMC benchmarking
+
+We benchmarked Signac against PBMCs sequenced with seven different technologies: CEL-seq, Drop-Seq, inDrop, 10X (v2), 10X (v3), Seq-Well and Smart-Seq2. Signac is the only prior-knowledge based classifier to perform well across all technologies, as we demonstrate [in this vignette]().
 
 <!-- ROADMAP -->
 ## Roadmap

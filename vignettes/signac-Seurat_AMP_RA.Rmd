@@ -3,9 +3,8 @@ title: 'Benchmarking Signac and SingleR with synovial flow cytometry data'
 author: 'Mathew Chamberlain'
 date: "`r Sys.Date()`"
 output:
-  html_document:
+  BiocStyle::html_document:
     fig_crop: no
-    theme: cerulean
     toc: true
     includes:
       after_body: footer.html
@@ -45,7 +44,7 @@ MitoFrac = Matrix::colSums(E[logik,]) / Matrix::colSums(E) * 100
 E = E[,MitoFrac < 20]
 ```
 
-Run SingleR
+## SingleR
 
 ```{r filter celseq, message = F, eval = F}
 library(SingleR)
@@ -55,14 +54,7 @@ save(file = "SingleR_Results.rda", Q)
 True_labels = M$type[match(colnames(E), M$cell_name)]
 ```
 
-Inspect SingleR labels compared to FACs
-
-```{r Seurat Visualization 10, message = F, echo = F}
-writeLines("td, th { padding : 6px } th { background-color : brown ; color : white; border : 1px solid white; } td { color : brown ; border : 1px solid brown }", con = "mystyle.css")
-knitr::kable(table(True_labels, SingleR = Q$labels), format = "html")
-```
-
-## Signac 
+## Seurat 
 
 Start with the standard pre-processing steps for a Seurat object.
 
@@ -129,12 +121,61 @@ DimPlot(synovium)
 
 Compare Signac with FACs labels
 
+Note:
+* These data were flow-sorted for CD3, and therefore lack NK cells. Signac detected no NK cells.
+
 ```{r Seurat Visualization 1110, message = F, echo = F}
 xx = celltypes$CellTypes
 xx[xx == "Plasma.cells"] = "B"
 xx[xx == "NonImmune"] = celltypes$CellStates[xx == "NonImmune"]
-writeLines("td, th { padding : 6px } th { background-color : brown ; color : white; border : 1px solid white; } td { color : brown ; border : 1px solid brown }", con = "mystyle.css")
-knitr::kable(table(True_labels, Signac = xx), format = "html")
+xx[xx == "B"] = "B"
+xx[xx == "Fibroblasts"] = "F"
+xx[xx == "MPh"] = "MPh"
+xx[xx == "TNK"] = "T"
+xx[celltypes$CellStates == "NK"] = "NK"
+True_labels[True_labels == "B cell"] = "B"
+True_labels[True_labels == "Fibroblast"] = "F"
+True_labels[True_labels == "Monocyte"] = "MPh"
+True_labels[True_labels == "T cell"] = "T"
+tab = table(FACs = True_labels, Signac = xx)
+vcd::assoc(tab, shade=T, legend=T)
+```
+
+Note:
+* F = Fibroblasts; M = monocytes; T = T cells; B = B cells
+* Association plot indicates the deviations from a specified independence model in high-dimensional contingency table. See the "assoc" function in the vcd package.
+
+Compute Signac accuracy
+
+```{r Seurat Visualization 11110, message = F, echo = T}
+logik = xx != "Unclassified"
+Signac_Accuracy = round(sum(xx[logik] == True_labels[logik]) / sum(logik) * 100, 2)
+Signac_Accuracy
+```
+
+Compare SingleR with FACs labels
+
+```{r Seurat Visualization 10, message = F, echo = F}
+xx = Q$labels
+xx[xx %in% c("Macrophage", "DC", "Monocyte", "Platelets", "Neutrophils")] = "MPh"
+xx[xx %in% c("B_cell", "Pre-B_cell_CD34-", "Pro-B_cell_CD34+")] = "B"
+xx[xx == "Fibroblasts"] = "F"
+xx[xx == "T_cells"] = "T"
+xx[xx %in% c("Astrocyte", "Osteoblasts", "Tissue_stem_cells", "Smooth_muscle_cells", "MSC")] = "NonImmune"
+xx[xx == "NK_cell"] = "NK"
+xx[xx == "Chondrocytes"] = "Chondr."
+tab = table(FACs = True_labels, SingleR = xx)
+vcd::assoc(tab, shade=T, legend=T)
+```
+
+Note that SingleR inaccurately annotated the majority of fibroblast cells as Chondrocytes (Chondr.) and non immune cells, and also significantly identified NK cells (even though the data were flow-sorted for CD3, and thus empirically lacks NK cells).
+
+Compute SingleR accuracy
+
+```{r Seurat Visualization 111110, message = F, echo = T}
+logik = xx != "Unclassified"
+SingleR_Accuracy = round(sum(xx[logik] == True_labels[logik]) / sum(logik) * 100, 2)
+SingleR_Accuracy
 ```
 
 Save results
