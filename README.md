@@ -119,17 +119,20 @@ dat <- CID.writeJSON(celltypes, data.dir = dir)
 After running the above functions, cellular phenotypes and Louvain clusters are ready to be visualized with SPRING Viewer, which can be setup locally as described [here](https://github.com/mathewchamberlain/SPRING_dev/).
 
 ### Seurat
-Another way to use Signac is with Seurat. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html), we performed multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Signac integrated with Seurat. Note: This same data set was also processed using SPRING [in this notebook](https://github.com/mathewchamberlain/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb), and subsequently classified with Signac, which was used to generate SPRING layouts for these data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) (i.e., the CITE-seq data representations in SPRING plots; Figures 2-4).
+Another way to use Signac is with Seurat. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html), we performed multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Signac integrated with Seurat. Note: This same data set was also processed using SPRING [in this notebook](https://github.com/mathewchamberlain/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb), and subsequently classified with Signac, which was used to generate SPRING layouts for these data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) (Figures 2-4).
 
 #### MASC
 
 Sometimes, we have single cell genomics data with disease information. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP.html), we applied Signac to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) to identify disease-enriched cellular phenotypes that were classified by Signac.
 
-Note: MASC typically requires equal numbers of cells and human samples between case and control (as stated in [their study](https://pubmed.ncbi.nlm.nih.gov/30333237/)). This is because a disproportionate number of cells from one sample might skew the number of diseased cells within a cluster (i.e., a "batch effect"). Since Signac classifies each cell independently (without using clusters), it is not influenced by batch effects, and therefore can be used together with MASC (whereas cluster-based annotation methods cannot). 
+Note: MASC typically requires equal numbers of cells and human samples between case and control (as stated in [their study](https://pubmed.ncbi.nlm.nih.gov/30333237/)). This is because a disproportionate number of cells from one sample might skew the number of diseased cells within a cluster (i.e., a "batch effect"). Since Signac classifies each cell independently (without using clusters), it is not influenced by batch effects, and therefore can be used together with MASC without balancing samples or cells, whereas cluster-based annotation methods that do not adjust for batch effects would require batch correction first (with [harmony](https://www.nature.com/articles/s41592-019-0619-0), for example).
 
 ### Non-human data
 
-In Supplemental Figure 8 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we classified single cell data for a model organism (cynomolgus monkey) for which flow-sorted datasets were generally lacking without any additional species-specific training. Instead, we mapped homologous genes from the *Macaca fascicularis* genome to the human genome in the single cell data, and then performed cell type classification with Signac. We demonstrate how we mapped the gene symbols [here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/Crabeating_vignette.html). Note: this code can be used for to identify homologous genes between any two species.
+In Supplemental Figure 8 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we classified single cell data for a model organism (cynomolgus monkey) for which flow-sorted datasets were generally lacking without any additional species-specific training. Instead, we mapped homologous genes from the *Macaca fascicularis* genome to the human genome in the single cell data, and then performed cell type classification with Signac. We demonstrate how we mapped the gene symbols [here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/Crabeating_vignette.html).
+
+Note:
+* This code can be used for to identify homologous genes between any two species.
 
 ### Genes of interest
 
@@ -145,22 +148,25 @@ data("Genes_Of_Interest")
 
 ### Learning from single cell data
 
-In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we demonstrated that Signac reliably mapped cell type labels from one single cell data set to another (CD56<sup>bright</sup> NK cells). [Here, we provide a vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-SPRING_Learning.html) for reproducing this analysis, which can be used to map cell populations (or clusters of cells) from one data set to another. Note: the data used here were processed with SPRING prior to classification with Signac; those notebooks are available [here](https://github.com/mathewchamberlain/SPRING_dev/).
+In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we demonstrated that Signac reliably mapped cell type labels from one single cell data set to another (CD56<sup>bright</sup> NK cells). [Here, we provide a vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-SPRING_Learning.html) for reproducing this analysis, which can be used to map cell populations (or clusters of cells) from one data set to another.
+
+Note:
+* The data used here were processed with SPRING prior to classification with Signac; those notebooks are available [here](https://github.com/mathewchamberlain/SPRING_dev/).
 
 <!-- BENCHMARKING -->
 ## Benchmarking
 
 ### CITE-seq PBMCs
 
-In Figure 3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with CITE-seq PBMCs. Here, we reproduce that analysis with SPRING ([in this vignette](https://github.com/mathewchamberlain/SPRING_dev/)) and with Seurat ([in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)).
+In Figure 2-3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with CITE-seq PBMCs. Here, we reproduced that analysis with SPRING ([in this vignette](https://github.com/mathewchamberlain/SPRING_dev/); as was performed in the pre-print) and with Seurat ([in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)).
 
 ### Flow-sorted synovial cells
 
-In Figure 3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with flow cytometry. Here, we validate this result, and compared the performance of Signac to SingleR [in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP_RA.html).
+In Figure 3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with flow cytometry and compared Signac to SingleR. We reproduced that analysis using the Seurat workflow [in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP_RA.html).
 
 ### PBMC benchmarking
 
-In Table 1 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we benchmarked Signac against PBMCs sequenced with seven different technologies: CEL-seq, Drop-Seq, inDrop, 10X (v2), 10X (v3), Seq-Well and Smart-Seq2. We demonstrate the performance of Signac in this vignette; it is the only prior-knowledge based classifier that performed equally well across all technologies.
+In Table 1 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we benchmarked Signac with PBMCs sequenced with seven different technologies: CEL-seq, Drop-Seq, inDrop, 10X (v2), 10X (v3), Seq-Well and Smart-Seq2; this analysis was reproduced [here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/PBMC_bench.html).
 
 <!-- ROADMAP -->
 ## Roadmap
