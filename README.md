@@ -122,14 +122,14 @@ After running the above functions, cellular phenotypes and Louvain clusters are 
 Another way to use Signac is with Seurat. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html), we performed multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Signac integrated with Seurat.
 
 Note:
-*This same data set was also processed using SPRING [in this notebook](https://github.com/mathewchamberlain/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb), and subsequently classified with Signac, which was used to generate SPRING layouts for these data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) (Figures 2-4).
+* This same data set was also processed using SPRING [in this notebook](https://github.com/mathewchamberlain/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb), and subsequently classified with Signac, which was used to generate SPRING layouts for these data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) (Figures 2-4).
 
 #### MASC
 
 Sometimes, we have single cell genomics data with disease information. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP.html), we applied Signac to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) to identify disease-enriched cellular phenotypes that were classified by Signac.
 
 Note:
-*[MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) typically requires equal numbers of cells and of samples between case and control. This is because a disproportionate number of cells from one sample might skew the number of cells within a cluster (i.e., a "batch effect"), which could cause spurious disease enrichment. Since Signac classifies each cell independently (without using clustering), it is not influenced by batch effects, and therefore can be used together with MASC without balancing samples or cells. This differs from cluster-based cell type annotation methods (like Seurat) that do not adjust for batch effects.
+* [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) typically requires equal numbers of cells and samples between case and control: a disproportionate number of cells from one sample might skew the number of cells within a cluster (i.e., a "batch effect"), which could cause spurious disease enrichment when running MASC with clusters. Since Signac classifies each cell independently (without using clusters), it is not influenced by batch effects, and therefore can be used together with MASC without balancing samples or cells. This differs from cluster-based cell type annotation methods (like Seurat) that do not adjust for batch effects.
 
 ### Non-human data
 
