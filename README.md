@@ -129,7 +129,7 @@ Note:
 Sometimes, we have single cell genomics data with disease information. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP.html), we applied Signac to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) to identify disease-enriched cellular phenotypes that were classified by Signac.
 
 Note:
-* [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) typically requires equal numbers of cells and samples between case and control: a disproportionate number of cells from one sample might skew the number of cells within a cluster (i.e., a "batch effect"), which could cause spurious disease enrichment when running MASC with clusters. Since Signac classifies each cell independently (without using clusters), it is not influenced by batch effects, and therefore can be used together with MASC without balancing samples or cells. This differs from cluster-based cell type annotation methods (like Seurat) that do not adjust for batch effects.
+* MASC typically requires equal numbers of cells and samples between case and control: an unequal number might skew the clustering of cells towards one sample (i.e., a "batch effect"), which could cause spurious disease enrichment. Signac classifies each cell independently (without using clusters), and therefore can be used with MASC without balancing samples or cells.
 
 ### Non-human data
 
