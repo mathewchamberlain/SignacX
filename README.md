@@ -12,7 +12,7 @@
     <img src="images/GitHubFigure.svg" alt="Logo" width="600" height="300">
   </a>
 
-  <h3 align="center">Signac 2.1.0</h3>
+  <h3 align="center">Signac 2.1.1</h3>
 
   <p align="center">
     Get the most out of your single cell data.
@@ -46,9 +46,9 @@
   * [Learning from single cell data](#learning-from-single-cell-data)
   * [Fast Signac](#fast-signac)
 * [Benchmarking](#benchmarking) 
-  * [CITE-seq](#cite-seq-pbmcs)
+  * [CITE-seq](#cite-seq)
   * [Flow-sorted synovial cells](#flow-sorted-synovial-cells)
-  * [PBMC benchmarking](#pbmc-benchmarking)
+  * [PBMCs](#pbmcs)
 * [Roadmap](#roadmap)
 * [Contributing](#contributing)
 * [License](#license)
@@ -127,10 +127,10 @@ Note:
 
 #### MASC
 
-Sometimes, we have single cell genomics data with disease information. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP.html), we applied Signac to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) to identify which cellular phenotypes were disease-enriched.
+Sometimes, we have single cell genomics data with disease information, and we want to know which cellular phenotypes are enriched for disease. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP.html), we applied Signac to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) to identify which cellular phenotypes were disease-enriched.
 
 Note:
-* MASC typically requires equal numbers of cells and samples between case and control: an unequal number might skew the clustering of cells towards one sample (i.e., a "batch effect"), which could cause spurious disease enrichment (biasing the mixed effect model). Since Signac classifies each cell independently (without using clusters), it can be used with MASC without balancing samples or cells, unlike cluster-based annotation methods.
+* MASC typically requires equal numbers of cells and samples between case and control: an unequal number might skew the clustering of cells towards one sample (i.e., a "batch effect"), which could cause spurious disease enrichment in the mixed effect model. Since Signac classifies each cell independently (without using clusters), it can be used with MASC without balancing samples or cells, unlike cluster-based annotation methods.
 
 ### Non-human data
 
@@ -160,7 +160,7 @@ Note:
 
 ### Fast Signac
 
-Sometimes, we are in rush, and we don't have time to run Signac. Although Signac scales fine with large data sets (>300,000 cells), we developed SignacFast to quickly classify single cell data. The quick start is here:
+Sometimes we don't have time to run Signac, and need a quick solution. Although Signac scales fine with large data sets (>300,000 cells), we developed SignacFast to quickly classify single cell data:
 
 ```r
 # load the library
@@ -174,12 +174,25 @@ labels_fast <- SignacFast("your_data_here", Models = Models_HPCA, num.cores = 18
 celltypes_fast = Generate_lbls(labels_fast, E = "your_data_here")
 ```
 
-We demonstrate how to use this with a Seurat object in this [vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/SignacFast-Seurat_AMP_RA.html).
+Unlike Signac, SignacFast uses an ensemble of 1,800 pre-trained neural network models generated from the HPCA reference data, like so:
+
+```r
+# load the library
+library(Signac)
+
+# load pre-trained neural network ensemble model
+data("training_HPCA")
+
+# generate labels with pre-trained model
+Models_HPCA = ModelGenerator(R = training_HPCA, N = 100, num.cores = 10)
+```
+
+We demonstrate how to use SignacFast in this [vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/SignacFast-Seurat_AMP_RA.html).
 
 <!-- BENCHMARKING -->
 ## Benchmarking
 
-### CITE-seq PBMCs
+### CITE-seq
 
 In Figure 2-3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with CITE-seq PBMCs. Here, we reproduced that analysis with SPRING ([in this vignette](https://github.com/AllonKleinLab/SPRING_dev); as was performed in the pre-print) and additionally with Seurat ([in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)).
 
@@ -187,7 +200,7 @@ In Figure 2-3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02
 
 In Figure 3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with flow cytometry and compared Signac to SingleR. We reproduced that analysis using Seurat [in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP_RA.html).
 
-### PBMC benchmarking
+### PBMCs
 
 In Table 1 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we benchmarked Signac across seven different technologies: CEL-seq, Drop-Seq, inDrop, 10X (v2), 10X (v3), Seq-Well and Smart-Seq2; this analysis was reproduced [here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/PBMC_bench.html).
 
@@ -199,13 +212,15 @@ See the [open issues](https://github.com/mathewchamberlain/Signac/issues) for a 
 <!-- CONTRIBUTING -->
 ## Contributing
 
-Contributions are what make the open source community such an amazing place to be learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+Any contributions you make are **greatly appreciated**.
 
 1. Fork the Project
 2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
 3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
 4. Push to the Branch (`git push origin feature/AmazingFeature`)
 5. Open a Pull Request
+
+You can also open a pull request to commit to the master branch.
 
 <!-- LICENSE -->
 ## License
