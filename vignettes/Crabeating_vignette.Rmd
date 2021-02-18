@@ -1,35 +1,64 @@
 ---
-title: 'Crab-eating macaque PBMCs: Mapping human-homolog gene symbols'
+title: 'Mapping homologous gene symbols'
 author: 'Mathew Chamberlain'
-date: "`r Sys.Date()`"
+date: 'Compiled: `r format(Sys.Date(), "%B %d, %Y")`'
 output:
-  html_document:
-    code_folding: hide
-    theme: sandstone
+  BiocStyle::html_document:
+    fig_crop: no
     toc: true
+    df_print: kable
     includes:
       after_body: footer.html
 ---
 
-This vignette shows how to map gene symbols for PBMCs derived from Cynomolgus monkey (crab-eating macaque) to human homologs. 
+This vignette shows how to map homologous gene symbols from Macaca fascicularis to the human genome.
 
-Load the essential packages: Signac, Seurat, biomaRt and tidyverse.
+```{r setup, include=FALSE}
+all_times <- list()  # store the time for each chunk
+knitr::knit_hooks$set(time_it = local({
+  now <- NULL
+  function(before, options) {
+    if (before) {
+      now <<- Sys.time()
+    } else {
+      res <- difftime(Sys.time(), now, units = "secs")
+      all_times[[options$label]] <<- res
+    }
+  }
+}))
+knitr::opts_chunk$set(
+  tidy = TRUE,
+  tidy.opts = list(width.cutoff = 95),
+  message = FALSE,
+  warning = FALSE,
+  time_it = TRUE
+)
+Hmisc::hidingTOC(
+buttonLabel = "Contents",
+levels = 3,
+tocSide = c("right"),
+buttonSide = c("right"),
+hidden = FALSE
+)
+```
 
-```{r setup packages, echo = T}
-library(Signac)
-library(Seurat)
+# Load the essential packages
+
+```{r setup packages}
 library(biomaRt)
 library(tidyverse)
 ```
 
-After mapping the reads to the Macaca fasccicularis genome, we load the genes.
+After mapping the reads to the Macaca fasccicularis genome, we load the genes, which were generated from the output of the [cellranger pipeline](https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/what-is-cell-ranger) from 10X Genomics.
+
+# Load Macaca fascicularis genes
 
 ```{r load genes, echo = T}
-features.tsv <- read.delim("../../../../data/2021-01-04-Monkey/count/3003/outs/raw_feature_bc_matrix/features.tsv.gz", header=FALSE, stringsAsFactors=FALSE)
+features.tsv <- read.delim("features.tsv.gz", header=FALSE, stringsAsFactors=FALSE)
 head(features.tsv)
 ```
 
-Next, we map the gene homologs from monkey gene symbols to human gene symbols using biomaRt.
+# Map homologous genes
 
 ```{r map genes}
 # get human and cyno gene symbols
@@ -70,13 +99,21 @@ idx = match(listeENSID, orthologs$GeneID)
 xx = orthologs$HumanSymbol[idx]
 logik = !is.na(orthologs$HumanSymbol[idx]) # sum(logik) returns 17,365 homologous genes
 xx = xx[logik]
+orthologs = orthologs[!is.na(orthologs$HumanSymbol),]
 # note: several of these genes are not unique mappers; we will aggregate them later or make them unique. To aggregate, where E is the sparse expression matrix with rownames set to xx:
 # E = Matrix.utils::aggregate.Matrix(E, row.names(E))
+head(orthologs)
 ```
-After mapping gene homologs, Signac can be used to classify the cell types.
 
-## Session information
+After mapping homologous genes, Signac can be used to classify the cell types.
 
-```{r sessioninfo, message = F, echo = F}
+```{r save.times, include = FALSE}
+write.csv(x = t(as.data.frame(all_times)), file = "Crabeating_vignette_tutorial_times.csv")
+```
+
+<details>
+  <summary>**Session Info**</summary>
+```{r, echo=FALSE}
 sessionInfo()
 ```
+</details>

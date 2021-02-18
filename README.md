@@ -93,7 +93,7 @@ celltypes = Generate_lbls(labels, your_data_here)
 To make life easier, Signac was integrated with [Seurat](https://satijalab.org/seurat/) (versions 3 and 4), and with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/). We provide a few vignettes:
 
 ### SPRING
-In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we often used Signac integrated with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/). To reproduce our findings and to generate new results with SPRING, please visit the SPRING repository which has [example notebooks for processing CITE-seq and scRNA-seq data from 10X Genomics with Signac and SPRING](https://github.com/AllonKleinLab/SPRING_dev). Briefly, Signac is integrated seamlessly with the output files of SPRING in R, requiring only a few functions:
+In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we often used Signac integrated with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/). To reproduce our findings and to generate new results with SPRING, please visit the SPRING repository which has [example notebooks and installation instructions](https://github.com/AllonKleinLab/SPRING_dev), particularly for [processing CITE-seq and scRNA-seq data from 10X Genomics](https://github.com/AllonKleinLab/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb). Briefly, Signac is integrated seamlessly with the output files of SPRING in R, requiring only a few functions:
 
 ```r
 # load the Signac library
@@ -122,14 +122,14 @@ After running the above functions, cellular phenotypes and Louvain clusters are 
 Another way to use Signac is with Seurat. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html), we performed multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Signac integrated with Seurat.
 
 Note:
-* This same data set was also processed using SPRING [in this notebook](https://github.com/mathewchamberlain/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb), and subsequently classified with Signac, which was used to generate SPRING layouts for these data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) (Figures 2-4).
+* This same data set was also processed using SPRING [in this notebook](https://github.com/AllonKleinLab/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb), and subsequently classified with Signac, which was used to generate SPRING layouts for these data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) (Figures 2-4).
 
 #### MASC
 
-Sometimes, we have single cell genomics data with disease information. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP.html), we applied Signac to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) to identify disease-enriched cellular phenotypes that were classified by Signac.
+Sometimes, we have single cell genomics data with disease information. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP.html), we applied Signac to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) to identify which cellular phenotypes were disease-enriched.
 
 Note:
-* MASC typically requires equal numbers of cells and samples between case and control: an unequal number might skew the clustering of cells towards one sample (i.e., a "batch effect"), which could cause spurious disease enrichment. Signac classifies each cell independently (without using clusters), and therefore can be used with MASC without balancing samples or cells.
+* MASC typically requires equal numbers of cells and samples between case and control: an unequal number might skew the clustering of cells towards one sample (i.e., a "batch effect"), which could cause spurious disease enrichment (biasing the mixed effect model). Since Signac classifies each cell independently (without using clusters), it can be used with MASC without balancing samples or cells, unlike cluster-based annotation methods.
 
 ### Non-human data
 
