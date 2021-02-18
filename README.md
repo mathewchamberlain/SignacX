@@ -44,6 +44,7 @@
   * [Non-human data](#non-human-data)
   * [Genes of interest](#genes-of-interest)
   * [Learning from single cell data](#learning-from-single-cell-data)
+  * [Fast Signac](#fast-signac)
 * [Benchmarking](#benchmarking) 
   * [CITE-seq](#cite-seq-pbmcs)
   * [Flow-sorted synovial cells](#flow-sorted-synovial-cells)
@@ -156,6 +157,24 @@ In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.0
 
 Note:
 * The data used here were processed with SPRING prior to classification with Signac; those notebooks are available [here](https://github.com/mathewchamberlain/SPRING_dev/).
+
+### Fast Signac
+
+Sometimes, we are in rush, and we don't have time to run Signac. Although Signac scales fine with large data sets (>300,000 cells), we developed SignacFast to quickly classify single cell data. The quick start is here:
+
+```r
+# load the library
+library(Signac)
+
+# load pre-trained neural network ensemble model
+data("Models_HPCA")
+
+# generate labels with pre-trained model
+labels_fast <- SignacFast("your_data_here", Models = Models_HPCA, num.cores = 18)
+celltypes_fast = Generate_lbls(labels_fast, E = "your_data_here")
+```
+
+We demonstrate how to use this with a Seurat object in this [vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/SignacFast-Seurat_AMP_RA.html).
 
 <!-- BENCHMARKING -->
 ## Benchmarking

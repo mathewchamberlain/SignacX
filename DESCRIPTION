@@ -1,11 +1,11 @@
 Package: Signac
 Type: Package
 Title: Cell type identification based on gene expression patterns
-Version: 2.1.0
+Version: 2.1.1
 Author: Mathew Chamberlain, Virginia Savova
 Maintainer: Mathew Chamberlain <mathew.chamberlain@sanofi.com>
-Imports: Matrix, qlcMatrix(>= 0.9.7), Seurat(>= 2.3.1), RJSONIO, igraph (>= 1.2.1), jsonlite (>= 1.5), RColorBrewer (>= 1.1.2), stats, graphics, neuralnet, e1071, randomForest, lme4, knitr, glasso, methods, ggplot2
-Suggests: RJDBC, rJava(>= 0.9-9), DBI(>= 1.0.0), xCell, SAVER, AnnotationDbi, ReactomePA, hdf5r, org.Hs.eg.db, rhdf5
+Imports: Matrix, pbmcapply, qlcMatrix(>= 0.9.7), Seurat(>= 2.3.1), RJSONIO, igraph (>= 1.2.1), jsonlite (>= 1.5), RColorBrewer (>= 1.1.2), stats, graphics, neuralnet, e1071, randomForest, lme4, knitr, glasso, methods, ggplot2
+Suggests: rJava(>= 0.9-9), DBI(>= 1.0.0), xCell, SAVER, AnnotationDbi, ReactomePA, hdf5r, org.Hs.eg.db, rhdf5
 Description: Signac is an algorithm that addresses the classification problem in single cell RNA sequencing. We often have an expression matrix and we need to classify the cells into their cell types and cell states based on their gene expression patterns.
 Depends: R (>= 3.1.0)
 License: GPL-3 | file LICENSE

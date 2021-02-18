@@ -1,346 +1,243 @@
-#' Generate a network with Graphical LASSO
+#' Main function for generating an ensemble of machine learning models.
 #'
-#' @param E Sparse expression matrix with rows genes and columns cells (see ?Signac)
-#' @param gns_of_int <10,000 gene list of genes for network reconstruction
-#' @param rho sparsity parameter for graphical LASSO
-#' @param metadata data frame with metadata for each cell after signac classification
-#' @return network object
+#' @param R Reference dataset; user should do data("Reference_hpca") and then set R to Reference_hpca.
+#' @param model.use Machine learning model to use. Default option is neural network. Can also be set to 'svm' or 'rf'.
+#' @param N Number of machine learning models to train (for nn and svm). Default is 100.
+#' @param num.cores Number of cores to use. Default is 1.
+#' @param verbose if TRUE, code will report outputs. Default is TRUE.
+#' @param hidden Number of hidden layers in the neural network. Default is 1.
+#' @param set.seed If true, seed is set to ensure reproducibility of these results. Default is TRUE.
+#' @param seed if set.seed is TRUE, seed is set to 42.
+#' @return models for predicting cell types based on reference dataset
 #' @export
-GenerateNetwork = function(E, gns_of_int, rho = c(0.3, 0.4, 0.5, 0.6), metadata)
+ModelGenerator <- function(R, model.use = "nn", N = 1, num.cores = 1, verbose = T, hidden = 1, set.seed = T, seed = '42')
 {
-  # subset expression matrix
-  E = E[rownames(E) %in% gns_of_int,]
-  
-  # build networks around rho
-  res = lapply(rho, function(z){
-    
-    ## seperate two matrices by cell state
-    Q = lapply(unique(metadata$CellTypes), function(x) {
-      Matrix::t(E[,metadata$CellTypes == x])
-    })
-    
-    ## remove any genes with zero expression
-    Q = lapply(Q, function(x) {x[,Matrix::colSums(x) != 0]})
-    
-    ## remove any cells with zero expression
-    Q = lapply(Q, function(x) {x[Matrix::rowSums(x) != 0,]})
-    
-    # Graphical LASSO using QUIC
-    Covs = lapply(Q, function(x){
-      stats::cov(as.matrix(x))
-    })
-    
-    Nets = lapply(Covs, function(x){
-      glasso::glasso(x, rho = z)
-    })
-    
-    # apply rownames
-    Nets = lapply(Nets, function(x) {x$wi})
-    Nets = mapply(function(x,y) {
-      rownames(x) <- colnames(y)
-      colnames(x) <- colnames(y)
-      x
-    }, x = Nets, y = Q)
-    
-    names(Nets) <-unique(metadata$CellTypes)
-    Nets
-  })
-  
-  # keep stable networks
-  N = lapply(res, function(x) {
-    lapply(x, function(z){
-      1*(z != 0)})
-    })
-
-  outs = list("")
-  for (j in 1:length(res[[1]])){
-    outs[[j]] = Reduce("+", lapply(N, function(x){x[[j]]}))
-    logik = outs[[j]] == length(rho)
-    outs[[j]][logik] = 1
-    outs[[j]][!logik] = 0
-    outs[[j]] = Matrix::Matrix(outs[[j]], sparse = T)
-  }
-  
-  names(outs) <- names(N[[1]])
-  
-  # return networks
-  return(outs)
-}
-
-#' Differential Expression Analysis for reference dataset
-#'
-#' @param R A reference list as returned by data("Reference_sim")
-#' @return a list of DEG tables
-#' @export
-GetMarkers <- function(R)
-{
-  E = R$data
-  # set colnames
-  colnames(E) <- seq(1, ncol(E))
-  # Set up object
-  outs = lapply(1:ncol(R$celltypes),function(x){
-    lbls = R$celltypes[,x]
-    if (length(unique(lbls)) == 1)
-    {
-      return(NULL)
-    } else {
-      if (x > 1)
-      {
-        logik = R$celltypes[,x] != R$celltypes[,x-1]
-        dat = E[,logik]
-        lbls = lbls[logik]
-      } else {
-        dat = E
-        lbls = lbls
-      }
-      ctrl <- Seurat::CreateSeuratObject(counts = dat, project = "CID", min.cells = 0)
-      ctrl <- Seurat::NormalizeData(ctrl, normalization.method = "RC")
-      ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
-      ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
-      Seurat::FindAllMarkers(ctrl, only.pos = T, min.cells.group = 0)
-    }
-  })
-  
-  return(outs)
-}
-
-#' Differential Expression Analysis
-#'
-#' @param E A gene by cell expression matrix
-#' @param Samples A character vector of samples.
-#' @param Identities A character vector of cell type or cluster labels
-#' @param Disease A character vector of disease labels
-#' @param omit Any samples to omit. Default is "none" and "Empty"
-#' @return a DEG table
-#' @export
-GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = c("none", "Empty", "Double200-0109&200-0611"))
-{
-  cat(" ..........  Entry in GetAllMarkers: \n");
-  ta = proc.time()[3];
-  cat("             Number of cells:", ncol(E), "\n");
-  cat("             Number of genes:", nrow(E), "\n");
-  
-  colnames(E) <- 1:ncol(E)
-  
-  if (! is.null(Disease))
+  if (verbose)
   {
-    if (!is.null(Samples)) {
-      logik = !Samples %in% omit
-      E = E[,logik]
-      Disease = Disease[logik]
-      Identities = Identities[logik]
-      Samples = Samples[logik]
-    }
-
-      # create Seurat object for each cell type; run differential expression
-      y = as.character(sort(unique(Identities)))
-      qq = lapply(y, function(z){
-        logik = Identities == z;
-        E.          = E[,logik]
-        Disease.    = Disease[logik]
-        Identities. = Identities[logik]
-        if (length(unique(Disease.))!=1) { 
-          ctrl <- suppressWarnings(Seurat::CreateSeuratObject(E.))
-          ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
-          ctrl <- Seurat::AddMetaData(ctrl, metadata=Disease., col.name = "Disease")
-          ctrl <- Seurat::SetIdent(ctrl, value='Disease')
-          dummy = Seurat::FindAllMarkers(ctrl, only.pos = T, verbose = F, min.cells.group = 0, max.cells.per.ident = 500)
-          if (nrow(dummy) != 0)
-          {
-            dummy$celltype = z
-            dummy
-          } else {
-            NULL
-          }
-        } else {
-          NULL
-          }
-      })
-      names(qq) <- y
-      
-      qq = qq[sapply(qq, function(x){!is.null(x)})]
+    cat(" ..........  Entry in ModelGenerator \n");
+    ta = proc.time()[3];
     
-    ## pool together DE results
-    df = do.call(rbind, qq)
-    names(df) <- c("p_val", "avg_logFC", "pct.1", "pct.2", "p_val_adj", "disease", "gene", "identity")
-    df = df[order(df$disease),]
-    df$pct.1 = round(df$pct.1, digits = 2) * 100
-    df$pct.2 = round(df$pct.2, digits = 2) * 100
-    df$avg_logFC = round(df$avg_logFC, digits = 2)
-    df$p_val = formatC(df$p_val, format = "e", digits = 2)
-    df$p_val_adj = formatC(df$p_val_adj, format = "e", digits = 2)
-    rownames(df) <- NULL
-    df = data.frame(
-      gene = df$gene,
-      identity = df$identity,
-      disease = df$disease,
-      avg_logFC = df$avg_logFC,
-      pct.1 = df$pct.1,
-      pct.2 = df$pct.2,
-      p_val = df$p_val,
-      p_val_adj = df$p_val_adj
-    )
-    df = split.data.frame(df, f = df$identity)
-    df = lapply(df, function(x){x[order(x$avg_logFC, decreasing = T),]})
-    df = do.call(rbind, df)
-    rownames(df) <- NULL
-    return(df) 
-  } else {
-    if (!is.null(Samples)) {
-      logik = !Samples %in% omit
-      E = E[,logik]
-      Identities = Identities[logik]
-    }
-    
-    # create Seurat object for each cell type; run differential expression
-    ctrl <- suppressWarnings(Seurat::CreateSeuratObject(E))
-    ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
-    ctrl <- Seurat::AddMetaData(ctrl, metadata=Identities, col.name = "Identities")
-    ctrl <- Seurat::SetIdent(ctrl, value='Identities')
-    df = Seurat::FindAllMarkers(ctrl, only.pos = T, verbose = F, min.cells.group = 0, max.cells.per.ident = 500)
-    
-    ## pool together DE results
-    names(df) <- c("p_val", "avg_logFC", "pct.1", "pct.2", "p_val_adj", "identity", "gene")
-    df = df[order(df$identity),]
-    df$pct.1 = round(df$pct.1, digits = 2) * 100
-    df$pct.2 = round(df$pct.2, digits = 2) * 100
-    df$avg_logFC = round(df$avg_logFC, digits = 2)
-    df$p_val = formatC(df$p_val, format = "e", digits = 2)
-    df$p_val_adj = formatC(df$p_val_adj, format = "e", digits = 2)
-    rownames(df) <- NULL
-    df = data.frame(
-      gene = df$gene,
-      identity = df$identity,
-      avg_logFC = df$avg_logFC,
-      pct.1 = df$pct.1,
-      pct.2 = df$pct.2,
-      p_val = df$p_val,
-      p_val_adj = df$p_val_adj
-    )
-    df = split.data.frame(df, f = df$identity)
-    df = lapply(df, function(x){x[order(x$avg_logFC, decreasing = T),]})
-    df = do.call(rbind, df)
-    rownames(df) <- NULL
-    return(df) 
+    # main function
+    cat(" ..........  Running ModelGenerator on input reference dataset :\n");
+    cat("             classifiers = ", length(R$Reference), "\n", sep = "");
+    cat("             total classifier stack = ", N * length(R$Reference), "\n", sep = "");
   }
   
-  tb = proc.time()[3] - ta;
-  cat("\n ..........  Exit GetAllMarkers.\n");
-  cat("             Execution time = ", tb, " s.\n", sep = "");
+  res = lapply(R$Reference, function(x){
+    # train a neural network (N times)
+    if (model.use == "nn"){
+      if (set.seed)
+      {
+        RNGkind("L'Ecuyer-CMRG")
+        set.seed(seed = seed)
+      }
+      out = suppressWarnings(parallel::mclapply(1:N, function(y) {
+        model.fit = neuralnet::neuralnet(celltypes~.,hidden=hidden,data=x, act.fct = 'logistic', linear.output = F)
+        model.fit$generalized.weights <- NULL
+        model.fit$covariate <- NULL
+        model.fit$data <- NULL
+        model.fit$response <- NULL
+        model.fit$startweights <- NULL
+        model.fit$call <- NULL
+        model.fit$net.result <- NULL
+        model.fit$exclude <- NULL
+        model.fit$err.fct <- NULL
+        model.fit$result.matrix <- NULL
+        return(model.fit)
+      }, mc.cores = num.cores))
+      }
+    # if desired, run svm
+    if (model.use == "svm") {
+      out = e1071::svm(celltypes ~ ., data = x, probability=TRUE)
+    }
+    # if desired, run RF
+    if (model.use == "rf") {
+      out = parallel::mclapply(1:N, function(y) {
+        randomForest::randomForest(celltypes ~ ., data=x, keep.forest = TRUE)
+      }, mc.cores = num.cores)
+    }
+    outs = list(
+      genes = colnames(x)[-ncol(x)],
+      classifiers = out
+    )
+    return(outs)
+  })
+  
+  if (verbose) {
+    tb = proc.time()[3] - ta;
+    cat("\n ..........  Exit ModelGenerator.\n");
+    cat("             Execution time = ", tb, " s.\n", sep = "");
+  }
+  return(res)
 }
 
-
-#' Main function for mixed effect modeling
+#' Main function for fast classification of Signac with precomputed models
 #'
-#' @param dataset data frame of covariate, cell type, clustering or disease information
-#' @param cluster celltypes returned by Signac or cluster identities
-#' @param contrast Typically disease
-#' @param random_effects User specified random effect variables in dataset
-#' @param fixed_effects User specific fixed effects in dataset
-#' @param verbose If TRUE, algorithm reports outputs
-#' @return mixed effect model results
+#' @param E a sparse gene (rows) by cell (column) matrix, or a Seurat object. Rows are HUGO symbols.
+#' @param Models as returned by data("Models_HPCA"). An ensemble of 1,800 neural network models.
+#' @param spring.dir If using SPRING, directory to categorical_coloring_data.json. Default is NULL.
+#' @param model.use Machine learning model to use. Default option is neural network. Can also be set to 'svm' or 'rf'.
+#' @param threshold Probability threshold for assigning cells to "Unclassified." Default is 0.
+#' @param smooth if TRUE, smooths the cell type classifications. Default is TRUE.
+#' @param impute if TRUE, gene expression values are imputed prior to cell type classification. Default is TRUE.
+#' @param verbose if TRUE, code will report outputs. Default is TRUE.
+#' @param do.normalize if TRUE, cells are normalized to the mean library size. Default is TRUE.
+#' @param num.cores number of cores to use for parallel computation. Default is 1. 
+#' @param return.probability if TRUE, returns the probability associated with each cell type label. Default is TRUE.
+#' @return cell type annotations
 #' @export
-MASC <- function(dataset, cluster, contrast, random_effects = NULL, fixed_effects = NULL,
-                 verbose = FALSE) {
-  # Check inputs
-  if (is.factor(dataset[[contrast]]) == FALSE) {
-    stop("Specified contrast term is not coded as a factor in dataset")
+SignacFast <- function(E, Models, spring.dir = NULL, num.cores = 1, model.use = "nn", threshold = 0, smooth = T, impute = T, verbose = T, do.normalize = T, return.probability = F)
+{
+  flag = class(E) == "Seurat"
+  
+  if (flag){
+    default.assay <- Seurat::DefaultAssay(E)
+    edges = E@graphs[[which(grepl(paste0(default.assay, "_nn"), names(E@graphs)))]]
   }
   
-  cat(" ..........  Entry in MASC \n");
-  ta = proc.time()[3];
-  
-  # Generate design matrix from cluster assignments
-  cluster <- as.character(cluster)
-  designmat <- model.matrix(~ cluster + 0, data.frame(cluster = cluster))
-  dataset <- cbind(designmat, dataset)
-  
-  # Convert cluster assignments to string
-  cluster <- as.character(cluster)
-  # Prepend design matrix generated from cluster assignments
-  designmat <- model.matrix(~ cluster + 0, data.frame(cluster = cluster))
-  dataset <- cbind(designmat, dataset)
-  # Create output list to hold results
-  res <- vector(mode = "list", length = length(unique(cluster)))
-  names(res) <- attributes(designmat)$dimnames[[2]]
-  
-  # Create model formulas
-  if (!is.null(fixed_effects) && !is.null(random_effects)) {
-    model_rhs <- paste0(c(paste0(fixed_effects, collapse = " + "),
-                          paste0("(1|", random_effects, ")", collapse = " + ")),
-                        collapse = " + ")
-    if (verbose == TRUE) {
-      message(paste("Using null model:", "cluster ~", model_rhs))
+  if (verbose)
+  {
+    cat(" ..........  Entry in SignacFast \n");
+    ta = proc.time()[3];
+    
+    # main function
+    if (!flag)
+    {
+      cat(" ..........  Running SignacFast on input data matrix :\n");
+    } else {
+      cat(" ..........  Running SignacFast on Seurat object :\n");
     }
-  } else if (!is.null(fixed_effects) && is.null(random_effects)) {
-    model_rhs <- paste0(fixed_effects, collapse = " + ")
-    if (verbose == TRUE) {
-      message(paste("Using null model:", "cluster ~", model_rhs))
-      # For now, do not allow models without mixed effects terms
-      stop("No random effects specified")
+    cat("             nrow = ", nrow(E), "\n", sep = "");
+    cat("             ncol = ", ncol(E), "\n", sep = "");
+  }
+  
+  # keep only unique row names
+  logik = CID.IsUnique(rownames(E))
+  E = E[logik,]
+  
+  # intersect genes with reference set
+  gns = sort(unique(unlist(sapply(Models, function(x){ x$genes }))))
+  V = E[rownames(E) %in% gns, ]
+  
+  if (class(V) %in% "data.frame")
+    V = Matrix::Matrix(as.matrix(V), sparse = T)
+  
+  # normalize to the mean library size
+  if (do.normalize)
+  {
+    if (!flag)
+    {
+      V = CID.Normalize(V)
+    } else {
+      V = CID.Normalize(V@assays[[default.assay]]@counts)
     }
-  } else if (is.null(fixed_effects) && !is.null(random_effects)) {
-    model_rhs <- paste0("(1|", random_effects, ")", collapse = " + ")
-    if (verbose == TRUE) {
-      message(paste("Using null model:", "cluster ~", model_rhs))
-    }
+  }
+  
+  # normalization function for gene expression scaling
+  normalize <- function(x) {
+    return ((x - min(x)) / (max(x) - min(x)))
+  }
+  
+  # normalize V
+  V = t(apply(V, 1, function(x){
+    normalize(x)
+  }))
+  logik = apply(V, 1, function(x) {any(is.na(x))})
+  V = V[!logik,]
+  
+  # set up imputation matrices
+  if (flag) {
+    dM = CID.GetDistMat(edges)
+    louvain = CID.Louvain(edges = edges)
   } else {
-    model_rhs <- "1" # only includes intercept
-    if (verbose == TRUE) {
-      message(paste("Using null model:", "cluster ~", model_rhs))
-      stop("No random or fixed effects specified")
-    }
+    edges = CID.LoadEdges(data.dir = spring.dir)
+    dM = CID.GetDistMat(edges)
+    louvain = CID.Louvain(edges = edges)
   }
-  
-  # Initialize list to store model objects for each cluster
-  cluster_models <- vector(mode = "list",
-                           length = length(attributes(designmat)$dimnames[[2]]))
-  names(cluster_models) <- attributes(designmat)$dimnames[[2]]
-  
-  # Run nested mixed-effects models for each cluster
-  for (i in seq_along(attributes(designmat)$dimnames[[2]])) {
-    test_cluster <- attributes(designmat)$dimnames[[2]][i]
-    if (verbose == TRUE) {
-      message(paste("Creating logistic mixed models for", test_cluster))
+  res = pbmcapply::pbmclapply(Models, FUN = function(x){
+    
+    Z = V[rownames(V) %in% x$genes,]
+    
+    # run imputation (if desired)
+    if (impute){
+      Z = KSoftImpute(E = Z, dM = dM, verbose = F)
+      Z = t(apply(Z, 1, function(x){
+        normalize(x)
+      }))
     }
-    null_fm <- as.formula(paste0(c(paste0(test_cluster, " ~ 1 + "),
-                                   model_rhs), collapse = ""))
-    full_fm <- as.formula(paste0(c(paste0(test_cluster, " ~ ", contrast, " + "),
-                                   model_rhs), collapse = ""))
-    # Run null and full mixed-effects models
-    null_model <- lme4::glmer(formula = null_fm, data = dataset,
-                              family = binomial, nAGQ = 1, verbose = 0,
-                              control = lme4::glmerControl(optimizer = "bobyqa"))
-    full_model <- lme4::glmer(formula = full_fm, data = dataset,
-                              family = binomial, nAGQ = 1, verbose = 0,
-                              control = lme4::glmerControl(optimizer = "bobyqa"))
-    model_lrt <- anova(null_model, full_model)
-    # calculate confidence intervals for contrast term beta
-    contrast_lvl2 <- paste0(contrast, levels(dataset[[contrast]])[2])
-    contrast_ci <- lme4::confint.merMod(full_model, method = "Wald",
-                                  parm = contrast_lvl2)
-    # Save model objects to list
-    cluster_models[[i]]$null_model <- null_model
-    cluster_models[[i]]$full_model <- full_model
-    cluster_models[[i]]$model_lrt <- model_lrt
-    cluster_models[[i]]$confint <- contrast_ci
+    
+    # zero impute in any missing genes
+    dummy = Matrix::Matrix(0, nrow = length(x$genes) - nrow(Z), ncol = ncol(Z))
+    rownames(dummy) <- x$genes[!x$genes %in% rownames(Z)]
+    Z = rbind(Z, dummy)
+    Z = Z[order(rownames(Z)),]
+    
+    # generate predictions
+    if (model.use == "nn"){
+      res = lapply(x$classifiers, function(y) {
+        Predict = stats::predict(y, Matrix::t(Z))
+        colnames(Predict) <- sort(y$model.list$response)
+        return(Predict)
+      })
+      res = res[sapply(res, function(x) !is.null(x))]
+      res.squared.mean <- Reduce("+", lapply(res, "^", 2)) / length(res)
+      res = Reduce(res, f = '+') / length(res)
+      res.variance <- res.squared.mean - res^2
+      res.sd <- sqrt(res.variance)
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Unclassified"
+      errors = round(sapply(1:length(xx), function(x){res.sd[x, xx[x]]}), digits = 4)
+      df = data.frame(celltypes = celltypes, probability = round(kmax, digits = 3), sd = errors, percent_features_detected = round(Matrix::colSums(Z != 0) / nrow(Z), digits = 3) * 100)
+    }
+    # if desired, run svm
+    if (model.use == "svm") {
+      xx = stats::predict(x$classifiers, t(Z), probability=TRUE)
+      res = attr(xx, "probabilities")
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Unclassified"
+      df = data.frame(celltypes = celltypes, probability = kmax)
+      df$celltypes = as.character(df$celltypes)
+    }
+    # if desired, run RF
+    if (model.use == "rf") {
+      res = lapply(x$classifiers, function(y) {
+        stats::predict(y,newdata=Matrix::t(Z),type="prob")
+      })
+      res = res[sapply(res, function(x) !is.null(x))]
+      res = Reduce(res, f = '+') / length(res)
+      xx = apply(res, 1, which.max)
+      celltypes = colnames(res)[xx]
+      kmax = apply(res, 1, max)
+      celltypes[kmax < threshold] = "Unclassified"
+      df = data.frame(celltypes = celltypes, probability = kmax)
+      df$celltypes = as.character(df$celltypes)
+    }
+    # smooth the output classifications
+    if (smooth & any(as.character(unique(x$celltypes)) %in% c("Immune", "Myeloid", "NonImmune", "Lymphocytes", "Monocytes.Neutrophils", "Monocytes", "Fibroblasts", "Epithelial")))
+      df$celltypes = CID.smooth(df$celltypes, dM[[1]])
+    
+    # return probabilities and cell type classifications
+    if (return.probability){
+      return(df)
+    } else {
+      return(df$celltypes)
+    }
+  }, mc.cores = num.cores)
+  
+  res$louvain = louvain
+  
+  if (verbose) {
+    tb = proc.time()[3] - ta;
+    cat("\n ..........  Exit SignacFast.\n");
+    cat("             Execution time = ", tb, " s.\n", sep = "");
   }
-  
-  # Organize results into output dataframe
-  output <- data.frame(cluster = attributes(designmat)$dimnames[[2]],
-                       size = colSums(designmat))
-  output$model.pvalue <- sapply(cluster_models, function(x) x$model_lrt[["Pr(>Chisq)"]][2])
-  output[[paste(contrast_lvl2, "OR", sep = ".")]] <- sapply(cluster_models, function(x) exp(lme4::fixef(x$full)[[contrast_lvl2]]))
-  output[[paste(contrast_lvl2, "OR", "95pct.ci.lower", sep = ".")]] <- sapply(cluster_models, function(x) exp(x$confint[contrast_lvl2, "2.5 %"]))
-  output[[paste(contrast_lvl2, "OR", "95pct.ci.upper", sep = ".")]] <- sapply(cluster_models, function(x) exp(x$confint[contrast_lvl2, "97.5 %"]))
-  
-  tb = proc.time()[3] - ta;
-  cat("\n ..........  Exit MASC.\n");
-  cat("             Execution time = ", tb, " s.\n", sep = "");
-  
-  # Return MASC results
-    return(output)
+  return(res)
 }
+
 
 #' Main function for solo-decision classification
 #'
@@ -546,7 +443,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.core
   flag = class(E) == "Seurat"
   
   if (flag){
-    default.assay <- DefaultAssay(E)
+    default.assay <- Seurat::DefaultAssay(E)
     edges = E@graphs[[which(grepl(paste0(default.assay, "_nn"), names(E@graphs)))]]
   }
   
@@ -609,7 +506,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.core
       dM = CID.GetDistMat(edges)
       louvain = CID.Louvain(edges = edges)
       }
-  res = lapply(R$Reference, function(x){
+  res = pbmcapply::pbmclapply(R$Reference, FUN = function(x){
     # keep same gene names
     gns = sort(intersect(rownames(V), colnames(x)))
     Z = V[rownames(V) %in% gns, ]
@@ -641,12 +538,12 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.core
         RNGkind("L'Ecuyer-CMRG")
         set.seed(seed = seed)
       }
-      res = suppressWarnings(parallel::mclapply(1:N, function(x) {
+      res = suppressWarnings(lapply(1:N, function(x) {
         nn=neuralnet::neuralnet(celltypes~.,hidden=hidden,data=df, act.fct = 'logistic', linear.output = F)
         Predict = stats::predict(nn, Matrix::t(Z))
         colnames(Predict) <- sort(nn$model.list$response)
         return(Predict)
-      }, mc.cores = num.cores))
+      }))
       res = res[sapply(res, function(x) !is.null(x))]
       res.squared.mean <- Reduce("+", lapply(res, "^", 2)) / length(res)
       res = Reduce(res, f = '+') / length(res)
@@ -673,10 +570,10 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.core
     }
     # if desired, run RF
     if (model.use == "rf") {
-      res = parallel::mclapply(1:N, function(x) {
+      res = lapply(1:N, function(x) {
         model = randomForest::randomForest(celltypes ~ ., data=df, keep.forest = TRUE)
         stats::predict(model,newdata=Matrix::t(Z),type="prob")
-      }, mc.cores = num.cores)
+      })
       res = Reduce(res, f = '+') / N
       xx = apply(res, 1, which.max)
       celltypes = colnames(res)[xx]
@@ -695,7 +592,7 @@ Signac <- function(E, R , spring.dir = NULL, model.use = "nn", N = 100, num.core
     } else {
       return(df$celltypes)
     }
-    })
+    }, mc.cores = num.cores)
   
   res$louvain = louvain
   
@@ -728,7 +625,7 @@ Generate_lbls = function(cr, spring.dir = NULL, E = NULL, smooth = T, new_popula
   
   flag = class(E) == "Seurat"
   if (flag) {
-    default.assay <- DefaultAssay(E)
+    default.assay <- Seurat::DefaultAssay(E)
     edges = E@graphs[[which(grepl(paste0(default.assay, "_nn"), names(E@graphs)))]]
     dM = CID.GetDistMat(edges)
   }
@@ -1978,4 +1875,426 @@ LoadNetwork <- function(filename = "network_total.h5")
  
   return(sparse.mat)
   
+}
+
+#' Write results to a folder
+#'
+#' @param D A list of count matrices
+#' @param data.dir directory (will be created if it does not exist) where results are saved
+#' @param genome default is GRCh38.
+#' @importFrom methods as
+#' @importClassesFrom Matrix dgCMatrix
+#' @return matrix.h5 file, where each is background corrected
+#' @export
+#' @importFrom rhdf5 h5createFile h5createGroup h5write h5write.default
+SaveCountsToH5 <- function(D, data.dir, genome = "GRCh38")
+{
+  
+  data.dir = gsub("\\/$", "", data.dir, perl = TRUE);
+  
+  if (!dir.exists(data.dir))
+    dir.create(data.dir)
+  
+  if (!"list" %in% class(D))
+    D = list(D)
+  
+  cat(" ..........  Entry in SaveCountsToH5: \n");
+  ta = proc.time()[3];
+  cat("             Number of cells:", sum(sapply(D, ncol)), "\n");
+  cat("             Number of genes:", nrow(D[[1]]), "\n");
+  cat("             Number of samples:", length(D), "\n");
+  
+  if (is.null(names(D)))
+    names(D) <- paste0("Sample", seq_along(1:length(D)))
+  
+  flag = rownames(D[[1]])[1] != gsub( "_.*$", "", rownames(D[[1]])[1])
+  
+  if (flag)
+  {
+    genes = strsplit(x = rownames(D[[1]]), split = "_._")
+    gene_names = sapply(genes, `[[`, 1)
+    genes = sapply(genes, `[[`, 2)
+  }
+  
+  D = lapply(D, function(x)
+  {
+    x@Dimnames[[1]] = rownames(D[[1]])
+    x
+  })
+  
+  data.dirs = paste(data.dir, names(D), sep = "/")
+  
+  q = lapply(data.dirs, function(x){
+    if (!dir.exists(x))
+      dir.create(x)})
+  
+  d = suppressWarnings(
+    mapply(function(x,y){
+      fn = "count_matrix.h5"
+      fn = paste(y, fn, sep = "/")
+      rhdf5::h5createFile(fn)
+      rhdf5::h5createGroup(fn, genome)
+      rhdf5::h5write.default(x@Dimnames[[2]], file = fn, name = paste0(genome, "/barcodes"))
+      if (flag)
+      {
+        rhdf5::h5write.default(genes, file = fn, name=paste0(genome, "/genes"))
+        rhdf5::h5write.default(gene_names, file = fn, name=paste0(genome, "/gene_names"))
+      } else {
+        rhdf5::h5write.default(x@Dimnames[[1]], file = fn, name=paste0(genome, "/genes"))
+        rhdf5::h5write.default(x@Dimnames[[1]], file = fn, name=paste0(genome, "/gene_names"))
+      }
+      rhdf5::h5write.default(x@x, file = fn, name=paste0(genome, "/data"))
+      rhdf5::h5write.default(dim(x), file = fn, name=paste0(genome, "/shape"))
+      rhdf5::h5write.default(x@i, file = fn, name=paste0(genome, "/indices")) # already zero-indexed.
+      rhdf5::h5write.default(x@p, file = fn, name=paste0(genome, "/indptr"))
+    }, x = D, y = data.dirs)
+  )
+  rhdf5::h5closeAll()
+  tb = proc.time()[3] - ta;
+  cat(" ..........  Exit SaveCountsToH5 \n");
+  cat("             Execution time = ", tb, " s.\n", sep = "");
+}
+
+#' Generate a network with Graphical LASSO
+#'
+#' @param E Sparse expression matrix with rows genes and columns cells (see ?Signac)
+#' @param gns_of_int <10,000 gene list of genes for network reconstruction
+#' @param rho sparsity parameter for graphical LASSO
+#' @param metadata data frame with metadata for each cell after signac classification
+#' @return network object
+#' @export
+GenerateNetwork = function(E, gns_of_int, rho = c(0.3, 0.4, 0.5, 0.6), metadata)
+{
+  # subset expression matrix
+  E = E[rownames(E) %in% gns_of_int,]
+  
+  # build networks around rho
+  res = lapply(rho, function(z){
+    
+    ## seperate two matrices by cell state
+    Q = lapply(unique(metadata$CellTypes), function(x) {
+      Matrix::t(E[,metadata$CellTypes == x])
+    })
+    
+    ## remove any genes with zero expression
+    Q = lapply(Q, function(x) {x[,Matrix::colSums(x) != 0]})
+    
+    ## remove any cells with zero expression
+    Q = lapply(Q, function(x) {x[Matrix::rowSums(x) != 0,]})
+    
+    # Graphical LASSO using QUIC
+    Covs = lapply(Q, function(x){
+      stats::cov(as.matrix(x))
+    })
+    
+    Nets = lapply(Covs, function(x){
+      glasso::glasso(x, rho = z)
+    })
+    
+    # apply rownames
+    Nets = lapply(Nets, function(x) {x$wi})
+    Nets = mapply(function(x,y) {
+      rownames(x) <- colnames(y)
+      colnames(x) <- colnames(y)
+      x
+    }, x = Nets, y = Q)
+    
+    names(Nets) <-unique(metadata$CellTypes)
+    Nets
+  })
+  
+  # keep stable networks
+  N = lapply(res, function(x) {
+    lapply(x, function(z){
+      1*(z != 0)})
+  })
+  
+  outs = list("")
+  for (j in 1:length(res[[1]])){
+    outs[[j]] = Reduce("+", lapply(N, function(x){x[[j]]}))
+    logik = outs[[j]] == length(rho)
+    outs[[j]][logik] = 1
+    outs[[j]][!logik] = 0
+    outs[[j]] = Matrix::Matrix(outs[[j]], sparse = T)
+  }
+  
+  names(outs) <- names(N[[1]])
+  
+  # return networks
+  return(outs)
+}
+
+#' Differential Expression Analysis for reference dataset
+#'
+#' @param R A reference list as returned by data("Reference_sim")
+#' @return a list of DEG tables
+#' @export
+GetMarkers <- function(R)
+{
+  E = R$data
+  # set colnames
+  colnames(E) <- seq(1, ncol(E))
+  # Set up object
+  outs = lapply(1:ncol(R$celltypes),function(x){
+    lbls = R$celltypes[,x]
+    if (length(unique(lbls)) == 1)
+    {
+      return(NULL)
+    } else {
+      if (x > 1)
+      {
+        logik = R$celltypes[,x] != R$celltypes[,x-1]
+        dat = E[,logik]
+        lbls = lbls[logik]
+      } else {
+        dat = E
+        lbls = lbls
+      }
+      ctrl <- Seurat::CreateSeuratObject(counts = dat, project = "CID", min.cells = 0)
+      ctrl <- Seurat::NormalizeData(ctrl, normalization.method = "RC")
+      ctrl <- Seurat::AddMetaData(ctrl, metadata=lbls, col.name = "celltypes")
+      ctrl <- Seurat::SetIdent(ctrl, value='celltypes')
+      Seurat::FindAllMarkers(ctrl, only.pos = T, min.cells.group = 0)
+    }
+  })
+  
+  return(outs)
+}
+
+#' Differential Expression Analysis
+#'
+#' @param E A gene by cell expression matrix
+#' @param Samples A character vector of samples.
+#' @param Identities A character vector of cell type or cluster labels
+#' @param Disease A character vector of disease labels
+#' @param omit Any samples to omit. Default is "none" and "Empty"
+#' @return a DEG table
+#' @export
+GetAllMarkers <- function(E, Samples = NULL, Disease = NULL, Identities, omit = c("none", "Empty", "Double200-0109&200-0611"))
+{
+  cat(" ..........  Entry in GetAllMarkers: \n");
+  ta = proc.time()[3];
+  cat("             Number of cells:", ncol(E), "\n");
+  cat("             Number of genes:", nrow(E), "\n");
+  
+  colnames(E) <- 1:ncol(E)
+  
+  if (! is.null(Disease))
+  {
+    if (!is.null(Samples)) {
+      logik = !Samples %in% omit
+      E = E[,logik]
+      Disease = Disease[logik]
+      Identities = Identities[logik]
+      Samples = Samples[logik]
+    }
+    
+    # create Seurat object for each cell type; run differential expression
+    y = as.character(sort(unique(Identities)))
+    qq = lapply(y, function(z){
+      logik = Identities == z;
+      E.          = E[,logik]
+      Disease.    = Disease[logik]
+      Identities. = Identities[logik]
+      if (length(unique(Disease.))!=1) { 
+        ctrl <- suppressWarnings(Seurat::CreateSeuratObject(E.))
+        ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
+        ctrl <- Seurat::AddMetaData(ctrl, metadata=Disease., col.name = "Disease")
+        ctrl <- Seurat::SetIdent(ctrl, value='Disease')
+        dummy = Seurat::FindAllMarkers(ctrl, only.pos = T, verbose = F, min.cells.group = 0, max.cells.per.ident = 500)
+        if (nrow(dummy) != 0)
+        {
+          dummy$celltype = z
+          dummy
+        } else {
+          NULL
+        }
+      } else {
+        NULL
+      }
+    })
+    names(qq) <- y
+    
+    qq = qq[sapply(qq, function(x){!is.null(x)})]
+    
+    ## pool together DE results
+    df = do.call(rbind, qq)
+    names(df) <- c("p_val", "avg_logFC", "pct.1", "pct.2", "p_val_adj", "disease", "gene", "identity")
+    df = df[order(df$disease),]
+    df$pct.1 = round(df$pct.1, digits = 2) * 100
+    df$pct.2 = round(df$pct.2, digits = 2) * 100
+    df$avg_logFC = round(df$avg_logFC, digits = 2)
+    df$p_val = formatC(df$p_val, format = "e", digits = 2)
+    df$p_val_adj = formatC(df$p_val_adj, format = "e", digits = 2)
+    rownames(df) <- NULL
+    df = data.frame(
+      gene = df$gene,
+      identity = df$identity,
+      disease = df$disease,
+      avg_logFC = df$avg_logFC,
+      pct.1 = df$pct.1,
+      pct.2 = df$pct.2,
+      p_val = df$p_val,
+      p_val_adj = df$p_val_adj
+    )
+    df = split.data.frame(df, f = df$identity)
+    df = lapply(df, function(x){x[order(x$avg_logFC, decreasing = T),]})
+    df = do.call(rbind, df)
+    rownames(df) <- NULL
+    return(df) 
+  } else {
+    if (!is.null(Samples)) {
+      logik = !Samples %in% omit
+      E = E[,logik]
+      Identities = Identities[logik]
+    }
+    
+    # create Seurat object for each cell type; run differential expression
+    ctrl <- suppressWarnings(Seurat::CreateSeuratObject(E))
+    ctrl <- Seurat::NormalizeData(object = ctrl, verbose = F)
+    ctrl <- Seurat::AddMetaData(ctrl, metadata=Identities, col.name = "Identities")
+    ctrl <- Seurat::SetIdent(ctrl, value='Identities')
+    df = Seurat::FindAllMarkers(ctrl, only.pos = T, verbose = F, min.cells.group = 0, max.cells.per.ident = 500)
+    
+    ## pool together DE results
+    names(df) <- c("p_val", "avg_logFC", "pct.1", "pct.2", "p_val_adj", "identity", "gene")
+    df = df[order(df$identity),]
+    df$pct.1 = round(df$pct.1, digits = 2) * 100
+    df$pct.2 = round(df$pct.2, digits = 2) * 100
+    df$avg_logFC = round(df$avg_logFC, digits = 2)
+    df$p_val = formatC(df$p_val, format = "e", digits = 2)
+    df$p_val_adj = formatC(df$p_val_adj, format = "e", digits = 2)
+    rownames(df) <- NULL
+    df = data.frame(
+      gene = df$gene,
+      identity = df$identity,
+      avg_logFC = df$avg_logFC,
+      pct.1 = df$pct.1,
+      pct.2 = df$pct.2,
+      p_val = df$p_val,
+      p_val_adj = df$p_val_adj
+    )
+    df = split.data.frame(df, f = df$identity)
+    df = lapply(df, function(x){x[order(x$avg_logFC, decreasing = T),]})
+    df = do.call(rbind, df)
+    rownames(df) <- NULL
+    return(df) 
+  }
+  
+  tb = proc.time()[3] - ta;
+  cat("\n ..........  Exit GetAllMarkers.\n");
+  cat("             Execution time = ", tb, " s.\n", sep = "");
+}
+
+
+#' Main function for mixed effect modeling
+#'
+#' @param dataset data frame of covariate, cell type, clustering or disease information
+#' @param cluster celltypes returned by Signac or cluster identities
+#' @param contrast Typically disease
+#' @param random_effects User specified random effect variables in dataset
+#' @param fixed_effects User specific fixed effects in dataset
+#' @param verbose If TRUE, algorithm reports outputs
+#' @return mixed effect model results
+#' @export
+MASC <- function(dataset, cluster, contrast, random_effects = NULL, fixed_effects = NULL,
+                 verbose = FALSE) {
+  # Check inputs
+  if (is.factor(dataset[[contrast]]) == FALSE) {
+    stop("Specified contrast term is not coded as a factor in dataset")
+  }
+  
+  cat(" ..........  Entry in MASC \n");
+  ta = proc.time()[3];
+  
+  # Generate design matrix from cluster assignments
+  cluster <- as.character(cluster)
+  designmat <- model.matrix(~ cluster + 0, data.frame(cluster = cluster))
+  dataset <- cbind(designmat, dataset)
+  
+  # Convert cluster assignments to string
+  cluster <- as.character(cluster)
+  # Prepend design matrix generated from cluster assignments
+  designmat <- model.matrix(~ cluster + 0, data.frame(cluster = cluster))
+  dataset <- cbind(designmat, dataset)
+  # Create output list to hold results
+  res <- vector(mode = "list", length = length(unique(cluster)))
+  names(res) <- attributes(designmat)$dimnames[[2]]
+  
+  # Create model formulas
+  if (!is.null(fixed_effects) && !is.null(random_effects)) {
+    model_rhs <- paste0(c(paste0(fixed_effects, collapse = " + "),
+                          paste0("(1|", random_effects, ")", collapse = " + ")),
+                        collapse = " + ")
+    if (verbose == TRUE) {
+      message(paste("Using null model:", "cluster ~", model_rhs))
+    }
+  } else if (!is.null(fixed_effects) && is.null(random_effects)) {
+    model_rhs <- paste0(fixed_effects, collapse = " + ")
+    if (verbose == TRUE) {
+      message(paste("Using null model:", "cluster ~", model_rhs))
+      # For now, do not allow models without mixed effects terms
+      stop("No random effects specified")
+    }
+  } else if (is.null(fixed_effects) && !is.null(random_effects)) {
+    model_rhs <- paste0("(1|", random_effects, ")", collapse = " + ")
+    if (verbose == TRUE) {
+      message(paste("Using null model:", "cluster ~", model_rhs))
+    }
+  } else {
+    model_rhs <- "1" # only includes intercept
+    if (verbose == TRUE) {
+      message(paste("Using null model:", "cluster ~", model_rhs))
+      stop("No random or fixed effects specified")
+    }
+  }
+  
+  # Initialize list to store model objects for each cluster
+  cluster_models <- vector(mode = "list",
+                           length = length(attributes(designmat)$dimnames[[2]]))
+  names(cluster_models) <- attributes(designmat)$dimnames[[2]]
+  
+  # Run nested mixed-effects models for each cluster
+  for (i in seq_along(attributes(designmat)$dimnames[[2]])) {
+    test_cluster <- attributes(designmat)$dimnames[[2]][i]
+    if (verbose == TRUE) {
+      message(paste("Creating logistic mixed models for", test_cluster))
+    }
+    null_fm <- as.formula(paste0(c(paste0(test_cluster, " ~ 1 + "),
+                                   model_rhs), collapse = ""))
+    full_fm <- as.formula(paste0(c(paste0(test_cluster, " ~ ", contrast, " + "),
+                                   model_rhs), collapse = ""))
+    # Run null and full mixed-effects models
+    null_model <- lme4::glmer(formula = null_fm, data = dataset,
+                              family = binomial, nAGQ = 1, verbose = 0,
+                              control = lme4::glmerControl(optimizer = "bobyqa"))
+    full_model <- lme4::glmer(formula = full_fm, data = dataset,
+                              family = binomial, nAGQ = 1, verbose = 0,
+                              control = lme4::glmerControl(optimizer = "bobyqa"))
+    model_lrt <- anova(null_model, full_model)
+    # calculate confidence intervals for contrast term beta
+    contrast_lvl2 <- paste0(contrast, levels(dataset[[contrast]])[2])
+    contrast_ci <- lme4::confint.merMod(full_model, method = "Wald",
+                                        parm = contrast_lvl2)
+    # Save model objects to list
+    cluster_models[[i]]$null_model <- null_model
+    cluster_models[[i]]$full_model <- full_model
+    cluster_models[[i]]$model_lrt <- model_lrt
+    cluster_models[[i]]$confint <- contrast_ci
+  }
+  
+  # Organize results into output dataframe
+  output <- data.frame(cluster = attributes(designmat)$dimnames[[2]],
+                       size = colSums(designmat))
+  output$model.pvalue <- sapply(cluster_models, function(x) x$model_lrt[["Pr(>Chisq)"]][2])
+  output[[paste(contrast_lvl2, "OR", sep = ".")]] <- sapply(cluster_models, function(x) exp(lme4::fixef(x$full)[[contrast_lvl2]]))
+  output[[paste(contrast_lvl2, "OR", "95pct.ci.lower", sep = ".")]] <- sapply(cluster_models, function(x) exp(x$confint[contrast_lvl2, "2.5 %"]))
+  output[[paste(contrast_lvl2, "OR", "95pct.ci.upper", sep = ".")]] <- sapply(cluster_models, function(x) exp(x$confint[contrast_lvl2, "97.5 %"]))
+  
+  tb = proc.time()[3] - ta;
+  cat("\n ..........  Exit MASC.\n");
+  cat("             Execution time = ", tb, " s.\n", sep = "");
+  
+  # Return MASC results
+  return(output)
 }
