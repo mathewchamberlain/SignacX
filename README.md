@@ -62,15 +62,14 @@ Signac is software developed and maintained by the Savova lab at Sanofi with a f
 
 ## Data portal
 
-Data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) is available for interactive exploration here:
+Here, we provide interactive access to the data processed with Signac in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full):
 
-| Link to data | Tissue | Disease | Source |
-| ----------- | ----------- | ----------- | ----------- |
-| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1)      | Synovium       | RA / OA  | AMP       |
-| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/Immunity_LungCancer_blood/FullDataset_v1) | Blood | Cancer | [Zilionis et al. 2020](https://pubmed.ncbi.nlm.nih.gov/30979687/)       |
-| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/Immunity_LungCancer_lung/FullDataset_v1) | Lung | Cancer | [Zilionis et al. 2020](https://pubmed.ncbi.nlm.nih.gov/30979687/)       |
-| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/EXPLORATORY_AD_FIBROBLASTS_EMMA_GUTTMAN/FullDataset_v1) | Skin | Atopic dermatitis | [He et al. 2020](https://pubmed.ncbi.nlm.nih.gov/32035984/) |
-
+| Links | Tissue | Disease | Number of cells | Number of samples | Source | Signac version |
+| ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
+| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1) | Synovium | Rheumatoid arthritis and osteoarthritis | 8,920 | 26 | [Zhang et. al 2019](https://www.nature.com/articles/s41590-019-0378-1) | v2.0.7 |
+| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/Immunity_LungCancer_lung/FullDataset_v1) | Lung | Cancer | 42,844 | 18 | [Zilionis et al. 2020](https://pubmed.ncbi.nlm.nih.gov/30979687/) | v2.0.7 |
+| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/Immunity_LungCancer_blood/FullDataset_v1) | Blood | Cancer | 14,048 | 8 | [Zilionis et al. 2020](https://pubmed.ncbi.nlm.nih.gov/30979687/) | v2.0.7 |
+| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/EXPLORATORY_AD_FIBROBLASTS_EMMA_GUTTMAN/FullDataset_v1) | Skin | Atopic dermatitis | 36,690 | 17 | [He et al. 2020](https://pubmed.ncbi.nlm.nih.gov/32035984/) | v2.0.7 |
 
 <!-- GETTING STARTED -->
 ## Getting Started
