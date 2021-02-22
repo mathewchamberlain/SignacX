@@ -34,6 +34,7 @@
 ## Table of Contents
 
 * [What is Signac?](#about-the-project)
+* [Data portal](#data-portal)
 * [Getting Started](#getting-started)
   * [Installation](#installation)
   * [Quick start](#quickstart)
@@ -58,6 +59,18 @@
 ## What is Signac?
 
 Signac is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. Signac helps solve the cell type classification problem in single cell RNA sequencing: We have gene expression profiles for each individual cell, but we do not know the cellular phenotypes. Signac classifies the cellular phenotype for each individual cell in single cell RNA-sequencing data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). Signac can: integrate single cell data (mapping cells from one data set to another), classify non-human data, identify novel cell types, and classify single cell data across many tissues, diseases and technologies. We used Signac to identify potential gene drug targets for rheumatoid arthritis, employing a precision medicine strategy to seek immune-modifying therapies that might have reduced side effects, and to identify conserved gene expression-based representations of cellular phenotypes. Check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full).
+
+## Data portal
+
+Data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) is available for interactive exploration here:
+
+| Link to data | Tissue | Disease | Source |
+| ----------- | ----------- | ----------- | ----------- |
+| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1)      | Synovium       | RA / OA  | AMP       |
+| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/Immunity_LungCancer_blood/FullDataset_v1) | Blood | Cancer | [Zilionis et al. 2020](https://pubmed.ncbi.nlm.nih.gov/30979687/)       |
+| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/Immunity_LungCancer_lung/FullDataset_v1) | Lung | Cancer | [Zilionis et al. 2020](https://pubmed.ncbi.nlm.nih.gov/30979687/)       |
+| [Explore data](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/EXPLORATORY_AD_FIBROBLASTS_EMMA_GUTTMAN/FullDataset_v1) | Skin | Atopic dermatitis | [He et al. 2020](https://pubmed.ncbi.nlm.nih.gov/32035984/) |
+
 
 <!-- GETTING STARTED -->
 ## Getting Started
