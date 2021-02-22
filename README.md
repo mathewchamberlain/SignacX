@@ -62,7 +62,7 @@ Signac is software developed and maintained by the Savova lab at Sanofi with a f
 
 ## Data portal
 
-Here, we provide interactive access to data from the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) with SPRING Viewer (video tutorials [here](https://kleintools.hms.harvard.edu/tools/spring.html)). Signac annotations are provided at five levels: Immune, CellTypes, CellTypes_Novel, CellStates and CellStates_Novel, as well as Louvain clusters. When available, we also provided information about covariates (i.e., diagnosis, age, gender, etc.), including FACs for the synovium data.
+Here, we provide interactive access to data from the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) with [SPRING Viewer](https://kleintools.hms.harvard.edu/tools/spring.html)). Signac annotations are provided at four levels (Immune, CellTypes, CellStates and novel CellTypes). When available, we also provided information about covariates (i.e., disease, age, gender, etc.), including FACs for the synovium data.
 
 | Links | Tissue | Disease | Number of cells | Number of samples | Source | Signac version |
 | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
