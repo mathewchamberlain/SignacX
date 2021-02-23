@@ -62,7 +62,7 @@ Signac is software developed and maintained by the Savova lab at Sanofi with a f
 
 ## Data portal
 
-Here, we provide interactive access to data from the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) with [SPRING Viewer](https://kleintools.hms.harvard.edu/tools/spring.html). Signac annotations are provided at four levels (immune, celltypes, cellstates and novel celltypes). When available, we also provided information about sample covariates (i.e., disease, age, gender, FACs etc.). Just click the "Explore" links below, and search your favorite gene:
+Here, we provide interactive access to data from the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) with [SPRING Viewer](https://kleintools.hms.harvard.edu/tools/spring.html). Just click the "Explore" links below, and search your favorite gene:
 
 | Links | Tissue | Disease | Number of cells | Number of samples | Source | Signac version |
 | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
@@ -79,6 +79,10 @@ Here, we provide interactive access to data from the [pre-print](https://www.bio
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/PBMCs_5k_10X/FullDataset_v1) | PBMCs | Healthy | 4,784 | 1 | [10X Genomics](https://support.10xgenomics.com/single-cell-gene-expression/datasets/3.0.2/5k_pbmc_v3) | v2.0.7 |
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/EXPLORATORY_AD_FIBROBLASTS_EMMA_GUTTMAN/FullDataset_v1) | Skin | Atopic dermatitis | 36,690 | 17 | [He et al. 2020](https://pubmed.ncbi.nlm.nih.gov/32035984/) | v2.0.7 |
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1) | Synovium | Rheumatoid arthritis and osteoarthritis | 8,920 | 26 | [Zhang et. al 2019](https://www.nature.com/articles/s41590-019-0378-1) | v2.0.7 |
+
+Note: 
+* Signac annotations are provided at four levels (immune, celltypes, cellstates and novel celltypes).
+* When available, we also provided information about sample covariates (i.e., disease, age, gender, FACs etc.). 
 
 Special thanks to Allon Klein's lab (particularly Caleb Weinreb and Sam Wolock) for hosting the data.
 
@@ -109,6 +113,20 @@ labels = Signac(your_data_here, R = training_HPCA)
 
 # Get cell type labels
 celltypes = Generate_lbls(labels, your_data_here)
+```
+
+Sometimes we don't have time to run Signac, and need a quick solution. Although Signac scales fine with large data sets (>300,000 cells), we developed SignacFast to quickly classify single cell data:
+
+```r
+# load the library
+library(Signac)
+
+# load pre-trained neural network ensemble model
+data("Models_HPCA")
+
+# generate labels with pre-trained model
+labels_fast <- SignacFast("your_data_here", Models = Models_HPCA, num.cores = 18)
+celltypes_fast = Generate_lbls(labels_fast, E = "your_data_here")
 ```
 
 <!-- USAGE EXAMPLES -->
