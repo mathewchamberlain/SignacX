@@ -81,8 +81,9 @@ Here, we provide interactive access to data from the [pre-print](https://www.bio
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1) | Synovium | Rheumatoid arthritis and osteoarthritis | 8,920 | 26 | [Zhang et. al 2019](https://www.nature.com/articles/s41590-019-0378-1) | v2.0.7 |
 
 Note: 
-* Signac annotations are provided at four levels (immune, celltypes, cellstates and novel celltypes).
+* Cell type annotations are provided at four levels (immune, celltypes, cellstates and novel celltypes).
 * When available, we also provided information about sample covariates (i.e., disease, age, gender, FACs etc.). 
+* Cell type annotations for all 13 data sets were generated with the Signac function with the default settings without changing any settings or parameters.
 
 Special thanks to Allon Klein's lab (particularly Caleb Weinreb and Sam Wolock) for hosting the data.
 
