@@ -179,10 +179,11 @@ In Supplemental Figure 8 of the [pre-print](https://www.biorxiv.org/content/10.1
 
 Note:
 * This code can be used for to identify homologous genes between any two species.
+* Monkey data used in Supplemental Figure 8 are available for interactive exploration in the table listed above.
 
 ### Genes of interest
 
-In Figure 6 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we compiled data from three source ([CellPhoneDB](https://www.cellphonedb.org/), [GWAS catalog](https://www.ebi.ac.uk/gwas/) and [this paper](https://www.nature.com/articles/s41588-019-0460-5)) to find genes of immunological / pharmacological interest. These genes and their annotations can be accessed internally from within Signac:
+In Figure 6 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we compiled data from three source ([CellPhoneDB](https://www.cellphonedb.org/), [GWAS catalog](https://www.ebi.ac.uk/gwas/) and [Fang et al. 2020](https://www.nature.com/articles/s41588-019-0456-1)) to find genes of immunological / pharmacological interest. These genes and their annotations can be accessed internally from within Signac:
 
 ```r
 # load the library
@@ -194,7 +195,7 @@ data("Genes_Of_Interest")
 
 ### Learning from single cell data
 
-In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we demonstrated that Signac mapped cell type labels from one single cell data set to another (CD56<sup>bright</sup> NK cells). [Here, we provide a vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-SPRING_Learning.html) for reproducing this analysis, which can be used to map cell populations (or clusters of cells) from one data set to another. We also provide interactive access to the single cell data that were annotated with the CD56<sup>bright</sup> NK cell-model (the CD56<sup>bright</sup> NK cells appear in the "CellStates" annotation layer as red cells).
+In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we demonstrated that Signac mapped cell type labels from one single cell data set to another; learning CD56<sup>bright</sup> NK cells from CITE-seq data. [Here, we provide a vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-SPRING_Learning.html) for reproducing this analysis, which can be used to map cell populations (or clusters of cells) from one data set to another. We also provide interactive access to the single cell data that were annotated with the CD56<sup>bright</sup> NK cell-model (Note: the CD56<sup>bright</sup> NK cells appear in the "CellStates" annotation layer as red cells).
 
 | Links | Tissue | Disease | Number of cells | Number of samples | Source | Signac version |
 | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
@@ -207,17 +208,13 @@ In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.0
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/Monkey_Sample3004/FullDataset_v1_Learned) | Monkey PBMCs | Healthy | 5,220 | 1 | [Chamberlain et al. 2021](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) | v2.0.7 + CD56<sup>bright</sup> NK |
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/Monkey_Tcells/FullDataset_v1_Learned) | Monkey T cells | Healthy | 5,496 | 1 | [Chamberlain et al. 2021](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) | v2.0.7 + CD56<sup>bright</sup> NK |
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/Immunity_LungCancer_blood/FullDataset_v1_Learned) | PBMCs | Cancer | 14,048 | 8 | [Zilionis et al. 2020](https://pubmed.ncbi.nlm.nih.gov/30979687/) | v2.0.7 + CD56<sup>bright</sup> NK |
-| [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein_Learned) | PBMCs | Healthy | 7,902 | 1 | [10X Genomics](https://support.10xgenomics.com/single-cell-gene-expression/datasets/3.0.0/pbmc_10k_protein_v3) | v2.0.7 |
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/PBMCs_5k_10X/FullDataset_v1_Learned) | PBMCs | Healthy | 4,784 | 1 | [10X Genomics](https://support.10xgenomics.com/single-cell-gene-expression/datasets/3.0.2/5k_pbmc_v3) | v2.0.7 + CD56<sup>bright</sup> NK |
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/EXPLORATORY_AD_FIBROBLASTS_EMMA_GUTTMAN/FullDataset_v1_Learned) | Skin | Atopic dermatitis | 36,690 | 17 | [He et al. 2020](https://pubmed.ncbi.nlm.nih.gov/32035984/) | v2.0.7 + CD56<sup>bright</sup> NK |
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1) | Synovium | Rheumatoid arthritis and osteoarthritis | 8,920 | 26 | [Zhang et. al 2019](https://www.nature.com/articles/s41590-019-0378-1) | v2.0.7 + CD56<sup>bright</sup> NK |
 
-Note:
-* The data used here were processed with SPRING prior to classification with Signac; those notebooks are available [here](https://github.com/mathewchamberlain/SPRING_dev/).
-
 ### Fast Signac
 
-Sometimes we don't have time to run Signac, and need a quick solution. Although Signac scales fine with large data sets (>300,000 cells), we developed SignacFast to quickly classify single cell data:
+Sometimes we don't have time to run Signac, and need a quick solution. Although Signac scales fine with large data sets (>300,000 cells) and even for large data, typically takes less than an hour, we developed SignacFast to quickly classify single cell data:
 
 ```r
 # load the library
@@ -244,18 +241,21 @@ data("training_HPCA")
 Models_HPCA = ModelGenerator(R = training_HPCA, N = 100, num.cores = 10)
 ```
 
-We demonstrate how to use SignacFast in this [vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/SignacFast-Seurat_AMP_RA.html).
+We demonstrate how to use SignacFast in this [vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/SignacFast-Seurat_AMP_RA.html), which shows that the results are broadly consistent with running Signac.
+
+Note:
+* For proper use; if the concern is only major cell types (i.e., TNK and MPh cells), then SignacFast is a fine alternative to Signac.
 
 <!-- BENCHMARKING -->
 ## Benchmarking
 
 ### CITE-seq
 
-In Figure 2-3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with CITE-seq PBMCs. Here, we reproduced that analysis with SPRING ([in this vignette](https://github.com/AllonKleinLab/SPRING_dev); as was performed in the pre-print) and additionally with Seurat ([in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)).
+In Figure 2-3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with CITE-seq PBMCs. Here, we reproduced that analysis with SPRING ([in this vignette](https://github.com/AllonKleinLab/SPRING_dev); as was performed in the pre-print) and additionally with Seurat ([in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)), and provide interactive access to the data [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein). 
 
 ### Flow-sorted synovial cells
 
-In Figure 3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with flow cytometry and compared Signac to SingleR. We reproduced that analysis using Seurat [in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP_RA.html).
+In Figure 3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with flow cytometry and compared Signac to SingleR. We reproduced that analysis using Seurat [in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP_RA.html), and provide interactive access to the data [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1).
 
 ### PBMCs
 
