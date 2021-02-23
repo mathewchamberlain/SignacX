@@ -58,11 +58,11 @@
 <!-- ABOUT THE PROJECT -->
 ## What is Signac?
 
-Signac is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. Signac helps solve the cell type classification problem in single cell RNA sequencing: We have gene expression profiles for each individual cell, but we do not know the cellular phenotypes. Signac classifies the cellular phenotype for each individual cell in single cell RNA-sequencing data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). Signac can: integrate single cell data (mapping cells from one data set to another), classify non-human data, identify novel cell types, and classify single cell data across many tissues, diseases and technologies. We used Signac to identify potential gene drug targets for rheumatoid arthritis, employing a precision medicine strategy to seek immune-modifying therapies that might have reduced side effects, and to identify conserved gene expression-based representations of cellular phenotypes. Check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full).
+Signac is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. Signac classifies the cellular phenotype for each individual cell in single cell RNA-sequencing data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). In this R implementation, we provide functions and vignettes that demonstrate how to: integrate single cell data (mapping cells from one data set to another), classify non-human data, identify novel cell types, and classify single cell data across many tissues, diseases and technologies. To learn more, check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full).
 
 ## Data portal
 
-Here, we provide interactive access to data from the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) with [SPRING Viewer](https://kleintools.hms.harvard.edu/tools/spring.html). Signac annotations are provided at four levels (immune, celltypes, cellstates and novel celltypes). When available, we also provided information about sample covariates (i.e., disease, age, gender, etc.), including FACs for the synovium data.
+Here, we provide interactive access to data from the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) with [SPRING Viewer](https://kleintools.hms.harvard.edu/tools/spring.html). Signac annotations are provided at four levels (immune, celltypes, cellstates and novel celltypes). When available, we also provided information about sample covariates (i.e., disease, age, gender, FACs etc.). Just click the "Explore" links below, and search your favorite gene:
 
 | Links | Tissue | Disease | Number of cells | Number of samples | Source | Signac version |
 | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
@@ -80,7 +80,7 @@ Here, we provide interactive access to data from the [pre-print](https://www.bio
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/EXPLORATORY_AD_FIBROBLASTS_EMMA_GUTTMAN/FullDataset_v1) | Skin | Atopic dermatitis | 36,690 | 17 | [He et al. 2020](https://pubmed.ncbi.nlm.nih.gov/32035984/) | v2.0.7 |
 | [Explore](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1) | Synovium | Rheumatoid arthritis and osteoarthritis | 8,920 | 26 | [Zhang et. al 2019](https://www.nature.com/articles/s41590-019-0378-1) | v2.0.7 |
 
-Special thanks to Allon Klein's lab for hosting the data.
+Special thanks to Allon Klein's lab (particularly Caleb Weinreb and Sam Wolock) for hosting the data.
 
 <!-- GETTING STARTED -->
 ## Getting Started
