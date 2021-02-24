@@ -16,7 +16,7 @@
 #' # load bootstrapped training data
 #' data("training_HPCA")
 #' 
-#' # Generate ensemble of 100 neural networks, each for every level of the hierarchy (1,800 models total)
+#' # Generate ensemble of 100 neural networks
 #' Models = ModelGenerator(R = training_HPCA, num.cores = 4)
 #' 
 #' # save results

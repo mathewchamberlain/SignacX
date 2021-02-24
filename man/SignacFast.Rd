@@ -42,8 +42,37 @@ SignacFast(
 \item{return.probability}{if TRUE, returns the probability associated with each cell type label. Default is TRUE.}
 }
 \value{
-cell type annotations
+cell type annotations at every level of the hierarchy
 }
 \description{
 Main function for fast classification of Signac with precomputed models
+}
+\examples{
+\dontrun{
+# download bootstrapped reference data for training models; or load models previously generated with GenerateModels
+data("training_HPCA")
+# train models (default is neural networks)
+Models = ModelGenerator(R = training_HPCA, N = 100, num.cores = 4)
+
+# download single cell data for classification
+download.file("https://cf.10xgenomics.com/samples/cell-exp/3.0.0/pbmc_1k_v3/pbmc_1k_v3_filtered_feature_bc_matrix.h5", destfile = "pbmc_1k_v3_filtered_feature_bc_matrix.h5")
+
+# load data, process with Seurat
+library(Seurat)
+E = Read10X_h5(filename = "pbmc_1k_v3_filtered_feature_bc_matrix.h5")
+pbmc <- CreateSeuratObject(counts = E, project = "pbmc")
+
+# run Seurat pipeline
+pbmc <- SCTransform(pbmc, verbose = FALSE)
+pbmc <- RunPCA(pbmc, verbose = FALSE)
+pbmc <- RunUMAP(pbmc, dims = 1:30, verbose = FALSE)
+pbmc <- FindNeighbors(pbmc, dims = 1:30, verbose = FALSE)
+
+# classify cells
+labels = SignacFast(E = pbmc, Models = Models)
+celltypes = Generate_lbls(labels, E = pbmc)
+}
+}
+\seealso{
+[Signac()] for another classification function, [GenerateModels()] for building stack of neural networks
 }

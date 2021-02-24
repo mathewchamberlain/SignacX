@@ -36,3 +36,14 @@
 #'   ...
 #' }
 "Models_HPCA"
+
+#' A single reference data set used for identifying CD56+ NK cells
+#'
+#' For use with Signac_Solo
+#'
+#' @format A data frame with 32 columns (features + cell type labels) and 2,000 bootstrapped cells
+#' \describe{
+#'   \item{celltypes}{Labels for classification (celltypes)}
+#'   ...
+#' }
+"R_learned"
