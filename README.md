@@ -117,7 +117,7 @@ Sometimes we don't have time to run Signac, and need a quick solution. Although 
 
 ```r
 # load the library
-library(Signac)
+library(SignacX)
 
 # generate labels with pre-trained model
 labels_fast <- SignacFast(E = your_data_here, num.cores = 4)
@@ -144,10 +144,10 @@ E = CID.LoadData(dir)
 
 # generate cellular phenotype labels
 labels = Signac(E, spring.dir = dir)
-celltypes = GenerateLabels(labels, E = E)
+celltypes = GenerateLabels(labels, E = E, spring.dir = dir)
 
 # write cell types and Louvain clusters to SPRING
-dat <- CID.writeJSON(celltypes, data.dir = dir)
+dat <- CID.writeJSON(celltypes, spring.dir = dir)
 ```
 
 After running the above functions, cellular phenotypes and Louvain clusters are ready to be visualized with SPRING Viewer, which can be setup locally as described [here](https://github.com/AllonKleinLab/SPRING_dev).
