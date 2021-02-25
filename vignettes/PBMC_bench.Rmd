@@ -1,16 +1,17 @@
 ---
 title: 'Benchmarking Signac across seven sequencing technologies'
 author: 'Mathew Chamberlain'
-date: "`r Sys.Date()`"
+date: 'Compiled: `r format(Sys.Date(), "%B %d, %Y")`'
 output:
   BiocStyle::html_document:
     fig_crop: no
     toc: true
+    df_print: kable
     includes:
       after_body: footer.html
 ---
 
-This vignette shows how we benchmarked Signac to annotate PBMCs sequenced with seven different technologies [in a previous study](https://www.nature.com/articles/s41587-020-0465-8). We accessed the raw data together with previously-established cell type labels [here](https://doi.org/10.5281/zenodo.3357167).
+This vignette shows how we benchmarked Signac to annotate PBMCs sequenced with seven different technologies. We accessed the raw data from a previous [study](https://www.nature.com/articles/s41587-020-0465-8) together with previously-established cell type labels [here](https://doi.org/10.5281/zenodo.3357167).
 
 ## Processing script
 
@@ -174,8 +175,15 @@ Signac average median F1 score:
 mean(as.numeric(df))
 ```
 
+```{r save.times, include = FALSE}
+write.csv(x = t(as.data.frame(all_times)), file = "Crabeating_vignette_tutorial_times.csv")
+```
+
 ## Session information
 
-```{r sessioninfo, message = F, echo = F}
+<details>
+  <summary>**Session Info**</summary>
+```{r, echo=FALSE}
 sessionInfo()
 ```
+</details>
