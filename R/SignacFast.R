@@ -21,7 +21,7 @@
 #' @export
 #' @seealso \code{\link{Signac}}
 #' 
-#' See \url{https://doi.org/10.1101/2021.02.01.429207} for more details.
+#' See \doi{10.1101/2021.02.01.429207} for more details.
 #' 
 #' @examples
 #' \dontrun{

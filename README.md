@@ -3,7 +3,6 @@
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![GPL License][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
 
 <!-- PROJECT LOGO -->
 <br />
@@ -167,7 +166,7 @@ Note:
 
 ### Non-human data
 
-In Supplemental Figure 8 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we classified single cell data for a model organism (cynomolgus monkey) for which flow-sorted datasets were generally lacking without any additional species-specific training. Instead, we mapped homologous genes from the *Macaca fascicularis* genome to the human genome in the single cell data, and then performed cell type classification with Signac. We demonstrate how we mapped the gene symbols [here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/Crabeating_vignette.html).
+In Supplemental Figure 8 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we classified single cell data for a model organism (cynomolgus monkey) for which flow-sorted datasets were generally lacking without any additional species-specific training. Instead, we mapped homologous genes from the *Macaca fascicularis* genome to the human genome in the single cell data, and then performed cell type classification with Signac. We demonstrate how we mapped the gene symbols [here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/Crabeating_vignette.html).
 
 Note:
 * This code can be used for to identify homologous genes between any two species.
@@ -187,7 +186,7 @@ data("Genes_Of_Interest")
 
 ### Learning from single cell data
 
-In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we demonstrated that Signac mapped cell type labels from one single cell data set to another; learning CD56<sup>bright</sup> NK cells from CITE-seq data. [Here, we provide a vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-SPRING_Learning.html) for reproducing this analysis, which can be used to map cell populations (or clusters of cells) from one data set to another. We also provide interactive access to the single cell data that were annotated with the CD56<sup>bright</sup> NK cell-model (Note: the CD56<sup>bright</sup> NK cells appear in the "CellStates" annotation layer as red cells).
+In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we demonstrated that Signac mapped cell type labels from one single cell data set to another; learning CD56<sup>bright</sup> NK cells from CITE-seq data. [Here, we provide a vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-SPRING_Learning.html) for reproducing this analysis, which can be used to map cell populations (or clusters of cells) from one data set to another. We also provide interactive access to the single cell data that were annotated with the CD56<sup>bright</sup> NK cell-model (Note: the CD56<sup>bright</sup> NK cells appear in the "CellStates" annotation layer as red cells).
 
 | Links | Tissue | Disease | Number of cells | Number of samples | Source | Signac version |
 | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |
@@ -206,7 +205,7 @@ In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.0
 
 ### Fast Signac
 
-Sometimes we don't have time to run Signac, and need a quick solution. Although Signac scales fine with large data sets (>300,000 cells) and even for large data, typically takes less than an hour, we developed SignacFast to quickly classify single cell data:
+Sometimes we don't have time to run Signac and need a faster solution. Although Signac scales fine with large data sets (>300,000 cells) and even for large data, typically takes less than an hour, we developed SignacFast to quickly classify single cell data:
 
 ```r
 # load the library
@@ -217,7 +216,7 @@ labels_fast <- SignacFast(E = your_data_here, num.cores = 4)
 celltypes_fast = GenerateLabels(labels_fast, E = your_data_here)
 ```
 
-Unlike Signac, SignacFast uses an ensemble of 1,800 pre-trained neural network models generated from the HPCA reference data, like so:
+Unlike Signac, SignacFast uses a pre-trained ensemble of neural network models generated from the HPCA reference data, speeding classsification time ~5-10x fold. These models were generated from the HPCA training data like so:
 
 ```r
 # load the library
@@ -226,11 +225,21 @@ library(SignacX)
 # load pre-trained neural network ensemble model
 ref = GetTrainingData_HPCA()
 
-# generate labels with pre-trained model
+# generate models
 Models_HPCA = ModelGenerator(R = training_HPCA, N = 100, num.cores = 4)
 ```
 
-We demonstrate how to use SignacFast in this [vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/SignacFast-Seurat_AMP_RA.html), which shows that the results are broadly consistent with running Signac.
+The "Models_HPCA" are accessed from within the R package:
+
+```r
+# load the library
+library(SignacX)
+
+# load pre-trained neural network ensemble model
+Models = GetModels_HPCA()
+```
+
+We demonstrate how to use SignacFast in this [vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/SignacFast-Seurat_AMP_RA.html), which shows that the results are broadly consistent with running Signac.
 
 Note:
 * For proper use; if the concern is only major cell types (i.e., TNK and MPh cells), then SignacFast is a fine alternative to Signac.
@@ -240,20 +249,20 @@ Note:
 
 ### CITE-seq
 
-In Figure 2-3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with CITE-seq PBMCs. Here, we reproduced that analysis with SPRING ([in this vignette](https://github.com/AllonKleinLab/SPRING_dev); as was performed in the pre-print) and additionally with Seurat ([in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITE-seq.html)), and provide interactive access to the data [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein). 
+In Figure 2-3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with CITE-seq PBMCs. Here, we reproduced that analysis with SPRING ([in this vignette](https://github.com/AllonKleinLab/SPRING_dev); as was performed in the pre-print) and additionally with Seurat ([in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_CITE-seq.html)), and provide interactive access to the data [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein). 
 
 ### Flow-sorted synovial cells
 
-In Figure 3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with flow cytometry and compared Signac to SingleR. We reproduced that analysis using Seurat [in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP_RA.html), and provide interactive access to the data [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1).
+In Figure 3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with flow cytometry and compared Signac to SingleR. We reproduced that analysis using Seurat [in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_AMP_RA.html), and provide interactive access to the data [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1).
 
 ### PBMCs
 
-In Table 1 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we benchmarked Signac across seven different technologies: CEL-seq, Drop-Seq, inDrop, 10X (v2), 10X (v3), Seq-Well and Smart-Seq2; this analysis was reproduced [here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/PBMC_bench.html).
+In Table 1 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we benchmarked Signac across seven different technologies: CEL-seq, Drop-Seq, inDrop, 10X (v2), 10X (v3), Seq-Well and Smart-Seq2; this analysis was reproduced [here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/PBMC_bench.html).
 
 <!-- ROADMAP -->
 ## Roadmap
 
-See the [open issues](https://github.com/mathewchamberlain/Signac/issues) for a list of proposed features (and known issues).
+See the [open issues](https://github.com/mathewchamberlain/SignacX/issues) for a list of proposed features (and known issues).
 
 <!-- CONTRIBUTING -->
 ## Contributing
@@ -276,21 +285,19 @@ Distributed under the GPL v3.0 License. See `LICENSE` for more information.
 <!-- CONTACT -->
 ## Contact
 
-Mathew Chamberlain - [linkedin](https://linkedin.com/in/chamberlainmathew) - mathew.chamberlain@sanofi.com
+Mathew Chamberlain - mathew.chamberlain@sanofi.com
 
-Project Link: [https://github.com/mathewchamberlain/Signac](https://github.com/mathewchamberlain/Signac)
+Project Link: [https://github.com/mathewchamberlain/SignacX](https://github.com/mathewchamberlain/SignacX)
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
-[contributors-shield]: https://img.shields.io/github/contributors/mathewchamberlain/Signac.svg?style=flat-square
-[contributors-url]: https://github.com/mathewchamberlain/Signac/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/mathewchamberlain/Signac.svg?style=flat-square
-[forks-url]: https://github.com/mathewchamberlain/Signac/network/members
-[stars-shield]: https://img.shields.io/github/stars/mathewchamberlain/Signac.svg?style=flat-square
-[stars-url]: https://github.com/mathewchamberlain/Signac/stargazers
-[issues-shield]: https://img.shields.io/github/issues/mathewchamberlain/Signac.svg?style=flat-square
-[issues-url]: https://github.com/mathewchamberlain/Signac/issues
-[license-shield]: https://img.shields.io/github/license/mathewchamberlain/Signac.svg?style=flat-square
+[contributors-shield]: https://img.shields.io/github/contributors/mathewchamberlain/SignacX.svg?style=flat-square
+[contributors-url]: https://github.com/mathewchamberlain/SignacX/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/mathewchamberlain/SignacX.svg?style=flat-square
+[forks-url]: https://github.com/mathewchamberlain/SignacX/network/members
+[stars-shield]: https://img.shields.io/github/stars/mathewchamberlain/SignacX.svg?style=flat-square
+[stars-url]: https://github.com/mathewchamberlain/SignacX/stargazers
+[issues-shield]: https://img.shields.io/github/issues/mathewchamberlain/SignacX.svg?style=flat-square
+[issues-url]: https://github.com/mathewchamberlain/SignacX/issues
+[license-shield]: https://img.shields.io/github/license/mathewchamberlain/SignacX.svg?style=flat-square
 [license-url]: https://choosealicense.com/licenses/gpl-3.0/
-[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=flat-square&logo=linkedin&colorB=555
-[linkedin-url]: https://linkedin.com/in/chamberlainmathew

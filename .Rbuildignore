@@ -1,8 +1,11 @@
 assets
 images
 LICENSE
+vignettes/SignacFast-Seurat_AMP_RA.Rmd
 vignettes/fls/SDY997_EXP15176_celseq_matrix_ru10_molecules.tsv.gz
 vignettes/fls/SDY997_EXP15176_celseq_meta.tsv
+vignettes/fls/celseq_matrix_ru10_molecules.tsv.gz
+vignettes/fls/celseq_meta.immport.723957.tsv
 vignettes/reference_data
 vignettes/fls/pbmc_10k_protein_v3_filtered_feature_bc_matrix.h5
 vignettes/fls/pbmc_1k_v3_filtered_feature_bc_matrix.h5
