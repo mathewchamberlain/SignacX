@@ -1,2 +1,17 @@
+assets
+images
+LICENSE
+vignettes/fls/SDY997_EXP15176_celseq_matrix_ru10_molecules.tsv.gz
+vignettes/fls/SDY997_EXP15176_celseq_meta.tsv
+vignettes/reference_data
+vignettes/fls/pbmc_10k_protein_v3_filtered_feature_bc_matrix.h5
+vignettes/fls/pbmc_1k_v3_filtered_feature_bc_matrix.h5
+vignettes/fls/pbmcs_signac.rds
+vignettes/fls/pbmcs_signac_citeseq.rds
+vignettes/fls/amp_kidney_signac.rds
+vignettes/fls/tutorial_times_signac-Seurat_AMP.csv
+vignettes/fls/tutorial_times_Crabeating_vignette.csv
+vignettes/fls/tutorial_times_signac-Seurat_citeseq.csv
+vignettes/fls/tutorial_times_signac-Seurat_pbmcs.csv
 ^.*\.Rproj$
 ^\.Rproj\.user$

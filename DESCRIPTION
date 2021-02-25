@@ -1,18 +1,23 @@
-Package: Signac
-Type: Package
-Title: Cell type identification based on gene expression patterns
-Version: 2.1.1
-Author: Mathew Chamberlain, Virginia Savova
+Package: SignacX
+Version: 2.2.0
+Date: 2021-02-24
+Title: Cell Type Identification and Discovery from Single Cell Gene Expression Data
+Authors@R: c(
+  person(given = "Mathew", family = "Chamberlain", email = "mathew.chamberlain@sanofi.com", role = c( "aut","cre")),
+  person(given = "Virginia", family = "Savova", email = "virginia.savova@sanofi.com", role = c( "aut")),
+  person(given = "Richa", family = "Hanamsagar", email = "richa.hanamsagar@sanofi.com", role = c( "aut")),
+  person(given = "Frank", family = "Nestle", email = "frank.nestle@sanofi.com", role = c( "aut")),
+  person(given = "Emanuele", family = "de Rinaldis", email = "Emanuele.deRinaldis@sanofi.com", role = c( "aut")),
+  person("Sanofi US", role = "fnd"))
 Maintainer: Mathew Chamberlain <mathew.chamberlain@sanofi.com>
-Imports: Matrix, pbmcapply, qlcMatrix(>= 0.9.7), Seurat(>= 2.3.1), RJSONIO, igraph (>= 1.2.1), jsonlite (>= 1.5), RColorBrewer (>= 1.1.2), stats, graphics, neuralnet, e1071, randomForest, lme4, knitr, glasso, methods, ggplot2
-Suggests: rJava(>= 0.9-9), DBI(>= 1.0.0), xCell, SAVER, AnnotationDbi, ReactomePA, hdf5r, org.Hs.eg.db, rhdf5
-Description: Signac is an algorithm that addresses the classification problem in single cell RNA sequencing. We often have an expression matrix and we need to classify the cells into their cell types and cell states based on their gene expression patterns.
+URL: https://github.com/mathewchamberlain/Signac
+BugReports: https://github.com/mathewchamberlain/Signac/issues
+Imports: neuralnet, lme4, methods, Matrix, pbmcapply, Seurat(>= 3.2.0), RJSONIO, igraph (>= 1.2.1), jsonlite (>= 1.5), RColorBrewer (>= 1.1.2), stats
+Suggests: hdf5r, rhdf5, knitr, rmarkdown, formatR
+Description: An implementation of neural networks trained with flow-sorted gene expression data to classify cellular phenotypes in single cell RNA-sequencing data. See Chamberlain M et al. (2021) <doi:10.1101/2021.02.01.429207> for more details.
 Depends: R (>= 3.5.0)
-License: GPL-3 | file LICENSE
+License: GPL-3
 Encoding: UTF-8
 LazyData: false
 RoxygenNote: 7.1.0
-biocViews: org.Hs.eg.db, ReactomePA, AnnotationDbi
-URL: http://github.com/mathewchamberlain/Signac
-BugReports: http://github.com/mathewchamberlain/Signac/issues
 VignetteBuilder: knitr

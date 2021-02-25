@@ -9,10 +9,10 @@
 <br />
 <p align="center">
   <a href="https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full">
-    <img src="images/GitHubFigure.svg" alt="Logo" width="600" height="300">
+    <img src="https://github.com/mathewchamberlain/SignacX/blob/master/images/GitHubFigure.svg" alt="Logo" width="600" height="300">
   </a>
 
-  <h3 align="center">Signac 2.1.1</h3>
+  <h3 align="center">SignacX 2.2.0</h3>
 
   <p align="center">
     Get the most out of your single cell data.
@@ -20,11 +20,11 @@
     <a href="#getting-started"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html">View Demo</a>
+    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_CITEseq.html">View Demo</a>
     ·
-    <a href="https://github.com/mathewchamberlain/Signac/issues">Report Bug</a>
+    <a href="https://github.com/mathewchamberlain/SignacX/issues">Report Bug</a>
     ·
-    <a href="https://github.com/mathewchamberlain/Signac/issues">Request Feature</a>
+    <a href="https://github.com/mathewchamberlain/SignacX/issues">Request Feature</a>
   </p>
 </p>
 
@@ -33,7 +33,7 @@
 <!-- TABLE OF CONTENTS -->
 ## Table of Contents
 
-* [What is Signac?](#about-the-project)
+* [What is SignacX?](#about-the-project)
 * [Data portal](#data-portal)
 * [Getting Started](#getting-started)
   * [Installation](#installation)
@@ -56,9 +56,9 @@
 * [Contact](#contact)
 
 <!-- ABOUT THE PROJECT -->
-## What is Signac?
+## What is SignacX?
 
-Signac is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. Signac classifies the cellular phenotype for each individual cell in single cell RNA-sequencing data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). In this R implementation, we provide functions and vignettes that demonstrate how to: integrate single cell data (mapping cells from one data set to another), classify non-human data, identify novel cell types, and classify single cell data across many tissues, diseases and technologies. To learn more, check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full).
+SignacX is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. SignacX classifies the cellular phenotype for each individual cell in single cell RNA-sequencing data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). In this R implementation, we provide functions and vignettes that demonstrate how to: integrate single cell data (mapping cells from one data set to another), classify non-human data, identify novel cell types, and classify single cell data across many tissues, diseases and technologies. To learn more, check out the pre-print [here](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full).
 
 ## Data portal
 
@@ -90,12 +90,12 @@ Special thanks to Allon Klein's lab (particularly Caleb Weinreb and Sam Wolock) 
 <!-- GETTING STARTED -->
 ## Getting Started
 
-To install Signac in R, simply do:
+To install SignacX in R, simply do:
 
 ### Installation
 
 ```r
-devtools::install_github("mathewchamberlain/Signac")
+devtools::install_github("mathewchamberlain/SignacX")
 ```
 
 ### Quick start
@@ -104,16 +104,13 @@ The main functions in Signac are:
 
 ```r
 # load the library
-library(Signac)
-
-# Load the reference training data set
-data("training_HPCA")
+library(SignacX)
 
 # Generate initial labels
-labels = Signac(your_data_here, R = training_HPCA)
+labels = Signac(E = your_data_here)
 
 # Get cell type labels
-celltypes = Generate_lbls(labels, your_data_here)
+celltypes = GenerateLabels(labels, E = your_data_here)
 ```
 
 Sometimes we don't have time to run Signac, and need a quick solution. Although Signac scales fine with large data sets (>300,000 cells), we developed SignacFast to quickly classify single cell data:
@@ -122,25 +119,22 @@ Sometimes we don't have time to run Signac, and need a quick solution. Although 
 # load the library
 library(Signac)
 
-# load pre-trained neural network ensemble model
-data("Models_HPCA")
-
 # generate labels with pre-trained model
-labels_fast <- SignacFast("your_data_here", Models = Models_HPCA, num.cores = 18)
-celltypes_fast = Generate_lbls(labels_fast, E = "your_data_here")
+labels_fast <- SignacFast(E = your_data_here, num.cores = 4)
+celltypes_fast = GenerateLabels(labels_fast, E = your_data_here)
 ```
 
 <!-- USAGE EXAMPLES -->
 ## Usage
 
-To make life easier, Signac was integrated with [Seurat](https://satijalab.org/seurat/) (versions 3 and 4), and with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/). We provide a few vignettes:
+To make life easier, SignacX was integrated with [Seurat](https://satijalab.org/seurat/) (versions 3 and 4), and with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/). We provide a few vignettes:
 
 ### SPRING
 In the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we often used Signac integrated with [SPRING](https://pubmed.ncbi.nlm.nih.gov/29228172/). To reproduce our findings and to generate new results with SPRING, please visit the SPRING repository which has [example notebooks and installation instructions](https://github.com/AllonKleinLab/SPRING_dev), particularly for [processing CITE-seq and scRNA-seq data from 10X Genomics](https://github.com/AllonKleinLab/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb). Briefly, Signac is integrated seamlessly with the output files of SPRING in R, requiring only a few functions:
 
 ```r
 # load the Signac library
-library(Signac)
+library(SignacX)
 
 # dir points to the "FullDataset_v1" directory generated by the SPRING Jupyter notebook
 dir = "./FullDataset_v1" 
@@ -148,12 +142,9 @@ dir = "./FullDataset_v1"
 # load the expression data
 E = CID.LoadData(dir)
 
-# load the reference data
-data("training_HPCA")
-
 # generate cellular phenotype labels
-labels = Signac(E, R = training_HPCA, spring.dir = dir)
-celltypes = Generate_lbls(labels, E = E)
+labels = Signac(E, spring.dir = dir)
+celltypes = GenerateLabels(labels, E = E)
 
 # write cell types and Louvain clusters to SPRING
 dat <- CID.writeJSON(celltypes, data.dir = dir)
@@ -162,14 +153,14 @@ dat <- CID.writeJSON(celltypes, data.dir = dir)
 After running the above functions, cellular phenotypes and Louvain clusters are ready to be visualized with SPRING Viewer, which can be setup locally as described [here](https://github.com/AllonKleinLab/SPRING_dev).
 
 ### Seurat
-Another way to use Signac is with Seurat. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html), we performed multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Signac integrated with Seurat.
+Another way to use Signac is with Seurat. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_CITEseq.html), we performed multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Signac integrated with Seurat.
 
 Note:
 * This same data set was also processed using SPRING [in this notebook](https://github.com/AllonKleinLab/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb), and subsequently classified with Signac, which was used to generate SPRING layouts for these data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) (Figures 2-4), which is available for interactive exploration [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein).
 
 #### MASC
 
-Sometimes, we have single cell genomics data with disease information, and we want to know which cellular phenotypes are enriched for disease. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_AMP.html), we applied Signac to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) to identify which cellular phenotypes were disease-enriched.
+Sometimes, we have single cell genomics data with disease information, and we want to know which cellular phenotypes are enriched for disease. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_AMP.html), we applied Signac to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) to identify which cellular phenotypes were disease-enriched.
 
 Note:
 * MASC typically requires equal numbers of cells and samples between case and control: an unequal number might skew the clustering of cells towards one sample (i.e., a "batch effect"), which could cause spurious disease enrichment in the mixed effect model. Since Signac classifies each cell independently (without using clusters), Signac annotations can be used with MASC without a priori balancing samples or cells, unlike cluster-based annotation methods.
@@ -188,7 +179,7 @@ In Figure 6 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.0
 
 ```r
 # load the library
-library(Signac)
+library(SignacX)
 
 # See ?Genes_Of_Interest
 data("Genes_Of_Interest")
@@ -221,12 +212,9 @@ Sometimes we don't have time to run Signac, and need a quick solution. Although 
 # load the library
 library(Signac)
 
-# load pre-trained neural network ensemble model
-data("Models_HPCA")
-
 # generate labels with pre-trained model
-labels_fast <- SignacFast("your_data_here", Models = Models_HPCA, num.cores = 18)
-celltypes_fast = Generate_lbls(labels_fast, E = "your_data_here")
+labels_fast <- SignacFast("your_data_here", num.cores = 4)
+celltypes_fast = GenerateLabels(labels_fast, E = "your_data_here")
 ```
 
 Unlike Signac, SignacFast uses an ensemble of 1,800 pre-trained neural network models generated from the HPCA reference data, like so:
@@ -236,10 +224,10 @@ Unlike Signac, SignacFast uses an ensemble of 1,800 pre-trained neural network m
 library(Signac)
 
 # load pre-trained neural network ensemble model
-data("training_HPCA")
+ref = GetTrainingData_HPCA()
 
 # generate labels with pre-trained model
-Models_HPCA = ModelGenerator(R = training_HPCA, N = 100, num.cores = 10)
+Models_HPCA = ModelGenerator(R = training_HPCA, N = 100, num.cores = 4)
 ```
 
 We demonstrate how to use SignacFast in this [vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/SignacFast-Seurat_AMP_RA.html), which shows that the results are broadly consistent with running Signac.
@@ -306,4 +294,3 @@ Project Link: [https://github.com/mathewchamberlain/Signac](https://github.com/m
 [license-url]: https://choosealicense.com/licenses/gpl-3.0/
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=flat-square&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/chamberlainmathew
-[product-screenshot]: images/screenshot.png

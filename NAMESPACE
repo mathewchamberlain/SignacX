@@ -4,6 +4,5 @@ importFrom("stats", "na.omit", "phyper", "sd")
 importFrom("utils", "data", "read.csv", "read.delim", "read.table",
                "write.table", "combn")
 importFrom("methods", "new", "as")
-importFrom("graphics", "hist")
-importFrom("stats", "optimize", "quantile","cor.test", "cutree", "dist", "hclust", "median")
 importFrom("stats", "anova", "as.formula", "binomial", "model.matrix", "cov")
+importFrom("utils", "download.file")

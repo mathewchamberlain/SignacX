@@ -1,14 +1,12 @@
 ---
 title: 'Mapping homologous gene symbols'
 author: 'Mathew Chamberlain'
-date: 'Compiled: `r format(Sys.Date(), "%B %d, %Y")`'
-output:
-  BiocStyle::html_document:
-    fig_crop: no
-    toc: true
-    df_print: kable
-    includes:
-      after_body: footer.html
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Mapping homologous gene symbols}
+  %\VignetteEngine{knitr::rmarkdown_notangle}
+  %\VignetteEncoding{UTF-8}
 ---
 
 This vignette shows how to map homologous gene symbols from Macaca fascicularis to the human genome.
@@ -33,34 +31,29 @@ knitr::opts_chunk$set(
   warning = FALSE,
   time_it = TRUE
 )
-Hmisc::hidingTOC(
-buttonLabel = "Contents",
-levels = 3,
-tocSide = c("right"),
-buttonSide = c("right"),
-hidden = FALSE
-)
+orthologs <- readRDS(file = "fls/orthologs.rds")
 ```
 
 # Load the essential packages
 
-```{r setup packages}
-library(biomaRt)
-library(tidyverse)
+```{r setup packages, eval = F}
+require(biomaRt)
+require(tidyverse)
+require(SignacX)
 ```
 
 After mapping the reads to the Macaca fasccicularis genome, we load the genes, which were generated from the output of the [cellranger pipeline](https://support.10xgenomics.com/single-cell-gene-expression/software/pipelines/latest/what-is-cell-ranger) from 10X Genomics.
 
 # Load Macaca fascicularis genes
 
-```{r load genes, echo = T}
-features.tsv <- read.delim("features.tsv.gz", header=FALSE, stringsAsFactors=FALSE)
+```{r load genes, echo = T, eval = T}
+features.tsv <- read.delim("fls/features.tsv.gz", header=FALSE, stringsAsFactors=FALSE)
 head(features.tsv)
 ```
 
 # Map homologous genes
 
-```{r map genes}
+```{r map genes, eval = F}
 # get human and cyno gene symbols
 human.R95 <- useMart(host='jan2019.archive.ensembl.org', 
 				   biomart='ENSEMBL_MART_ENSEMBL', 
@@ -102,13 +95,19 @@ xx = xx[logik]
 orthologs = orthologs[!is.na(orthologs$HumanSymbol),]
 # note: several of these genes are not unique mappers; we will aggregate them later or make them unique. To aggregate, where E is the sparse expression matrix with rownames set to xx:
 # E = Matrix.utils::aggregate.Matrix(E, row.names(E))
+```
+
+Now we have mapped homologous gene symbols across species:
+
+```{r display orthologs}
 head(orthologs)
 ```
 
 After mapping homologous genes, Signac can be used to classify the cell types.
 
 ```{r save.times, include = FALSE}
-write.csv(x = t(as.data.frame(all_times)), file = "Crabeating_vignette_tutorial_times.csv")
+write.csv(x = t(as.data.frame(all_times)), file = "fls/tutorial_times_Crabeating_vignette.csv")
+saveRDS(orthologs, file = "fls/orthologs.rds")
 ```
 
 <details>
