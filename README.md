@@ -20,7 +20,7 @@
     <a href="#getting-started"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_CITEseq.html">View Demo</a>
+    <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_CITE-seq.html">View Demo</a>
     ·
     <a href="https://github.com/mathewchamberlain/SignacX/issues">Report Bug</a>
     ·
@@ -153,7 +153,7 @@ dat <- CID.writeJSON(celltypes, spring.dir = dir)
 After running the above functions, cellular phenotypes and Louvain clusters are ready to be visualized with SPRING Viewer, which can be setup locally as described [here](https://github.com/AllonKleinLab/SPRING_dev).
 
 ### Seurat
-Another way to use Signac is with Seurat. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_CITEseq.html), we performed multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Signac integrated with Seurat.
+Another way to use Signac is with Seurat. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_CITE-seq.html), we performed multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Signac integrated with Seurat.
 
 Note:
 * This same data set was also processed using SPRING [in this notebook](https://github.com/AllonKleinLab/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb), and subsequently classified with Signac, which was used to generate SPRING layouts for these data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) (Figures 2-4), which is available for interactive exploration [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein).
@@ -210,18 +210,18 @@ Sometimes we don't have time to run Signac, and need a quick solution. Although 
 
 ```r
 # load the library
-library(Signac)
+library(SignacX)
 
 # generate labels with pre-trained model
-labels_fast <- SignacFast("your_data_here", num.cores = 4)
-celltypes_fast = GenerateLabels(labels_fast, E = "your_data_here")
+labels_fast <- SignacFast(E = your_data_here, num.cores = 4)
+celltypes_fast = GenerateLabels(labels_fast, E = your_data_here)
 ```
 
 Unlike Signac, SignacFast uses an ensemble of 1,800 pre-trained neural network models generated from the HPCA reference data, like so:
 
 ```r
 # load the library
-library(Signac)
+library(SignacX)
 
 # load pre-trained neural network ensemble model
 ref = GetTrainingData_HPCA()
@@ -240,7 +240,7 @@ Note:
 
 ### CITE-seq
 
-In Figure 2-3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with CITE-seq PBMCs. Here, we reproduced that analysis with SPRING ([in this vignette](https://github.com/AllonKleinLab/SPRING_dev); as was performed in the pre-print) and additionally with Seurat ([in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITEseq.html)), and provide interactive access to the data [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein). 
+In Figure 2-3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with CITE-seq PBMCs. Here, we reproduced that analysis with SPRING ([in this vignette](https://github.com/AllonKleinLab/SPRING_dev); as was performed in the pre-print) and additionally with Seurat ([in this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/Signac/master/vignettes/signac-Seurat_CITE-seq.html)), and provide interactive access to the data [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein). 
 
 ### Flow-sorted synovial cells
 

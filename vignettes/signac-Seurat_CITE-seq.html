@@ -307,7 +307,7 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 
 
-<p>This vignette shows how to use Signac with Seurat. There are three parts: Seurat, Signac and then visualization. We use an example PBMCs scRNA-seq data set from 10X Genomics. First, we set up a folder for holding the Signac reference data:</p>
+<p>This vignette shows how to use Signac with Seurat. There are three parts: Seurat, Signac and then visualization. We use an example PBMCs scRNA-seq data set from 10X Genomics.</p>
 <div id="seurat" class="section level2">
 <h2>Seurat</h2>
 <p>Start with the standard pre-processing steps for a Seurat object.</p>
@@ -541,8 +541,7 @@ Unclassified
 ## Running under: CentOS Linux 7 (Core)
 ## 
 ## Matrix products: default
-## BLAS: /usr/lib64/libblas.so.3.4.2
-## LAPACK: /site/ne/app/x86_64/R/v3.5.0/lib64/R/lib/libRlapack.so
+## BLAS/LAPACK: /site/ne/home/i0369218/.local/share/r-miniconda/envs/r-reticulate/lib/libopenblasp-r0.3.10.so
 ## 
 ## locale:
 ##  [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C              
@@ -579,34 +578,33 @@ Unclassified
 ##  [52] htmlwidgets_1.5.3    httr_1.4.2           gplots_3.0.3        
 ##  [55] RColorBrewer_1.1-2   ellipsis_0.3.0       Seurat_3.2.0        
 ##  [58] ica_1.0-2            pkgconfig_2.0.3      uwot_0.1.8          
-##  [61] deldir_0.2-10        utf8_1.1.4           RJSONIO_1.3-1.4     
-##  [64] tidyselect_1.1.0     rlang_0.4.8          reshape2_1.4.4      
-##  [67] later_1.0.0          munsell_0.5.0        pbmcapply_1.5.0     
-##  [70] tools_3.5.0          cli_2.0.2            devtools_2.3.1      
-##  [73] ggridges_0.5.3       evaluate_0.14        stringr_1.4.0       
-##  [76] fastmap_1.0.1        yaml_2.2.1           goftest_1.2-2       
-##  [79] npsurv_0.4-0         processx_3.4.2       knitr_1.28          
-##  [82] fs_1.4.1             fitdistrplus_1.0-14  caTools_1.17.1.1    
-##  [85] purrr_0.3.3          RANN_2.6.1           pbapply_1.4-2       
-##  [88] future_1.16.0        nlme_3.1-145         mime_0.9            
-##  [91] formatR_1.7          xml2_1.3.1           compiler_3.5.0      
-##  [94] rstudioapi_0.11      plotly_4.9.3         png_0.1-7           
-##  [97] testthat_2.3.2       lsei_1.2-0           spatstat.utils_2.0-0
-## [100] tibble_3.0.6         statmod_1.4.34       stringi_1.4.6       
-## [103] highr_0.8            ps_1.3.2             desc_1.2.0          
-## [106] lattice_0.20-41      Matrix_1.2-18        nloptr_1.2.2.1      
-## [109] vctrs_0.3.6          pillar_1.4.3         lifecycle_0.2.0     
-## [112] lmtest_0.9-37        RcppAnnoy_0.0.16     data.table_1.14.0   
-## [115] cowplot_1.1.1        bitops_1.0-6         irlba_2.3.3         
-## [118] httpuv_1.5.2         patchwork_1.1.1      R6_2.4.1            
-## [121] promises_1.1.0       KernSmooth_2.23-16   gridExtra_2.3       
-## [124] sessioninfo_1.1.1    codetools_0.2-16     boot_1.3-24         
-## [127] MASS_7.3-51.1        gtools_3.8.1         assertthat_0.2.1    
-## [130] pkgload_1.0.2        rprojroot_1.3-2      withr_2.4.1         
-## [133] sctransform_0.3.2    mgcv_1.8-31          parallel_3.5.0      
-## [136] grid_3.5.0           rpart_4.1-15         tidyr_1.1.2         
-## [139] minqa_1.2.4          rmarkdown_2.1        Rtsne_0.15          
-## [142] shiny_1.4.0.2</code></pre>
+##  [61] deldir_0.2-10        RJSONIO_1.3-1.4      tidyselect_1.1.0    
+##  [64] rlang_0.4.8          reshape2_1.4.4       later_1.0.0         
+##  [67] munsell_0.5.0        pbmcapply_1.5.0      tools_3.5.0         
+##  [70] cli_2.0.2            devtools_2.3.1       ggridges_0.5.3      
+##  [73] evaluate_0.14        stringr_1.4.0        fastmap_1.0.1       
+##  [76] yaml_2.2.1           goftest_1.2-2        npsurv_0.4-0        
+##  [79] processx_3.4.2       knitr_1.28           fs_1.4.1            
+##  [82] fitdistrplus_1.0-14  caTools_1.17.1.1     purrr_0.3.3         
+##  [85] RANN_2.6.1           pbapply_1.4-2        future_1.16.0       
+##  [88] nlme_3.1-145         mime_0.9             formatR_1.7         
+##  [91] xml2_1.3.1           compiler_3.5.0       rstudioapi_0.11     
+##  [94] plotly_4.9.3         png_0.1-7            testthat_2.3.2      
+##  [97] lsei_1.2-0           spatstat.utils_2.0-0 tibble_3.0.6        
+## [100] statmod_1.4.34       stringi_1.4.6        highr_0.8           
+## [103] ps_1.3.2             desc_1.2.0           lattice_0.20-41     
+## [106] Matrix_1.2-18        nloptr_1.2.2.1       vctrs_0.3.6         
+## [109] pillar_1.4.3         lifecycle_0.2.0      lmtest_0.9-37       
+## [112] RcppAnnoy_0.0.16     data.table_1.14.0    cowplot_1.1.1       
+## [115] bitops_1.0-6         irlba_2.3.3          httpuv_1.5.2        
+## [118] patchwork_1.1.1      R6_2.4.1             promises_1.1.0      
+## [121] KernSmooth_2.23-16   gridExtra_2.3        sessioninfo_1.1.1   
+## [124] codetools_0.2-16     boot_1.3-24          MASS_7.3-51.1       
+## [127] gtools_3.8.1         assertthat_0.2.1     pkgload_1.0.2       
+## [130] rprojroot_1.3-2      withr_2.4.1          sctransform_0.3.2   
+## [133] mgcv_1.8-31          parallel_3.5.0       grid_3.5.0          
+## [136] rpart_4.1-15         tidyr_1.1.2          minqa_1.2.4         
+## [139] rmarkdown_2.1        Rtsne_0.15           shiny_1.4.0.2</code></pre>
 </details>
 </div>
 

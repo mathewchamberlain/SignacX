@@ -1,7 +1,8 @@
 Package: SignacX
 Version: 2.2.0
 Date: 2021-02-24
-Title: Cell Type Identification and Discovery from Single Cell Gene Expression Data
+Title: Cell Type Identification and Discovery from Single Cell Gene
+        Expression Data
 Authors@R: c(
   person(given = "Mathew", family = "Chamberlain", email = "mathew.chamberlain@sanofi.com", role = c( "aut","cre")),
   person(given = "Virginia", family = "Savova", email = "virginia.savova@sanofi.com", role = c( "aut")),
@@ -12,7 +13,9 @@ Authors@R: c(
 Maintainer: Mathew Chamberlain <mathew.chamberlain@sanofi.com>
 URL: https://github.com/mathewchamberlain/Signac
 BugReports: https://github.com/mathewchamberlain/Signac/issues
-Imports: neuralnet, lme4, methods, Matrix, pbmcapply, Seurat(>= 3.2.0), RJSONIO, igraph (>= 1.2.1), jsonlite (>= 1.5), RColorBrewer (>= 1.1.2), stats
+Imports: neuralnet, lme4, methods, Matrix, pbmcapply, Seurat(>= 3.2.0),
+        RJSONIO, igraph (>= 1.2.1), jsonlite (>= 1.5), RColorBrewer (>=
+        1.1.2), stats
 Suggests: hdf5r, rhdf5, knitr, rmarkdown, formatR
 Description: An implementation of neural networks trained with flow-sorted gene expression data to classify cellular phenotypes in single cell RNA-sequencing data. See Chamberlain M et al. (2021) <doi:10.1101/2021.02.01.429207> for more details.
 Depends: R (>= 3.5.0)
@@ -21,3 +24,11 @@ Encoding: UTF-8
 LazyData: false
 RoxygenNote: 7.1.0
 VignetteBuilder: knitr
+NeedsCompilation: no
+Packaged: 2021-02-25 18:29:09 UTC; i0369218
+Author: Mathew Chamberlain [aut, cre],
+  Virginia Savova [aut],
+  Richa Hanamsagar [aut],
+  Frank Nestle [aut],
+  Emanuele de Rinaldis [aut],
+  Sanofi US [fnd]
