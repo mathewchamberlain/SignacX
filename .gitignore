@@ -12,6 +12,7 @@ vignettes/fls/pbmc_1k_v3_filtered_feature_bc_matrix.h5
 vignettes/fls/pbmcs_signac.rds
 vignettes/fls/pbmcs_signac_citeseq.rds
 vignettes/fls/amp_kidney_signac.rds
+vignettes/fls/seurat_obj_amp_synovium.rds
 vignettes/fls/tutorial_times_signac-Seurat_AMP.csv
 vignettes/fls/tutorial_times_Crabeating_vignette.csv
 vignettes/fls/tutorial_times_signac-Seurat_citeseq.csv
