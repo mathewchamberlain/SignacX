@@ -186,6 +186,7 @@ DoHeatmap(pbmc, features = unique(top5$gene), angle = 90)
 dev.off()
 ```
 ![Immune marker genes](./fls/plot6.png)
+
 Save results
 
 ```{r save results, message = F, eval = F}

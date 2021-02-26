@@ -43,12 +43,8 @@ celltypes = readRDS("./fls/celltypes_citeseq.rds")
 #  pbmc <- RunUMAP(pbmc, dims = 1:30, verbose = FALSE)
 #  pbmc <- FindNeighbors(pbmc, dims = 1:30, verbose = FALSE)
 
-## ----setup2, message = F, eval = F--------------------------------------------
-#  install.packages("SignacX")
-
 ## ----Signac setup folder, message = T, eval = F-------------------------------
-#  # load library
-#  library(SignacX)
+#  require(SignacX)
 
 ## ----Signac, message = T, eval = F--------------------------------------------
 #  # Run Signac
@@ -99,15 +95,25 @@ knitr::kable(table(Signac = celltypes$CellTypes, SignacFast = celltypes_fast$Cel
 #  dev.off()
 
 ## ----Seurat visualize protein 33, message = F, eval = F-----------------------
-#  # Downsample the clusters to a maximum of 500 cells each (makes the heatmap easier to see for
-#  # small clusters)
-#  pbmc <- SetIdent(pbmc, value='cellstates')
+#  pbmc <- SetIdent(pbmc, value='celltypes')
 #  
 #  # Find markers for all clusters, and draw a heatmap
 #  markers <- FindAllMarkers(pbmc, only.pos = TRUE, verbose = F, logfc.threshold = 1)
 #  library(dplyr)
 #  top5 <- markers %>%  group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
-#  png(filename="./fls/plot6_citeseq.png")
+#  
+#  png(filename="./fls/plot9_citeseq.png", width = 640, height = 720)
+#  DoHeatmap(pbmc, features = unique(top5$gene), angle = 90)
+#  dev.off()
+
+## ----Seurat visualize protein 3333, message = F, eval = F---------------------
+#  pbmc <- SetIdent(pbmc, value='cellstates')
+#  
+#  # Find markers for all clusters, and draw a heatmap
+#  markers <- FindAllMarkers(pbmc, only.pos = TRUE, verbose = F, logfc.threshold = 1)
+#  top5 <- markers %>%  group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
+#  
+#  png(filename="./fls/plot6_citeseq.png", width = 640, height = 720)
 #  DoHeatmap(pbmc, features = unique(top5$gene), angle = 90)
 #  dev.off()
 
@@ -119,8 +125,8 @@ knitr::kable(table(Signac = celltypes$CellTypes, SignacFast = celltypes_fast$Cel
 ## ----Seurat visualize protein 3, eval = F-------------------------------------
 #  DefaultAssay(pbmc) <- "ADT"
 #  # Find protein markers for all clusters, and draw a heatmap
-#  adt.markers <- FindAllMarkers(pbmc.small, assay = "ADT", only.pos = TRUE, verbose = F)
-#  png(filename="./fls/plot7_citeseq.png")
+#  adt.markers <- FindAllMarkers(pbmc, assay = "ADT", only.pos = TRUE, verbose = F)
+#  png(filename="./fls/plot7_citeseq.png", width = 640, height = 720)
 #  DoHeatmap(pbmc, features = unique(adt.markers$gene), angle = 90)
 #  dev.off()
 

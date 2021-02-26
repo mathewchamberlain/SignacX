@@ -11,8 +11,8 @@ Authors@R: c(
   person(given = "Emanuele", family = "de Rinaldis", email = "Emanuele.deRinaldis@sanofi.com", role = c( "aut")),
   person("Sanofi US", role = "fnd"))
 Maintainer: Mathew Chamberlain <mathew.chamberlain@sanofi.com>
-URL: https://github.com/mathewchamberlain/Signac
-BugReports: https://github.com/mathewchamberlain/Signac/issues
+URL: https://github.com/mathewchamberlain/SignacX
+BugReports: https://github.com/mathewchamberlain/SignacX/issues
 Imports: neuralnet, lme4, methods, Matrix, pbmcapply, Seurat(>= 3.2.0),
         RJSONIO, igraph (>= 1.2.1), jsonlite (>= 1.5), RColorBrewer (>=
         1.1.2), stats

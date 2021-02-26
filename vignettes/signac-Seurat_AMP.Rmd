@@ -173,9 +173,9 @@ kidney.small <- kidney[, !celltypes$CellStates %in% c("NonImmune", "Fibroblasts"
 # Find protein markers for all clusters, and draw a heatmap
 markers <- FindAllMarkers(kidney.small, only.pos = TRUE, verbose = F, logfc.threshold = 1)
 require(dplyr)
-top3 <- markers %>%  group_by(cluster) %>% top_n(n = 3, wt = avg_logFC)
-png(filename="fls/plot4_amp.png")
-DoHeatmap(kidney.small, features = unique(top3$gene), angle = 90)
+top5 <- markers %>%  group_by(cluster) %>% top_n(n = 5, wt = avg_logFC)
+png(filename="fls/plot4_amp.png", width = 640, height = 640)
+DoHeatmap(kidney.small, features = unique(top5$gene), angle = 90)
 dev.off()
 ```
 ![Immune marker genes](./fls/plot4_amp.png)
@@ -190,7 +190,7 @@ Q = MASC(dataset = Meta_mapped, cluster = Meta_mapped$CellStates, contrast = 'di
 
 MASC results reveals that fibroblasts, plasma cells and B memory cells are enriched (p value < 0.05) for disease.
 
-```{r, results='asis'}
+```{r, results='asis', echo = F}
 writeLines("td, th { padding : 6px } th { background-color : brown ; color : white; border : 1px solid white; } td { color : brown ; border : 1px solid brown }", con = "mystyle.css")
 knitr::kable(Q, format = "html")
 ```

@@ -31,7 +31,6 @@ ModelGenerator(
 }
 \value{
 A list, each containing N neural network models
-See \doi{10.1101/2021.02.01.429207} for more details.
 }
 \description{
 \code{\link{ModelGenerator}} generates an ensemble of neural network models

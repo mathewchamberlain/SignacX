@@ -20,9 +20,6 @@
 #' as well as 'clusters' for the Louvain clustering results.
 #' @export
 #' @seealso \code{\link{Signac}}
-#' 
-#' See \doi{10.1101/2021.02.01.429207} for more details.
-#' 
 #' @examples
 #' \dontrun{
 #' # download single cell data for classification

@@ -84,6 +84,4 @@ saveRDS(celltypes, "celltypes.rds")
 \code{\link{Signac}} for another classification function.
 
 \code{\link{Signac}}
-
-See \doi{10.1101/2021.02.01.429207} for more details.
 }
