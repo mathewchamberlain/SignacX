@@ -9,9 +9,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
-  <a href="https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full">
-    <img src="https://github.com/mathewchamberlain/SignacX/blob/master/images/GitHubFigure.svg" alt="Logo" width="600" height="300">
-  </a>
+
 
   <h3 align="center">SignacX 2.2.0</h3>
 

@@ -1,0 +1,13 @@
+pandoc: 2.11.2
+pkgdown: 1.6.1
+pkgdown_sha: ~
+articles:
+  Crabeating_vignette: Crabeating_vignette.html
+  SignacFast-Seurat_AMP_RA: SignacFast-Seurat_AMP_RA.html
+  signac-SPRING_Learning: signac-SPRING_Learning.html
+  signac-Seurat_AMP: signac-Seurat_AMP.html
+  signac-Seurat_AMP_RA: signac-Seurat_AMP_RA.html
+  signac-Seurat_CITE-seq: signac-Seurat_CITE-seq.html
+  signac-Seurat_pbmcs: signac-Seurat_pbmcs.html
+last_built: 2021-03-01T18:43Z
+
