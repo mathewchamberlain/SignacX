@@ -1,13 +1,14 @@
 ---
-title: 'Signac and SPRING: Learning CD56 NK cells from multi-modal analysis of CITE-seq PBMCs from 10X Genomics'
-author: 'Mathew Chamberlain'
-date: "`r Sys.Date()`"
+title: 'Learning CD56 NK cells from CITE-seq PBMCs'
+date: Compiled `r Sys.Date()`
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Mapping cells from CITE-seq PBMCs from 10X Genomics to another data set}
   %\VignetteEngine{knitr::rmarkdown_notangle}
   %\VignetteEncoding{UTF-8}
 ---
+
+In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we demonstrated that SignacX mapped cell type labels from one single cell data set to another; learning CD56<sup>bright</sup> NK cells from CITE-seq data. In this vignette, we reproduced this analysis, which can be used to map cell populations (or clusters of cells) from one data set to another. We also provide interactive access to the single cell data that were annotated with the CD56<sup>bright</sup> NK cell-model in the SignacX data portal (Note: the CD56<sup>bright</sup> NK cells appear in the "CellStates" annotation layer as red cells).
 
 This vignette shows how to use SignacX with Seurat and SPRING to learn a new cell type category from single cell data.
 

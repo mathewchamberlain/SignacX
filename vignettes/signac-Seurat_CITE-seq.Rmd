@@ -1,7 +1,6 @@
 ---
 title: 'Cell type classification with SignacX: CITE-seq PBMCs from 10X Genomics'
-author: 'Mathew Chamberlain'
-date: "`r Sys.Date()`"
+date: Compiled `r Sys.Date()`
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Analysis of CITE-seq PBMCs from 10X Genomics}
@@ -34,7 +33,7 @@ celltypes = readRDS("./fls/celltypes_citeseq.rds")
 # pbmc = readRDS("fls/pbmcs_signac_citeseq.rds")
 ```
 
-This vignette shows how to use Signac with Seurat. There are three parts: Seurat, Signac and then visualization. We use an example PBMCs CITE-seq data set from 10X Genomics.
+In Figure 2-3 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we validated Signac with CITE-seq PBMCs. Here, we reproduced that analysis with Seurat, and provide interactive access to the data [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein). There are three parts to this vignette: Seurat, SignacX and then visualization. We use an example PBMCs CITE-seq data set from 10X Genomics.
 
 ## Seurat 
 

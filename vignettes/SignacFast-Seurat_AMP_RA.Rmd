@@ -1,15 +1,32 @@
 ---
 title: 'Benchmarking SignacFast with single cell flow-sorted data'
-author: 'Mathew Chamberlain'
-date: "`r Sys.Date()`"
+date: Compiled `r Sys.Date()`
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Benchmarking SignacFast with flow-sorted data}
+  %\VignetteIndexEntry{Benchmarking SignacFast with single cell flow-sorted data}
   %\VignetteEngine{knitr::rmarkdown_notangle}
   %\VignetteEncoding{UTF-8}
 ---
 
-This vignette shows how to use SignacFast to annotate flow-sorted synovial cells by integrating SignacX with Seurat. We start with raw counts from [this publication](https://www.nature.com/articles/s41590-019-0378-1). 
+Sometimes we don't have time to run Signac and need a faster solution. Although Signac scales fine with large data sets (>300,000 cells) and even for large data, typically takes less than an hour, we developed SignacFast to quickly classify single cell data. Unlike Signac, SignacFast uses a pre-trained ensemble of neural network models generated from the HPCA reference data, speeding classification time ~5-10x fold. These models were generated from the HPCA training data like so:
+
+```r
+# load pre-trained neural network ensemble model
+ref = GetTrainingData_HPCA()
+
+# generate models
+Models_HPCA = ModelGenerator(R = training_HPCA, N = 100, num.cores = 4)
+```
+
+The "Models_HPCA" are accessed from within the R package:
+
+```r
+# load pre-trained neural network ensemble model
+Models = GetModels_HPCA()
+```
+
+We demonstrate how to use SignacFast in this vignette, which shows that SignacFast is broadly consistent with Signac (just faster).
+Here, we show how to use SignacFast to annotate flow-sorted synovial cells by integrating SignacX with Seurat. We start with raw counts from [this publication](https://www.nature.com/articles/s41590-019-0378-1). 
 
 ```{r setup0, include=FALSE}
 all_times <- list()  # store the time for each chunk

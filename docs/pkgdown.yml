@@ -4,10 +4,15 @@ pkgdown_sha: ~
 articles:
   Crabeating_vignette: Crabeating_vignette.html
   SignacFast-Seurat_AMP_RA: SignacFast-Seurat_AMP_RA.html
+  dataportal: dataportal.html
+  genesofinterest: genesofinterest.html
+  install: install.html
+  quickstart: quickstart.html
   signac-SPRING_Learning: signac-SPRING_Learning.html
   signac-Seurat_AMP: signac-Seurat_AMP.html
   signac-Seurat_AMP_RA: signac-Seurat_AMP_RA.html
   signac-Seurat_CITE-seq: signac-Seurat_CITE-seq.html
   signac-Seurat_pbmcs: signac-Seurat_pbmcs.html
-last_built: 2021-03-01T18:43Z
+  springintegration: springintegration.html
+last_built: 2021-03-01T21:43Z
 

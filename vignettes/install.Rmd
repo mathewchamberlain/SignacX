@@ -1,0 +1,30 @@
+---
+title: 'Installation instructions for SignacX'
+output: html_document
+---
+
+SignacX is available on [CRAN](https://cran.r-project.org/package=SignacX) for all platforms. To install in R, run: 
+
+```{r setup packages, eval = F}
+install.packages('SignacX')
+library(SignacX)
+```
+
+### Install previous versions of SignacX
+
+#### Install any version 2 release
+
+Any of the SignacX version 2 releases can be installed with the following command:
+
+```{r eval = FALSE}
+devtools::install_github("mathewchamberlain/SignacX@2.X.X")
+```
+
+### Install the development version of SignacX
+
+Install the development version of SignacX - directly from [GitHub](https://github.com/mathewchamberlain/SignacX).
+
+```{r eval = FALSE}
+devtools::install_github(repo = 'mathewchamberlain/SignacX')
+library(SignacX)
+```

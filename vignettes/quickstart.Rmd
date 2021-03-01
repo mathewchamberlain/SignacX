@@ -1,0 +1,19 @@
+---
+title: 'SignacX: Quick start'
+output: html_document
+---
+
+## Quick start
+
+The main functions in SignacX are:
+
+```r
+install.packages('SignacX')
+library(SignacX)
+
+# Generate initial labels
+labels = Signac(E = your_data_here)
+
+# Generate cell type labels
+celltypes = GenerateLabels(labels, E = your_data_here)
+```

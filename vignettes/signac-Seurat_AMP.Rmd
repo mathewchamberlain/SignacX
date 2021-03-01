@@ -1,13 +1,17 @@
 ---
 title: 'SignacX, Seurat and MASC: Analysis of kidney cells from AMP'
-author: 'Mathew Chamberlain'
-date: "`r Sys.Date()`"
+date: Compiled `r Sys.Date()`
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Analysis of Kidney lupus data from AMP}
   %\VignetteEngine{knitr::rmarkdown_notangle}
   %\VignetteEncoding{UTF-8}
 ---
+Sometimes, we have single cell genomics data with disease information, and we want to know which cellular phenotypes are enriched for disease. In this vignette, we applied SignacX to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used [MASC](https://pubmed.ncbi.nlm.nih.gov/30333237/) to identify which cellular phenotypes were disease-enriched.
+
+Note:
+
+* MASC typically requires equal numbers of cells and samples between case and control: an unequal number might skew the clustering of cells towards one sample (i.e., a "batch effect"), which could cause spurious disease enrichment in the mixed effect model. Since Signac classifies each cell independently (without using clusters), Signac annotations can be used with MASC without a priori balancing samples or cells, unlike cluster-based annotation methods.
 
 This vignette shows how to use SignacX with Seurat and MASC. There are three parts: Seurat, SignacX and then MASC. We use an example data set of kidney cells from AMP from [this publication](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6726437/).
 

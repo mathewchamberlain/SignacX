@@ -38,46 +38,59 @@
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
 <li>
-  <a href="../index.html">
-    <span class="fas fa-home fa-lg"></span>
-     
-  </a>
+  <a href="../articles/install.html">Install</a>
 </li>
 <li>
-  <a href="../reference/index.html">Reference</a>
+  <a href="../articles/dataportal.html">Data portal</a>
+</li>
+<li>
+  <a href="../articles/quickstart.html">Quick start</a>
 </li>
 <li class="dropdown">
   <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
-    Articles
+    Vignettes
      
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
-<li>
-      <a href="../articles/Crabeating_vignette.html">Mapping homologous gene symbols</a>
+<li class="dropdown-header">Introductory Vignettes</li>
+    <li>
+      <a href="../articles/signac-Seurat_pbmcs.html">PBMCs 1K tutorial</a>
     </li>
     <li>
-      <a href="../articles/SignacFast-Seurat_AMP_RA.html">Benchmarking SignacFast with single cell flow-sorted data</a>
+      <a href="../articles/springintegration.html">Integrating SignacX with SPRING and Seurat</a>
+    </li>
+    <li class="divider">
+    <li class="dropdown-header">Advanced use</li>
+    <li>
+      <a href="../articles/signac-SPRING_Learning.html">Learning from single cell data</a>
     </li>
     <li>
-      <a href="../articles/signac-SPRING_Learning.html">Signac and SPRING: Learning CD56 NK cells from multi-modal analysis of CITE-seq PBMCs from 10X Genomics</a>
+      <a href="../articles/Crabeating_vignette.html">Classifying non-human single cell data</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_AMP.html">SignacX, Seurat and MASC: Analysis of kidney cells from AMP</a>
+      <a href="../articles/signac-Seurat_AMP.html">Identifying disease-enriched cell types with SignacX</a>
+    </li>
+    <li class="divider">
+    <li class="dropdown-header">Benchmarking</li>
+    <li>
+      <a href="../articles/signac-Seurat_AMP_RA.html">Flow cytometry synovium: SingleR vs. SignacX</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_AMP_RA.html">Benchmarking SignacX and SingleR with synovial flow cytometry data</a>
+      <a href="../articles/SignacFast-Seurat_AMP_RA.html">Flow cytometry synovium: FastSignac vs Signac</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_CITE-seq.html">Cell type classification with SignacX: CITE-seq PBMCs from 10X Genomics</a>
+      <a href="../articles/signac-Seurat_CITE-seq.html">CITE-seq PBMCs</a>
     </li>
+    <li class="divider">
+    <li class="dropdown-header">Other</li>
     <li>
-      <a href="../articles/signac-Seurat_pbmcs.html">Cell type classification with SignacX: PBMCs from 10X Genomics</a>
+      <a href="../articles/genesofinterest.html">Genes of immune and pharmacological interest</a>
     </li>
   </ul>
 </li>
 <li>
-  <a href="../news/index.html">Changelog</a>
+  <a href="https://github.com/mathewchamberlain/SignacX/discussions">FAQ</a>
 </li>
       </ul>
 <ul class="nav navbar-nav navbar-right">
@@ -101,9 +114,8 @@
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>SignacX, Seurat and MASC: Analysis of kidney cells from AMP</h1>
-                        <h4 class="author">Mathew Chamberlain</h4>
             
-            <h4 class="date">2021-03-01</h4>
+            <h4 class="date">Compiled 2021-03-01</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mathewchamberlain/SignacX/blob/master/vignettes/signac-Seurat_AMP.Rmd"><code>vignettes/signac-Seurat_AMP.Rmd</code></a></small>
       <div class="hidden name"><code>signac-Seurat_AMP.Rmd</code></div>
@@ -112,28 +124,32 @@
 
     
     
+<p>Sometimes, we have single cell genomics data with disease information, and we want to know which cellular phenotypes are enriched for disease. In this vignette, we applied SignacX to classify cellular phenotypes in healthy and lupus nephritis kidney cells, and then we used <a href="https://pubmed.ncbi.nlm.nih.gov/30333237/">MASC</a> to identify which cellular phenotypes were disease-enriched.</p>
+<p>Note:</p>
+<ul>
+<li>MASC typically requires equal numbers of cells and samples between case and control: an unequal number might skew the clustering of cells towards one sample (i.e., a “batch effect”), which could cause spurious disease enrichment in the mixed effect model. Since Signac classifies each cell independently (without using clusters), Signac annotations can be used with MASC without a priori balancing samples or cells, unlike cluster-based annotation methods.</li>
+</ul>
 <p>This vignette shows how to use SignacX with Seurat and MASC. There are three parts: Seurat, SignacX and then MASC. We use an example data set of kidney cells from AMP from <a href="https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6726437/">this publication</a>.</p>
 <div id="load-data" class="section level2">
 <h2 class="hasAnchor">
 <a href="#load-data" class="anchor"></a>Load data</h2>
 <p>Read the CEL-seq2 data.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">ReadCelseq</span> <span class="op">&lt;-</span> <span class="kw">function</span> <span class="op">(</span><span class="va">counts.file</span>, <span class="va">meta.file</span><span class="op">)</span>
-<span class="op">{</span>
-  <span class="va">E</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html">suppressWarnings</a></span><span class="op">(</span><span class="fu">readr</span><span class="fu">::</span><span class="fu">read_tsv</span><span class="op">(</span><span class="va">counts.file</span><span class="op">)</span><span class="op">)</span>;
-  <span class="va">gns</span> <span class="op">&lt;-</span> <span class="va">E</span><span class="op">$</span><span class="va">gene</span>;
-  <span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>,<span class="op">-</span><span class="fl">1</span><span class="op">]</span>
-  <span class="va">M</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html">suppressWarnings</a></span><span class="op">(</span><span class="fu">readr</span><span class="fu">::</span><span class="fu">read_tsv</span><span class="op">(</span><span class="va">meta.file</span><span class="op">)</span><span class="op">)</span>
-  <span class="va">S</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html">unique</a></span><span class="op">(</span><span class="va">M</span><span class="op">$</span><span class="va">sample</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span>
-    <span class="va">logik</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">colnames</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span> <span class="op">%in%</span> <span class="va">M</span><span class="op">$</span><span class="va">cell_name</span><span class="op">[</span><span class="va">M</span><span class="op">$</span><span class="va">sample</span> <span class="op">==</span> <span class="va">x</span><span class="op">]</span>
-    <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/Matrix.html">Matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html">as.matrix</a></span><span class="op">(</span><span class="va">E</span><span class="op">[</span>,<span class="va">logik</span><span class="op">]</span><span class="op">)</span>, sparse <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">}</span>
-    <span class="op">)</span>
-  <span class="fu"><a href="https://rdrr.io/r/base/names.html">names</a></span><span class="op">(</span><span class="va">S</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html">unique</a></span><span class="op">(</span><span class="va">M</span><span class="op">$</span><span class="va">sample</span><span class="op">)</span>
-  <span class="va">S</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html">lapply</a></span><span class="op">(</span><span class="va">S</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">{</span>
-    <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">rownames</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">gns</span>
-    <span class="va">x</span>
-  <span class="op">}</span><span class="op">)</span>
-  <span class="va">S</span>
+<code class="sourceCode R"><span class="va">ReadCelseq</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">counts.file</span>, <span class="va">meta.file</span><span class="op">)</span> <span class="op">{</span>
+    <span class="va">E</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html">suppressWarnings</a></span><span class="op">(</span><span class="fu">readr</span><span class="fu">::</span><span class="fu">read_tsv</span><span class="op">(</span><span class="va">counts.file</span><span class="op">)</span><span class="op">)</span>
+    <span class="va">gns</span> <span class="op">&lt;-</span> <span class="va">E</span><span class="op">$</span><span class="va">gene</span>
+    <span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>, <span class="op">-</span><span class="fl">1</span><span class="op">]</span>
+    <span class="va">M</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html">suppressWarnings</a></span><span class="op">(</span><span class="fu">readr</span><span class="fu">::</span><span class="fu">read_tsv</span><span class="op">(</span><span class="va">meta.file</span><span class="op">)</span><span class="op">)</span>
+    <span class="va">S</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/unique.html">unique</a></span><span class="op">(</span><span class="va">M</span><span class="op">$</span><span class="va">sample</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span>
+        <span class="va">logik</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">colnames</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span> <span class="op">%in%</span> <span class="va">M</span><span class="op">$</span><span class="va">cell_name</span><span class="op">[</span><span class="va">M</span><span class="op">$</span><span class="va">sample</span> <span class="op">==</span> <span class="va">x</span><span class="op">]</span>
+        <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/Matrix.html">Matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html">as.matrix</a></span><span class="op">(</span><span class="va">E</span><span class="op">[</span>, <span class="va">logik</span><span class="op">]</span><span class="op">)</span>, sparse <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>
+    <span class="op">}</span><span class="op">)</span>
+    <span class="fu"><a href="https://rdrr.io/r/base/names.html">names</a></span><span class="op">(</span><span class="va">S</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html">unique</a></span><span class="op">(</span><span class="va">M</span><span class="op">$</span><span class="va">sample</span><span class="op">)</span>
+    <span class="va">S</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html">lapply</a></span><span class="op">(</span><span class="va">S</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span>
+        <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">rownames</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">gns</span>
+        <span class="va">x</span>
+    <span class="op">}</span><span class="op">)</span>
+    <span class="va">S</span>
 <span class="op">}</span>
 
 <span class="va">counts.file</span> <span class="op">=</span> <span class="st">"./SDY997_EXP15176_celseq_matrix_ru10_molecules.tsv.gz"</span>
@@ -144,8 +160,8 @@
 <p>Merge into a single matrix</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="co"># keep only kidney cells</span>
-<span class="va">E</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html">lapply</a></span><span class="op">(</span><span class="va">E</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">{</span>
-  <span class="va">x</span><span class="op">[</span>,<span class="fu"><a href="https://rdrr.io/r/base/grep.html">grepl</a></span><span class="op">(</span><span class="st">"K"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">colnames</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span><span class="op">]</span>
+<span class="va">E</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html">lapply</a></span><span class="op">(</span><span class="va">E</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="op">{</span>
+    <span class="va">x</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/grep.html">grepl</a></span><span class="op">(</span><span class="st">"K"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">colnames</a></span><span class="op">(</span><span class="va">x</span><span class="op">)</span><span class="op">)</span><span class="op">]</span>
 <span class="op">}</span><span class="op">)</span>
 
 <span class="co"># remove any sample with no cells</span>
@@ -203,27 +219,27 @@
 <a href="#visualizations" class="anchor"></a>Visualizations</h2>
 <p>Now we can visualize the cell type classifications at many different levels:</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/AddMetaData.html">AddMetaData</a></span><span class="op">(</span><span class="va">kidney</span>, metadata<span class="op">=</span><span class="va">celltypes</span><span class="op">$</span><span class="va">Immune</span>, col.name <span class="op">=</span> <span class="st">"immmune"</span><span class="op">)</span>
-<span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/Idents.html">SetIdent</a></span><span class="op">(</span><span class="va">kidney</span>, value<span class="op">=</span><span class="st">'immmune'</span><span class="op">)</span>
-<span class="fu"><a href="https://rdrr.io/r/grDevices/png.html">png</a></span><span class="op">(</span>filename<span class="op">=</span><span class="st">"fls/plot1_amp.png"</span><span class="op">)</span>
+<code class="sourceCode R"><span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/AddMetaData.html">AddMetaData</a></span><span class="op">(</span><span class="va">kidney</span>, metadata <span class="op">=</span> <span class="va">celltypes</span><span class="op">$</span><span class="va">Immune</span>, col.name <span class="op">=</span> <span class="st">"immmune"</span><span class="op">)</span>
+<span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/Idents.html">SetIdent</a></span><span class="op">(</span><span class="va">kidney</span>, value <span class="op">=</span> <span class="st">"immmune"</span><span class="op">)</span>
+<span class="fu"><a href="https://rdrr.io/r/grDevices/png.html">png</a></span><span class="op">(</span>filename <span class="op">=</span> <span class="st">"fls/plot1_amp.png"</span><span class="op">)</span>
 <span class="fu"><a href="https://satijalab.org/seurat/reference/DimPlot.html">DimPlot</a></span><span class="op">(</span><span class="va">kidney</span><span class="op">)</span>
 <span class="fu"><a href="https://rdrr.io/r/grDevices/dev.html">dev.off</a></span><span class="op">(</span><span class="op">)</span></code></pre></div>
 <div class="figure">
 <img src="fls/plot1_amp.png" alt=""><p class="caption">Immune, Nonimmune (if any) and unclassified cells</p>
 </div>
 <div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/AddMetaData.html">AddMetaData</a></span><span class="op">(</span><span class="va">kidney</span>, metadata<span class="op">=</span><span class="va">celltypes</span><span class="op">$</span><span class="va">CellTypes</span>, col.name <span class="op">=</span> <span class="st">"celltypes"</span><span class="op">)</span>
-<span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/Idents.html">SetIdent</a></span><span class="op">(</span><span class="va">kidney</span>, value<span class="op">=</span><span class="st">'celltypes'</span><span class="op">)</span>
-<span class="fu"><a href="https://rdrr.io/r/grDevices/png.html">png</a></span><span class="op">(</span>filename<span class="op">=</span><span class="st">"fls/plot2_amp.png"</span><span class="op">)</span>
+<code class="sourceCode R"><span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/AddMetaData.html">AddMetaData</a></span><span class="op">(</span><span class="va">kidney</span>, metadata <span class="op">=</span> <span class="va">celltypes</span><span class="op">$</span><span class="va">CellTypes</span>, col.name <span class="op">=</span> <span class="st">"celltypes"</span><span class="op">)</span>
+<span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/Idents.html">SetIdent</a></span><span class="op">(</span><span class="va">kidney</span>, value <span class="op">=</span> <span class="st">"celltypes"</span><span class="op">)</span>
+<span class="fu"><a href="https://rdrr.io/r/grDevices/png.html">png</a></span><span class="op">(</span>filename <span class="op">=</span> <span class="st">"fls/plot2_amp.png"</span><span class="op">)</span>
 <span class="fu"><a href="https://satijalab.org/seurat/reference/DimPlot.html">DimPlot</a></span><span class="op">(</span><span class="va">kidney</span><span class="op">)</span>
 <span class="fu"><a href="https://rdrr.io/r/grDevices/dev.html">dev.off</a></span><span class="op">(</span><span class="op">)</span></code></pre></div>
 <div class="figure">
 <img src="fls/plot2_amp.png" alt=""><p class="caption">Cell types</p>
 </div>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/AddMetaData.html">AddMetaData</a></span><span class="op">(</span><span class="va">kidney</span>, metadata<span class="op">=</span><span class="va">celltypes</span><span class="op">$</span><span class="va">CellStates</span>, col.name <span class="op">=</span> <span class="st">"cellstates"</span><span class="op">)</span>
-<span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/Idents.html">SetIdent</a></span><span class="op">(</span><span class="va">kidney</span>, value<span class="op">=</span><span class="st">'cellstates'</span><span class="op">)</span>
-<span class="fu"><a href="https://rdrr.io/r/grDevices/png.html">png</a></span><span class="op">(</span>filename<span class="op">=</span><span class="st">"fls/plot3_amp.png"</span><span class="op">)</span>
+<code class="sourceCode R"><span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/AddMetaData.html">AddMetaData</a></span><span class="op">(</span><span class="va">kidney</span>, metadata <span class="op">=</span> <span class="va">celltypes</span><span class="op">$</span><span class="va">CellStates</span>, col.name <span class="op">=</span> <span class="st">"cellstates"</span><span class="op">)</span>
+<span class="va">kidney</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/Idents.html">SetIdent</a></span><span class="op">(</span><span class="va">kidney</span>, value <span class="op">=</span> <span class="st">"cellstates"</span><span class="op">)</span>
+<span class="fu"><a href="https://rdrr.io/r/grDevices/png.html">png</a></span><span class="op">(</span>filename <span class="op">=</span> <span class="st">"fls/plot3_amp.png"</span><span class="op">)</span>
 <span class="fu"><a href="https://satijalab.org/seurat/reference/DimPlot.html">DimPlot</a></span><span class="op">(</span><span class="va">kidney</span><span class="op">)</span>
 <span class="fu"><a href="https://rdrr.io/r/grDevices/dev.html">dev.off</a></span><span class="op">(</span><span class="op">)</span></code></pre></div>
 <div class="figure">
@@ -232,13 +248,14 @@
 <p>Identify immune marker genes (IMAGES)</p>
 <div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="co"># Downsample just the immune cells</span>
-<span class="va">kidney.small</span> <span class="op">&lt;-</span> <span class="va">kidney</span><span class="op">[</span>, <span class="op">!</span><span class="va">celltypes</span><span class="op">$</span><span class="va">CellStates</span> <span class="op">%in%</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"NonImmune"</span>, <span class="st">"Fibroblasts"</span>, <span class="st">"Unclassified"</span>, <span class="st">"Endothelial"</span>, <span class="st">"Epithelial"</span><span class="op">)</span><span class="op">]</span>
+<span class="va">kidney.small</span> <span class="op">&lt;-</span> <span class="va">kidney</span><span class="op">[</span>, <span class="op">!</span><span class="va">celltypes</span><span class="op">$</span><span class="va">CellStates</span> <span class="op">%in%</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"NonImmune"</span>, <span class="st">"Fibroblasts"</span>, <span class="st">"Unclassified"</span>, 
+    <span class="st">"Endothelial"</span>, <span class="st">"Epithelial"</span><span class="op">)</span><span class="op">]</span>
 
 <span class="co"># Find protein markers for all clusters, and draw a heatmap</span>
 <span class="va">markers</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/FindAllMarkers.html">FindAllMarkers</a></span><span class="op">(</span><span class="va">kidney.small</span>, only.pos <span class="op">=</span> <span class="cn">TRUE</span>, verbose <span class="op">=</span> <span class="cn">F</span>, logfc.threshold <span class="op">=</span> <span class="fl">1</span><span class="op">)</span>
 <span class="kw"><a href="https://rdrr.io/r/base/library.html">require</a></span><span class="op">(</span><span class="va"><a href="https://dplyr.tidyverse.org">dplyr</a></span><span class="op">)</span>
-<span class="va">top5</span> <span class="op">&lt;-</span> <span class="va">markers</span> <span class="op">%&gt;%</span>  <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">group_by</a></span><span class="op">(</span><span class="va">cluster</span><span class="op">)</span> <span class="op">%&gt;%</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/top_n.html">top_n</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">5</span>, wt <span class="op">=</span> <span class="va">avg_logFC</span><span class="op">)</span>
-<span class="fu"><a href="https://rdrr.io/r/grDevices/png.html">png</a></span><span class="op">(</span>filename<span class="op">=</span><span class="st">"fls/plot4_amp.png"</span>, width <span class="op">=</span> <span class="fl">640</span>, height <span class="op">=</span> <span class="fl">640</span><span class="op">)</span>
+<span class="va">top5</span> <span class="op">&lt;-</span> <span class="va">markers</span> <span class="op">%&gt;%</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/group_by.html">group_by</a></span><span class="op">(</span><span class="va">cluster</span><span class="op">)</span> <span class="op">%&gt;%</span> <span class="fu"><a href="https://dplyr.tidyverse.org/reference/top_n.html">top_n</a></span><span class="op">(</span>n <span class="op">=</span> <span class="fl">5</span>, wt <span class="op">=</span> <span class="va">avg_logFC</span><span class="op">)</span>
+<span class="fu"><a href="https://rdrr.io/r/grDevices/png.html">png</a></span><span class="op">(</span>filename <span class="op">=</span> <span class="st">"fls/plot4_amp.png"</span>, width <span class="op">=</span> <span class="fl">640</span>, height <span class="op">=</span> <span class="fl">640</span><span class="op">)</span>
 <span class="fu"><a href="https://satijalab.org/seurat/reference/DoHeatmap.html">DoHeatmap</a></span><span class="op">(</span><span class="va">kidney.small</span>, features <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html">unique</a></span><span class="op">(</span><span class="va">top5</span><span class="op">$</span><span class="va">gene</span><span class="op">)</span>, angle <span class="op">=</span> <span class="fl">90</span><span class="op">)</span>
 <span class="fu"><a href="https://rdrr.io/r/grDevices/dev.html">dev.off</a></span><span class="op">(</span><span class="op">)</span></code></pre></div>
 <div class="figure">
@@ -252,7 +269,8 @@
 <code class="sourceCode R"><span class="va">Meta_mapped</span> <span class="op">=</span> <span class="va">M</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/match.html">match</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html">colnames</a></span><span class="op">(</span><span class="va">kidney</span><span class="op">)</span>, <span class="va">M</span><span class="op">$</span><span class="va">cell_name</span><span class="op">)</span>, <span class="op">]</span>
 <span class="va">Meta_mapped</span><span class="op">$</span><span class="va">CellStates</span> <span class="op">=</span> <span class="va">celltypes</span><span class="op">$</span><span class="va">CellStates</span>
 <span class="va">Meta_mapped</span><span class="op">$</span><span class="va">disease</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html">factor</a></span><span class="op">(</span><span class="va">Meta_mapped</span><span class="op">$</span><span class="va">disease</span><span class="op">)</span>
-<span class="va">Q</span> <span class="op">=</span> <span class="fu"><a href="../reference/MASC.html">MASC</a></span><span class="op">(</span>dataset <span class="op">=</span> <span class="va">Meta_mapped</span>, cluster <span class="op">=</span> <span class="va">Meta_mapped</span><span class="op">$</span><span class="va">CellStates</span>, contrast <span class="op">=</span> <span class="st">'disease'</span>, random_effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"plate"</span>, <span class="st">"lane"</span>, <span class="st">"sample"</span><span class="op">)</span><span class="op">)</span></code></pre></div>
+<span class="va">Q</span> <span class="op">=</span> <span class="fu"><a href="../reference/MASC.html">MASC</a></span><span class="op">(</span>dataset <span class="op">=</span> <span class="va">Meta_mapped</span>, cluster <span class="op">=</span> <span class="va">Meta_mapped</span><span class="op">$</span><span class="va">CellStates</span>, contrast <span class="op">=</span> <span class="st">"disease"</span>, random_effects <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"plate"</span>, 
+    <span class="st">"lane"</span>, <span class="st">"sample"</span><span class="op">)</span><span class="op">)</span></code></pre></div>
 <p>MASC results reveals that fibroblasts, plasma cells and B memory cells are enriched (p value &lt; 0.05) for disease.</p>
 <table class="table">
 <thead><tr>
@@ -704,13 +722,13 @@ Unclassified
 ## 
 ## loaded via a namespace (and not attached):
 ##  [1] knitr_1.31        magrittr_2.0.1    R6_2.5.0          ragg_1.1.1       
-##  [5] rlang_0.4.10      fastmap_1.1.0     stringr_1.4.0     highr_0.8        
+##  [5] rlang_0.4.10      fastmap_1.1.0     highr_0.8         stringr_1.4.0    
 ##  [9] tools_4.0.0       xfun_0.21         jquerylib_0.1.3   htmltools_0.5.1.1
 ## [13] systemfonts_1.0.1 yaml_2.2.1        assertthat_0.2.1  digest_0.6.27    
 ## [17] rprojroot_2.0.2   pkgdown_1.6.1     crayon_1.4.1      textshaping_0.3.1
-## [21] sass_0.3.1        fs_1.5.0          memoise_2.0.0     cachem_1.0.3     
-## [25] evaluate_0.14     rmarkdown_2.7     stringi_1.5.3     compiler_4.0.0   
-## [29] bslib_0.2.4       desc_1.2.0        jsonlite_1.7.2</code></pre>
+## [21] formatR_1.7       sass_0.3.1        fs_1.5.0          memoise_2.0.0    
+## [25] cachem_1.0.3      evaluate_0.14     rmarkdown_2.7     stringi_1.5.3    
+## [29] compiler_4.0.0    bslib_0.2.4       desc_1.2.0        jsonlite_1.7.2</code></pre>
 </details>
 </div>
   </div>

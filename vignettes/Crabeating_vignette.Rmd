@@ -1,13 +1,18 @@
 ---
 title: 'Mapping homologous gene symbols'
-author: 'Mathew Chamberlain'
-date: "`r Sys.Date()`"
+date: Compiled `r Sys.Date()`
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Mapping homologous gene symbols}
   %\VignetteEngine{knitr::rmarkdown_notangle}
   %\VignetteEncoding{UTF-8}
 ---
+
+In Supplemental Figure 8 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we classified single cell data for a model organism (cynomolgus monkey) for which flow-sorted datasets were generally lacking without any additional species-specific training. Instead, we mapped homologous genes from the *Macaca fascicularis* genome to the human genome in the single cell data, and then performed cell type classification with Signac. We demonstrate how we mapped the gene symbols in this vignette.
+
+Note:
+* This code can be used for to identify homologous genes between any two species.
+* Monkey data used in Supplemental Figure 8 are available for interactive exploration in the table listed above.
 
 This vignette shows how to map homologous gene symbols from Macaca fascicularis to the human genome.
 

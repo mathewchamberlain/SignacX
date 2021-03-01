@@ -38,46 +38,59 @@
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
 <li>
-  <a href="../index.html">
-    <span class="fas fa-home fa-lg"></span>
-     
-  </a>
+  <a href="../articles/install.html">Install</a>
 </li>
 <li>
-  <a href="../reference/index.html">Reference</a>
+  <a href="../articles/dataportal.html">Data portal</a>
+</li>
+<li>
+  <a href="../articles/quickstart.html">Quick start</a>
 </li>
 <li class="dropdown">
   <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
-    Articles
+    Vignettes
      
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
-<li>
-      <a href="../articles/Crabeating_vignette.html">Mapping homologous gene symbols</a>
+<li class="dropdown-header">Introductory Vignettes</li>
+    <li>
+      <a href="../articles/signac-Seurat_pbmcs.html">PBMCs 1K tutorial</a>
     </li>
     <li>
-      <a href="../articles/SignacFast-Seurat_AMP_RA.html">Benchmarking SignacFast with single cell flow-sorted data</a>
+      <a href="../articles/springintegration.html">Integrating SignacX with SPRING and Seurat</a>
+    </li>
+    <li class="divider">
+    <li class="dropdown-header">Advanced use</li>
+    <li>
+      <a href="../articles/signac-SPRING_Learning.html">Learning from single cell data</a>
     </li>
     <li>
-      <a href="../articles/signac-SPRING_Learning.html">Signac and SPRING: Learning CD56 NK cells from multi-modal analysis of CITE-seq PBMCs from 10X Genomics</a>
+      <a href="../articles/Crabeating_vignette.html">Classifying non-human single cell data</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_AMP.html">SignacX, Seurat and MASC: Analysis of kidney cells from AMP</a>
+      <a href="../articles/signac-Seurat_AMP.html">Identifying disease-enriched cell types with SignacX</a>
+    </li>
+    <li class="divider">
+    <li class="dropdown-header">Benchmarking</li>
+    <li>
+      <a href="../articles/signac-Seurat_AMP_RA.html">Flow cytometry synovium: SingleR vs. SignacX</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_AMP_RA.html">Benchmarking SignacX and SingleR with synovial flow cytometry data</a>
+      <a href="../articles/SignacFast-Seurat_AMP_RA.html">Flow cytometry synovium: FastSignac vs Signac</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_CITE-seq.html">Cell type classification with SignacX: CITE-seq PBMCs from 10X Genomics</a>
+      <a href="../articles/signac-Seurat_CITE-seq.html">CITE-seq PBMCs</a>
     </li>
+    <li class="divider">
+    <li class="dropdown-header">Other</li>
     <li>
-      <a href="../articles/signac-Seurat_pbmcs.html">Cell type classification with SignacX: PBMCs from 10X Genomics</a>
+      <a href="../articles/genesofinterest.html">Genes of immune and pharmacological interest</a>
     </li>
   </ul>
 </li>
 <li>
-  <a href="../news/index.html">Changelog</a>
+  <a href="https://github.com/mathewchamberlain/SignacX/discussions">FAQ</a>
 </li>
       </ul>
 <ul class="nav navbar-nav navbar-right">
@@ -101,9 +114,8 @@
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Benchmarking SignacFast with single cell flow-sorted data</h1>
-                        <h4 class="author">Mathew Chamberlain</h4>
             
-            <h4 class="date">2021-03-01</h4>
+            <h4 class="date">Compiled 2021-03-01</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mathewchamberlain/SignacX/blob/master/vignettes/SignacFast-Seurat_AMP_RA.Rmd"><code>vignettes/SignacFast-Seurat_AMP_RA.Rmd</code></a></small>
       <div class="hidden name"><code>SignacFast-Seurat_AMP_RA.Rmd</code></div>
@@ -112,20 +124,30 @@
 
     
     
-<p>This vignette shows how to use SignacFast to annotate flow-sorted synovial cells by integrating SignacX with Seurat. We start with raw counts from <a href="https://www.nature.com/articles/s41590-019-0378-1">this publication</a>.</p>
+<p>Sometimes we don’t have time to run Signac and need a faster solution. Although Signac scales fine with large data sets (&gt;300,000 cells) and even for large data, typically takes less than an hour, we developed SignacFast to quickly classify single cell data. Unlike Signac, SignacFast uses a pre-trained ensemble of neural network models generated from the HPCA reference data, speeding classification time ~5-10x fold. These models were generated from the HPCA training data like so:</p>
+<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="co"># load pre-trained neural network ensemble model</span>
+<span class="va">ref</span> <span class="op">=</span> <span class="fu"><a href="../reference/GetTrainingData_HPCA.html">GetTrainingData_HPCA</a></span><span class="op">(</span><span class="op">)</span>
+
+<span class="co"># generate models</span>
+<span class="va">Models_HPCA</span> <span class="op">=</span> <span class="fu"><a href="../reference/ModelGenerator.html">ModelGenerator</a></span><span class="op">(</span>R <span class="op">=</span> <span class="va">training_HPCA</span>, N <span class="op">=</span> <span class="fl">100</span>, num.cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span></code></pre></div>
+<p>The “Models_HPCA” are accessed from within the R package:</p>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="co"># load pre-trained neural network ensemble model</span>
+<span class="va">Models</span> <span class="op">=</span> <span class="fu"><a href="../reference/GetModels_HPCA.html">GetModels_HPCA</a></span><span class="op">(</span><span class="op">)</span></code></pre></div>
+<p>We demonstrate how to use SignacFast in this vignette, which shows that SignacFast is broadly consistent with Signac (just faster). Here, we show how to use SignacFast to annotate flow-sorted synovial cells by integrating SignacX with Seurat. We start with raw counts from <a href="https://www.nature.com/articles/s41590-019-0378-1">this publication</a>.</p>
 <div id="load-data" class="section level2">
 <h2 class="hasAnchor">
 <a href="#load-data" class="anchor"></a>Load data</h2>
 <p>Read the CEL-seq2 data.</p>
-<div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">ReadCelseq</span> <span class="op">&lt;-</span> <span class="kw">function</span> <span class="op">(</span><span class="va">counts.file</span>, <span class="va">meta.file</span><span class="op">)</span>
-<span class="op">{</span>
-  <span class="va">E</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html">suppressWarnings</a></span><span class="op">(</span><span class="fu">readr</span><span class="fu">::</span><span class="fu">read_tsv</span><span class="op">(</span><span class="va">counts.file</span><span class="op">)</span><span class="op">)</span>;
-  <span class="va">gns</span> <span class="op">&lt;-</span> <span class="va">E</span><span class="op">$</span><span class="va">gene</span>;
-  <span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>,<span class="op">-</span><span class="fl">1</span><span class="op">]</span>
-  <span class="va">E</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/Matrix.html">Matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html">as.matrix</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span>, sparse <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>
-  <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">rownames</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">gns</span>
-  <span class="va">E</span>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span class="va">ReadCelseq</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">counts.file</span>, <span class="va">meta.file</span><span class="op">)</span> <span class="op">{</span>
+    <span class="va">E</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html">suppressWarnings</a></span><span class="op">(</span><span class="fu">readr</span><span class="fu">::</span><span class="fu">read_tsv</span><span class="op">(</span><span class="va">counts.file</span><span class="op">)</span><span class="op">)</span>
+    <span class="va">gns</span> <span class="op">&lt;-</span> <span class="va">E</span><span class="op">$</span><span class="va">gene</span>
+    <span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>, <span class="op">-</span><span class="fl">1</span><span class="op">]</span>
+    <span class="va">E</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/Matrix.html">Matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html">as.matrix</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span>, sparse <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>
+    <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">rownames</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">gns</span>
+    <span class="va">E</span>
 <span class="op">}</span>
 
 <span class="va">counts.file</span> <span class="op">=</span> <span class="st">"./fls/celseq_matrix_ru10_molecules.tsv.gz"</span>
@@ -137,25 +159,25 @@
 <span class="co"># filter data based on depth and number of genes detected</span>
 <span class="va">kmu</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span> <span class="op">!=</span> <span class="fl">0</span><span class="op">)</span>
 <span class="va">kmu2</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span>
-<span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>,<span class="va">kmu</span> <span class="op">&gt;</span> <span class="fl">200</span> <span class="op">&amp;</span> <span class="va">kmu2</span> <span class="op">&gt;</span> <span class="fl">500</span><span class="op">]</span>
+<span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>, <span class="va">kmu</span> <span class="op">&gt;</span> <span class="fl">200</span> <span class="op">&amp;</span> <span class="va">kmu2</span> <span class="op">&gt;</span> <span class="fl">500</span><span class="op">]</span>
 
 <span class="co"># filter by mitochondrial percentage</span>
 <span class="va">logik</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html">grepl</a></span><span class="op">(</span><span class="st">"^MT-"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">rownames</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span><span class="op">)</span>
-<span class="va">MitoFrac</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span><span class="op">[</span><span class="va">logik</span>,<span class="op">]</span><span class="op">)</span> <span class="op">/</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>
-<span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>,<span class="va">MitoFrac</span> <span class="op">&lt;</span> <span class="fl">20</span><span class="op">]</span></code></pre></div>
+<span class="va">MitoFrac</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span><span class="op">[</span><span class="va">logik</span>, <span class="op">]</span><span class="op">)</span><span class="op">/</span><span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>
+<span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>, <span class="va">MitoFrac</span> <span class="op">&lt;</span> <span class="fl">20</span><span class="op">]</span></code></pre></div>
 </div>
 <div id="seurat" class="section level2">
 <h2 class="hasAnchor">
 <a href="#seurat" class="anchor"></a>Seurat</h2>
 <p>Start with the standard pre-processing steps for a Seurat object.</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://satijalab.org/seurat">Seurat</a></span><span class="op">)</span></code></pre></div>
 <p>Create a Seurat object, and then perform SCTransform normalization. Note:</p>
 <ul>
 <li>You can use the legacy functions here (i.e., NormalizeData, ScaleData, etc.), use SCTransform or any other normalization method (including no normalization). We did not notice a significant difference in cell type annotations with different normalization methods.</li>
 <li>We think that it is best practice to use SCTransform, but it is not a necessary step. Signac will work fine without it.</li>
 </ul>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="co"># load data</span>
 <span class="va">synovium</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/CreateSeuratObject.html">CreateSeuratObject</a></span><span class="op">(</span>counts <span class="op">=</span> <span class="va">E</span>, project <span class="op">=</span> <span class="st">"FACs"</span><span class="op">)</span>
 
@@ -165,7 +187,7 @@
 <ul>
 <li>Signac actually needs these functions since it uses the nearest neighbor graph generated by Seurat.</li>
 </ul>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="co"># These are now standard steps in the Seurat workflow for visualization and clustering</span>
 <span class="va">synovium</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/RunPCA.html">RunPCA</a></span><span class="op">(</span><span class="va">synovium</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>
 <span class="va">synovium</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://satijalab.org/seurat/reference/RunUMAP.html">RunUMAP</a></span><span class="op">(</span><span class="va">synovium</span>, dims <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="fl">30</span>, verbose <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>
@@ -174,13 +196,13 @@
 <div id="signacx" class="section level2">
 <h2 class="hasAnchor">
 <a href="#signacx" class="anchor"></a>SignacX</h2>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="kw"><a href="https://rdrr.io/r/base/library.html">library</a></span><span class="op">(</span><span class="va"><a href="https://github.com/mathewchamberlain/SignacX">SignacX</a></span><span class="op">)</span></code></pre></div>
 <p>Generate Signac labels for the Seurat object. Note:</p>
 <ul>
 <li>Optionally, you can do parallel computing by setting num.cores &gt; 1 in the Signac function.</li>
 </ul>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">labels</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/Signac.html">Signac</a></span><span class="op">(</span><span class="va">synovium</span>, num.cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>
 <span class="va">celltypes</span> <span class="op">=</span> <span class="fu"><a href="../reference/GenerateLabels.html">GenerateLabels</a></span><span class="op">(</span><span class="va">labels</span>, E <span class="op">=</span> <span class="va">synovium</span><span class="op">)</span></code></pre></div>
 <p>Sometimes, training the neural networks takes a lot of time. The above classification took 27 minutes. To make a faster method, we implemented SignacFast which uses pre-trained models. Note:</p>
@@ -188,7 +210,7 @@
 <li>SignacFast uses an ensemble of 1,800 pre-calculated neural networks using the GenerateModels function together with the training_HPCA reference data set.</li>
 <li>Features that are absent from the single cell data and present in the neural network are set to zero.</li>
 </ul>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="co"># Run SignacFast</span>
 <span class="va">labels_fast</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/SignacFast.html">SignacFast</a></span><span class="op">(</span><span class="va">synovium</span>, num.cores <span class="op">=</span> <span class="fl">4</span><span class="op">)</span>
 <span class="va">celltypes_fast</span> <span class="op">=</span> <span class="fu"><a href="../reference/GenerateLabels.html">GenerateLabels</a></span><span class="op">(</span><span class="va">labels_fast</span>, E <span class="op">=</span> <span class="va">synovium</span><span class="op">)</span></code></pre></div>
@@ -1023,7 +1045,7 @@ Unclassified
 </tbody>
 </table>
 <p>Save results</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="fu"><a href="https://rdrr.io/r/base/readRDS.html">saveRDS</a></span><span class="op">(</span><span class="va">synovium</span>, file <span class="op">=</span> <span class="st">"fls/seurat_obj_amp_synovium.rds"</span><span class="op">)</span>
 <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html">saveRDS</a></span><span class="op">(</span><span class="va">celltypes</span>, file <span class="op">=</span> <span class="st">"fls/celltypes_amp_synovium.rds"</span><span class="op">)</span>
 <span class="fu"><a href="https://rdrr.io/r/base/readRDS.html">saveRDS</a></span><span class="op">(</span><span class="va">celltypes_fast</span>, file <span class="op">=</span> <span class="st">"fls/celltypes_fast_amp_synovium_celltypes.rds"</span><span class="op">)</span></code></pre></div>
@@ -1048,13 +1070,13 @@ Unclassified
 ## 
 ## loaded via a namespace (and not attached):
 ##  [1] knitr_1.31        magrittr_2.0.1    R6_2.5.0          ragg_1.1.1       
-##  [5] rlang_0.4.10      fastmap_1.1.0     stringr_1.4.0     highr_0.8        
+##  [5] rlang_0.4.10      fastmap_1.1.0     highr_0.8         stringr_1.4.0    
 ##  [9] tools_4.0.0       xfun_0.21         jquerylib_0.1.3   htmltools_0.5.1.1
 ## [13] systemfonts_1.0.1 yaml_2.2.1        assertthat_0.2.1  digest_0.6.27    
 ## [17] rprojroot_2.0.2   pkgdown_1.6.1     crayon_1.4.1      textshaping_0.3.1
-## [21] sass_0.3.1        fs_1.5.0          memoise_2.0.0     cachem_1.0.3     
-## [25] evaluate_0.14     rmarkdown_2.7     stringi_1.5.3     compiler_4.0.0   
-## [29] bslib_0.2.4       desc_1.2.0        jsonlite_1.7.2</code></pre>
+## [21] formatR_1.7       sass_0.3.1        fs_1.5.0          memoise_2.0.0    
+## [25] cachem_1.0.3      evaluate_0.14     rmarkdown_2.7     stringi_1.5.3    
+## [29] compiler_4.0.0    bslib_0.2.4       desc_1.2.0        jsonlite_1.7.2</code></pre>
 </details>
 </div>
   </div>

@@ -1,0 +1,40 @@
+destination: docs
+
+navbar:
+  title: "SignacX"
+  left:
+    - text: "Install"
+      href: articles/install.html
+    - text: "Data portal"
+      href: articles/dataportal.html
+    - text: "Quick start"
+      href: articles/quickstart.html
+    - text: "Vignettes"
+      menu:
+        - text: Introductory Vignettes
+        - text: "PBMCs 1K tutorial"
+          href: articles/signac-Seurat_pbmcs.html
+        - text: "Integrating SignacX with SPRING and Seurat"
+          href: articles/springintegration.html
+        - text: -------
+        - text: Advanced use
+        - text: "Learning from single cell data"
+          href: articles/signac-SPRING_Learning.html
+        - text: "Classifying non-human single cell data"
+          href: articles/Crabeating_vignette.html
+        - text: "Identifying disease-enriched cell types with SignacX"
+          href: articles/signac-Seurat_AMP.html
+        - text: -------
+        - text: Benchmarking
+        - text: "Flow cytometry synovium: SingleR vs. SignacX"
+          href: articles/signac-Seurat_AMP_RA.html
+        - text: "Flow cytometry synovium: FastSignac vs Signac"
+          href: articles/SignacFast-Seurat_AMP_RA.html
+        - text: "CITE-seq PBMCs"
+          href: articles/signac-Seurat_CITE-seq.html
+        - text: -------
+        - text: Other
+        - text: "Genes of immune and pharmacological interest"
+          href: articles/genesofinterest.html      
+    - text: FAQ
+      href: "https://github.com/mathewchamberlain/SignacX/discussions"

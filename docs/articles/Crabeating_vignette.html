@@ -38,46 +38,59 @@
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
 <li>
-  <a href="../index.html">
-    <span class="fas fa-home fa-lg"></span>
-     
-  </a>
+  <a href="../articles/install.html">Install</a>
 </li>
 <li>
-  <a href="../reference/index.html">Reference</a>
+  <a href="../articles/dataportal.html">Data portal</a>
+</li>
+<li>
+  <a href="../articles/quickstart.html">Quick start</a>
 </li>
 <li class="dropdown">
   <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
-    Articles
+    Vignettes
      
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
-<li>
-      <a href="../articles/Crabeating_vignette.html">Mapping homologous gene symbols</a>
+<li class="dropdown-header">Introductory Vignettes</li>
+    <li>
+      <a href="../articles/signac-Seurat_pbmcs.html">PBMCs 1K tutorial</a>
     </li>
     <li>
-      <a href="../articles/SignacFast-Seurat_AMP_RA.html">Benchmarking SignacFast with single cell flow-sorted data</a>
+      <a href="../articles/springintegration.html">Integrating SignacX with SPRING and Seurat</a>
+    </li>
+    <li class="divider">
+    <li class="dropdown-header">Advanced use</li>
+    <li>
+      <a href="../articles/signac-SPRING_Learning.html">Learning from single cell data</a>
     </li>
     <li>
-      <a href="../articles/signac-SPRING_Learning.html">Signac and SPRING: Learning CD56 NK cells from multi-modal analysis of CITE-seq PBMCs from 10X Genomics</a>
+      <a href="../articles/Crabeating_vignette.html">Classifying non-human single cell data</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_AMP.html">SignacX, Seurat and MASC: Analysis of kidney cells from AMP</a>
+      <a href="../articles/signac-Seurat_AMP.html">Identifying disease-enriched cell types with SignacX</a>
+    </li>
+    <li class="divider">
+    <li class="dropdown-header">Benchmarking</li>
+    <li>
+      <a href="../articles/signac-Seurat_AMP_RA.html">Flow cytometry synovium: SingleR vs. SignacX</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_AMP_RA.html">Benchmarking SignacX and SingleR with synovial flow cytometry data</a>
+      <a href="../articles/SignacFast-Seurat_AMP_RA.html">Flow cytometry synovium: FastSignac vs Signac</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_CITE-seq.html">Cell type classification with SignacX: CITE-seq PBMCs from 10X Genomics</a>
+      <a href="../articles/signac-Seurat_CITE-seq.html">CITE-seq PBMCs</a>
     </li>
+    <li class="divider">
+    <li class="dropdown-header">Other</li>
     <li>
-      <a href="../articles/signac-Seurat_pbmcs.html">Cell type classification with SignacX: PBMCs from 10X Genomics</a>
+      <a href="../articles/genesofinterest.html">Genes of immune and pharmacological interest</a>
     </li>
   </ul>
 </li>
 <li>
-  <a href="../news/index.html">Changelog</a>
+  <a href="https://github.com/mathewchamberlain/SignacX/discussions">FAQ</a>
 </li>
       </ul>
 <ul class="nav navbar-nav navbar-right">
@@ -101,9 +114,8 @@
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Mapping homologous gene symbols</h1>
-                        <h4 class="author">Mathew Chamberlain</h4>
             
-            <h4 class="date">2021-03-01</h4>
+            <h4 class="date">Compiled 2021-03-01</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mathewchamberlain/SignacX/blob/master/vignettes/Crabeating_vignette.Rmd"><code>vignettes/Crabeating_vignette.Rmd</code></a></small>
       <div class="hidden name"><code>Crabeating_vignette.Rmd</code></div>
@@ -112,6 +124,8 @@
 
     
     
+<p>In Supplemental Figure 8 of the <a href="https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full">pre-print</a>, we classified single cell data for a model organism (cynomolgus monkey) for which flow-sorted datasets were generally lacking without any additional species-specific training. Instead, we mapped homologous genes from the <em>Macaca fascicularis</em> genome to the human genome in the single cell data, and then performed cell type classification with Signac. We demonstrate how we mapped the gene symbols in this vignette.</p>
+<p>Note: * This code can be used for to identify homologous genes between any two species. * Monkey data used in Supplemental Figure 8 are available for interactive exploration in the table listed above.</p>
 <p>This vignette shows how to map homologous gene symbols from Macaca fascicularis to the human genome.</p>
 <div id="load-the-essential-packages" class="section level1">
 <h1 class="hasAnchor">
@@ -126,7 +140,7 @@
 <h1 class="hasAnchor">
 <a href="#load-macaca-fascicularis-genes" class="anchor"></a>Load Macaca fascicularis genes</h1>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">features.tsv</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/utils/read.table.html">read.delim</a></span><span class="op">(</span><span class="st">"fls/features.tsv.gz"</span>, header<span class="op">=</span><span class="cn">FALSE</span>, stringsAsFactors<span class="op">=</span><span class="cn">FALSE</span><span class="op">)</span>
+<code class="sourceCode R"><span class="va">features.tsv</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/utils/read.table.html">read.delim</a></span><span class="op">(</span><span class="st">"fls/features.tsv.gz"</span>, header <span class="op">=</span> <span class="cn">FALSE</span>, stringsAsFactors <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span>
 <span class="fu"><a href="https://rdrr.io/r/utils/head.html">head</a></span><span class="op">(</span><span class="va">features.tsv</span><span class="op">)</span></code></pre></div>
 <pre><code>##                   V1                 V2              V3
 ## 1 ENSMFAG00000044637              PGBD2 Gene Expression
@@ -141,46 +155,33 @@
 <a href="#map-homologous-genes" class="anchor"></a>Map homologous genes</h1>
 <div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="co"># get human and cyno gene symbols</span>
-<span class="va">human.R95</span> <span class="op">&lt;-</span> <span class="fu">useMart</span><span class="op">(</span>host<span class="op">=</span><span class="st">'jan2019.archive.ensembl.org'</span>, 
-                   biomart<span class="op">=</span><span class="st">'ENSEMBL_MART_ENSEMBL'</span>, 
-                   dataset<span class="op">=</span><span class="st">'hsapiens_gene_ensembl'</span><span class="op">)</span>
-<span class="va">cyno.R95</span> <span class="op">&lt;-</span> <span class="fu">useMart</span><span class="op">(</span>host<span class="op">=</span><span class="st">'jan2019.archive.ensembl.org'</span>, 
-                   biomart<span class="op">=</span><span class="st">'ENSEMBL_MART_ENSEMBL'</span>, 
-                   dataset<span class="op">=</span><span class="st">'mfascicularis_gene_ensembl'</span><span class="op">)</span>
- 
-<span class="co"># values = listeENSID: list of cynomolgus ensembl IDs to be retrieved. </span>
+<span class="va">human.R95</span> <span class="op">&lt;-</span> <span class="fu">useMart</span><span class="op">(</span>host <span class="op">=</span> <span class="st">"jan2019.archive.ensembl.org"</span>, biomart <span class="op">=</span> <span class="st">"ENSEMBL_MART_ENSEMBL"</span>, dataset <span class="op">=</span> <span class="st">"hsapiens_gene_ensembl"</span><span class="op">)</span>
+<span class="va">cyno.R95</span> <span class="op">&lt;-</span> <span class="fu">useMart</span><span class="op">(</span>host <span class="op">=</span> <span class="st">"jan2019.archive.ensembl.org"</span>, biomart <span class="op">=</span> <span class="st">"ENSEMBL_MART_ENSEMBL"</span>, dataset <span class="op">=</span> <span class="st">"mfascicularis_gene_ensembl"</span><span class="op">)</span>
+
+<span class="co"># values = listeENSID: list of cynomolgus ensembl IDs to be retrieved.</span>
 <span class="va">listeENSID</span> <span class="op">=</span> <span class="va">features.tsv</span><span class="op">$</span><span class="va">V1</span>
-<span class="va">orthologs</span> <span class="op">&lt;-</span> <span class="fu">getLDS</span><span class="op">(</span>attributes <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"ensembl_gene_id"</span>,<span class="st">"external_gene_name"</span><span class="op">)</span>, 
-                  filters <span class="op">=</span> <span class="st">"ensembl_gene_id"</span>, 
-                  values <span class="op">=</span> <span class="va">listeENSID</span>, 
-                  mart <span class="op">=</span> <span class="va">cyno.R95</span>, 
-                  attributesL <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"hgnc_symbol"</span>,<span class="st">"ensembl_gene_id"</span><span class="op">)</span>, 
-                  martL <span class="op">=</span> <span class="va">human.R95</span><span class="op">)</span>
+<span class="va">orthologs</span> <span class="op">&lt;-</span> <span class="fu">getLDS</span><span class="op">(</span>attributes <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"ensembl_gene_id"</span>, <span class="st">"external_gene_name"</span><span class="op">)</span>, filters <span class="op">=</span> <span class="st">"ensembl_gene_id"</span>, 
+    values <span class="op">=</span> <span class="va">listeENSID</span>, mart <span class="op">=</span> <span class="va">cyno.R95</span>, attributesL <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"hgnc_symbol"</span>, <span class="st">"ensembl_gene_id"</span><span class="op">)</span>, martL <span class="op">=</span> <span class="va">human.R95</span><span class="op">)</span>
 <span class="va">orthologs</span> <span class="op">&lt;-</span> <span class="fu">as_tibble</span><span class="op">(</span><span class="va">orthologs</span><span class="op">)</span>
-<span class="fu"><a href="https://rdrr.io/r/base/colnames.html">colnames</a></span><span class="op">(</span><span class="va">orthologs</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"GeneID"</span>,<span class="st">"cynoSymbol"</span>,<span class="st">"HumanSymbol"</span>,<span class="st">"HumanGeneID"</span><span class="op">)</span>
-  
+<span class="fu"><a href="https://rdrr.io/r/base/colnames.html">colnames</a></span><span class="op">(</span><span class="va">orthologs</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html">c</a></span><span class="op">(</span><span class="st">"GeneID"</span>, <span class="st">"cynoSymbol"</span>, <span class="st">"HumanSymbol"</span>, <span class="st">"HumanGeneID"</span><span class="op">)</span>
+
 <span class="co"># keep only 1:1 orthologs</span>
-<span class="va">one2one</span> <span class="op">&lt;-</span> <span class="va">orthologs</span> <span class="op">%&gt;%</span> 
-<span class="fu">group_by</span><span class="op">(</span><span class="va">GeneID</span><span class="op">)</span> <span class="op">%&gt;%</span> 
-<span class="fu">summarise</span><span class="op">(</span><span class="fu">n</span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">%&gt;%</span> 
-<span class="fu"><a href="https://rdrr.io/r/stats/filter.html">filter</a></span><span class="op">(</span><span class="va">`n()`</span><span class="op">&lt;=</span><span class="fl">1</span><span class="op">)</span> <span class="op">%&gt;%</span>
-<span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html">select</a></span><span class="op">(</span><span class="va">`GeneID`</span><span class="op">)</span> <span class="op">%&gt;%</span>
-<span class="fu">pull</span><span class="op">(</span><span class="op">)</span>
+<span class="va">one2one</span> <span class="op">&lt;-</span> <span class="va">orthologs</span> <span class="op">%&gt;%</span> <span class="fu">group_by</span><span class="op">(</span><span class="va">GeneID</span><span class="op">)</span> <span class="op">%&gt;%</span> <span class="fu">summarise</span><span class="op">(</span><span class="fu">n</span><span class="op">(</span><span class="op">)</span><span class="op">)</span> <span class="op">%&gt;%</span> <span class="fu"><a href="https://rdrr.io/r/stats/filter.html">filter</a></span><span class="op">(</span><span class="va">`n()`</span> <span class="op">&lt;=</span> <span class="fl">1</span><span class="op">)</span> <span class="op">%&gt;%</span> <span class="fu">dplyr</span><span class="fu">::</span><span class="fu"><a href="https://dplyr.tidyverse.org/reference/select.html">select</a></span><span class="op">(</span><span class="va">GeneID</span><span class="op">)</span> <span class="op">%&gt;%</span> 
+    <span class="fu">pull</span><span class="op">(</span><span class="op">)</span>
 <span class="va">orthologs</span> <span class="op">&lt;-</span> <span class="va">orthologs</span> <span class="op">%&gt;%</span> <span class="fu"><a href="https://rdrr.io/r/stats/filter.html">filter</a></span><span class="op">(</span><span class="va">GeneID</span> <span class="op">%in%</span> <span class="va">one2one</span><span class="op">)</span>
 
 <span class="co"># replace empty HumanSymbol (where there isn't a gene name for a homologous gene) with NA</span>
-<span class="va">orthologs</span> <span class="op">&lt;-</span> <span class="va">orthologs</span> <span class="op">%&gt;%</span>
-<span class="fu">mutate</span><span class="op">(</span>HumanSymbol<span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/replace.html">replace</a></span><span class="op">(</span><span class="va">HumanSymbol</span>,<span class="va">HumanSymbol</span><span class="op">==</span><span class="st">""</span>, <span class="cn">NA</span><span class="op">)</span><span class="op">)</span>
-<span class="va">orthologs</span> <span class="op">&lt;-</span> <span class="va">orthologs</span> <span class="op">%&gt;%</span>
-<span class="fu">mutate</span><span class="op">(</span>cynoSymbol<span class="op">=</span><span class="fu"><a href="https://rdrr.io/r/base/replace.html">replace</a></span><span class="op">(</span><span class="va">cynoSymbol</span>,<span class="va">cynoSymbol</span><span class="op">==</span><span class="st">""</span>, <span class="cn">NA</span><span class="op">)</span><span class="op">)</span>
+<span class="va">orthologs</span> <span class="op">&lt;-</span> <span class="va">orthologs</span> <span class="op">%&gt;%</span> <span class="fu">mutate</span><span class="op">(</span>HumanSymbol <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/replace.html">replace</a></span><span class="op">(</span><span class="va">HumanSymbol</span>, <span class="va">HumanSymbol</span> <span class="op">==</span> <span class="st">""</span>, <span class="cn">NA</span><span class="op">)</span><span class="op">)</span>
+<span class="va">orthologs</span> <span class="op">&lt;-</span> <span class="va">orthologs</span> <span class="op">%&gt;%</span> <span class="fu">mutate</span><span class="op">(</span>cynoSymbol <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/replace.html">replace</a></span><span class="op">(</span><span class="va">cynoSymbol</span>, <span class="va">cynoSymbol</span> <span class="op">==</span> <span class="st">""</span>, <span class="cn">NA</span><span class="op">)</span><span class="op">)</span>
 
 <span class="va">idx</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/match.html">match</a></span><span class="op">(</span><span class="va">listeENSID</span>, <span class="va">orthologs</span><span class="op">$</span><span class="va">GeneID</span><span class="op">)</span>
 <span class="va">xx</span> <span class="op">=</span> <span class="va">orthologs</span><span class="op">$</span><span class="va">HumanSymbol</span><span class="op">[</span><span class="va">idx</span><span class="op">]</span>
-<span class="va">logik</span> <span class="op">=</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html">is.na</a></span><span class="op">(</span><span class="va">orthologs</span><span class="op">$</span><span class="va">HumanSymbol</span><span class="op">[</span><span class="va">idx</span><span class="op">]</span><span class="op">)</span> <span class="co"># sum(logik) returns 17,365 homologous genes</span>
+<span class="va">logik</span> <span class="op">=</span> <span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html">is.na</a></span><span class="op">(</span><span class="va">orthologs</span><span class="op">$</span><span class="va">HumanSymbol</span><span class="op">[</span><span class="va">idx</span><span class="op">]</span><span class="op">)</span>  <span class="co"># sum(logik) returns 17,365 homologous genes</span>
 <span class="va">xx</span> <span class="op">=</span> <span class="va">xx</span><span class="op">[</span><span class="va">logik</span><span class="op">]</span>
-<span class="va">orthologs</span> <span class="op">=</span> <span class="va">orthologs</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html">is.na</a></span><span class="op">(</span><span class="va">orthologs</span><span class="op">$</span><span class="va">HumanSymbol</span><span class="op">)</span>,<span class="op">]</span>
-<span class="co"># note: several of these genes are not unique mappers; we will aggregate them later or make them unique. To aggregate, where E is the sparse expression matrix with rownames set to xx:</span>
-<span class="co"># E = Matrix.utils::aggregate.Matrix(E, row.names(E))</span></code></pre></div>
+<span class="va">orthologs</span> <span class="op">=</span> <span class="va">orthologs</span><span class="op">[</span><span class="op">!</span><span class="fu"><a href="https://rdrr.io/r/base/NA.html">is.na</a></span><span class="op">(</span><span class="va">orthologs</span><span class="op">$</span><span class="va">HumanSymbol</span><span class="op">)</span>, <span class="op">]</span>
+<span class="co"># note: several of these genes are not unique mappers; we will aggregate them later or make them</span>
+<span class="co"># unique. To aggregate, where E is the sparse expression matrix with rownames set to xx: E =</span>
+<span class="co"># Matrix.utils::aggregate.Matrix(E, row.names(E))</span></code></pre></div>
 <p>Now we have mapped homologous gene symbols across species:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="fu"><a href="https://rdrr.io/r/utils/head.html">head</a></span><span class="op">(</span><span class="va">orthologs</span><span class="op">)</span></code></pre></div>
@@ -212,14 +213,14 @@
 ## [1] stats     graphics  grDevices utils     datasets  methods   base     
 ## 
 ## loaded via a namespace (and not attached):
-##  [1] rprojroot_2.0.2   crayon_1.4.1      digest_0.6.27     assertthat_0.2.1 
-##  [5] R6_2.5.0          jsonlite_1.7.2    magrittr_2.0.1    evaluate_0.14    
-##  [9] stringi_1.5.3     rlang_0.4.10      cachem_1.0.3      fs_1.5.0         
-## [13] jquerylib_0.1.3   bslib_0.2.4       ragg_1.1.1        rmarkdown_2.7    
-## [17] pkgdown_1.6.1     textshaping_0.3.1 desc_1.2.0        tools_4.0.0      
-## [21] stringr_1.4.0     yaml_2.2.1        xfun_0.21         fastmap_1.1.0    
-## [25] compiler_4.0.0    systemfonts_1.0.1 memoise_2.0.0     htmltools_0.5.1.1
-## [29] knitr_1.31        sass_0.3.1</code></pre>
+##  [1] knitr_1.31        magrittr_2.0.1    R6_2.5.0          ragg_1.1.1       
+##  [5] rlang_0.4.10      fastmap_1.1.0     stringr_1.4.0     tools_4.0.0      
+##  [9] xfun_0.21         jquerylib_0.1.3   htmltools_0.5.1.1 systemfonts_1.0.1
+## [13] yaml_2.2.1        assertthat_0.2.1  digest_0.6.27     rprojroot_2.0.2  
+## [17] pkgdown_1.6.1     crayon_1.4.1      textshaping_0.3.1 formatR_1.7      
+## [21] sass_0.3.1        fs_1.5.0          memoise_2.0.0     cachem_1.0.3     
+## [25] evaluate_0.14     rmarkdown_2.7     stringi_1.5.3     compiler_4.0.0   
+## [29] bslib_0.2.4       desc_1.2.0        jsonlite_1.7.2</code></pre>
 </details>
 </div>
   </div>

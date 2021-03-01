@@ -38,46 +38,59 @@
     <div id="navbar" class="navbar-collapse collapse">
       <ul class="nav navbar-nav">
 <li>
-  <a href="../index.html">
-    <span class="fas fa-home fa-lg"></span>
-     
-  </a>
+  <a href="../articles/install.html">Install</a>
 </li>
 <li>
-  <a href="../reference/index.html">Reference</a>
+  <a href="../articles/dataportal.html">Data portal</a>
+</li>
+<li>
+  <a href="../articles/quickstart.html">Quick start</a>
 </li>
 <li class="dropdown">
   <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">
-    Articles
+    Vignettes
      
     <span class="caret"></span>
   </a>
   <ul class="dropdown-menu" role="menu">
-<li>
-      <a href="../articles/Crabeating_vignette.html">Mapping homologous gene symbols</a>
+<li class="dropdown-header">Introductory Vignettes</li>
+    <li>
+      <a href="../articles/signac-Seurat_pbmcs.html">PBMCs 1K tutorial</a>
     </li>
     <li>
-      <a href="../articles/SignacFast-Seurat_AMP_RA.html">Benchmarking SignacFast with single cell flow-sorted data</a>
+      <a href="../articles/springintegration.html">Integrating SignacX with SPRING and Seurat</a>
+    </li>
+    <li class="divider">
+    <li class="dropdown-header">Advanced use</li>
+    <li>
+      <a href="../articles/signac-SPRING_Learning.html">Learning from single cell data</a>
     </li>
     <li>
-      <a href="../articles/signac-SPRING_Learning.html">Signac and SPRING: Learning CD56 NK cells from multi-modal analysis of CITE-seq PBMCs from 10X Genomics</a>
+      <a href="../articles/Crabeating_vignette.html">Classifying non-human single cell data</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_AMP.html">SignacX, Seurat and MASC: Analysis of kidney cells from AMP</a>
+      <a href="../articles/signac-Seurat_AMP.html">Identifying disease-enriched cell types with SignacX</a>
+    </li>
+    <li class="divider">
+    <li class="dropdown-header">Benchmarking</li>
+    <li>
+      <a href="../articles/signac-Seurat_AMP_RA.html">Flow cytometry synovium: SingleR vs. SignacX</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_AMP_RA.html">Benchmarking SignacX and SingleR with synovial flow cytometry data</a>
+      <a href="../articles/SignacFast-Seurat_AMP_RA.html">Flow cytometry synovium: FastSignac vs Signac</a>
     </li>
     <li>
-      <a href="../articles/signac-Seurat_CITE-seq.html">Cell type classification with SignacX: CITE-seq PBMCs from 10X Genomics</a>
+      <a href="../articles/signac-Seurat_CITE-seq.html">CITE-seq PBMCs</a>
     </li>
+    <li class="divider">
+    <li class="dropdown-header">Other</li>
     <li>
-      <a href="../articles/signac-Seurat_pbmcs.html">Cell type classification with SignacX: PBMCs from 10X Genomics</a>
+      <a href="../articles/genesofinterest.html">Genes of immune and pharmacological interest</a>
     </li>
   </ul>
 </li>
 <li>
-  <a href="../news/index.html">Changelog</a>
+  <a href="https://github.com/mathewchamberlain/SignacX/discussions">FAQ</a>
 </li>
       </ul>
 <ul class="nav navbar-nav navbar-right">
@@ -101,9 +114,8 @@
   <div class="col-md-9 contents">
     <div class="page-header toc-ignore">
       <h1 data-toc-skip>Benchmarking SignacX and SingleR with synovial flow cytometry data</h1>
-                        <h4 class="author">Mathew Chamberlain</h4>
             
-            <h4 class="date">2021-03-01</h4>
+            <h4 class="date">Compiled 2021-03-01</h4>
       
       <small class="dont-index">Source: <a href="https://github.com/mathewchamberlain/SignacX/blob/master/vignettes/signac-Seurat_AMP_RA.Rmd"><code>vignettes/signac-Seurat_AMP_RA.Rmd</code></a></small>
       <div class="hidden name"><code>signac-Seurat_AMP_RA.Rmd</code></div>
@@ -112,20 +124,19 @@
 
     
     
-<p>This vignette shows how to use Signac to annotate flow-sorted synovial cells by integrating SignacX with Seurat. We also compared Signac to another popular cell type annotation tool, SingleR. We start with raw counts.</p>
+<p>In Figure 3 of the <a href="https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full">pre-print</a>, we validated Signac with flow cytometry and compared Signac to SingleR. We reproduced that analysis using Seurat in this vignette, and provide interactive access to the data <a href="https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/AMP_Phase1_RA_Apr2019/FullDataset_v1">here</a>. We start with raw counts.</p>
 <div id="load-data" class="section level2">
 <h2 class="hasAnchor">
 <a href="#load-data" class="anchor"></a>Load data</h2>
 <p>Read the CEL-seq2 data.</p>
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">ReadCelseq</span> <span class="op">&lt;-</span> <span class="kw">function</span> <span class="op">(</span><span class="va">counts.file</span>, <span class="va">meta.file</span><span class="op">)</span>
-<span class="op">{</span>
-  <span class="va">E</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html">suppressWarnings</a></span><span class="op">(</span><span class="fu">readr</span><span class="fu">::</span><span class="fu">read_tsv</span><span class="op">(</span><span class="va">counts.file</span><span class="op">)</span><span class="op">)</span>;
-  <span class="va">gns</span> <span class="op">&lt;-</span> <span class="va">E</span><span class="op">$</span><span class="va">gene</span>;
-  <span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>,<span class="op">-</span><span class="fl">1</span><span class="op">]</span>
-  <span class="va">E</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/Matrix.html">Matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html">as.matrix</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span>, sparse <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>
-  <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">rownames</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">gns</span>
-  <span class="va">E</span>
+<code class="sourceCode R"><span class="va">ReadCelseq</span> <span class="op">&lt;-</span> <span class="kw">function</span><span class="op">(</span><span class="va">counts.file</span>, <span class="va">meta.file</span><span class="op">)</span> <span class="op">{</span>
+    <span class="va">E</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/warning.html">suppressWarnings</a></span><span class="op">(</span><span class="fu">readr</span><span class="fu">::</span><span class="fu">read_tsv</span><span class="op">(</span><span class="va">counts.file</span><span class="op">)</span><span class="op">)</span>
+    <span class="va">gns</span> <span class="op">&lt;-</span> <span class="va">E</span><span class="op">$</span><span class="va">gene</span>
+    <span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>, <span class="op">-</span><span class="fl">1</span><span class="op">]</span>
+    <span class="va">E</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/Matrix.html">Matrix</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/matrix.html">as.matrix</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span>, sparse <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span>
+    <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">rownames</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="va">gns</span>
+    <span class="va">E</span>
 <span class="op">}</span>
 
 <span class="va">counts.file</span> <span class="op">=</span> <span class="st">"./fls/celseq_matrix_ru10_molecules.tsv.gz"</span>
@@ -137,12 +148,12 @@
 <span class="co"># filter data based on depth and number of genes detected</span>
 <span class="va">kmu</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span> <span class="op">!=</span> <span class="fl">0</span><span class="op">)</span>
 <span class="va">kmu2</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span>
-<span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>,<span class="va">kmu</span> <span class="op">&gt;</span> <span class="fl">200</span> <span class="op">&amp;</span> <span class="va">kmu2</span> <span class="op">&gt;</span> <span class="fl">500</span><span class="op">]</span>
+<span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>, <span class="va">kmu</span> <span class="op">&gt;</span> <span class="fl">200</span> <span class="op">&amp;</span> <span class="va">kmu2</span> <span class="op">&gt;</span> <span class="fl">500</span><span class="op">]</span>
 
 <span class="co"># filter by mitochondrial percentage</span>
 <span class="va">logik</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html">grepl</a></span><span class="op">(</span><span class="st">"^MT-"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html">rownames</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span><span class="op">)</span>
-<span class="va">MitoFrac</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span><span class="op">[</span><span class="va">logik</span>,<span class="op">]</span><span class="op">)</span> <span class="op">/</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>
-<span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>,<span class="va">MitoFrac</span> <span class="op">&lt;</span> <span class="fl">20</span><span class="op">]</span></code></pre></div>
+<span class="va">MitoFrac</span> <span class="op">=</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span><span class="op">[</span><span class="va">logik</span>, <span class="op">]</span><span class="op">)</span><span class="op">/</span><span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums.html">colSums</a></span><span class="op">(</span><span class="va">E</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>
+<span class="va">E</span> <span class="op">=</span> <span class="va">E</span><span class="op">[</span>, <span class="va">MitoFrac</span> <span class="op">&lt;</span> <span class="fl">20</span><span class="op">]</span></code></pre></div>
 </div>
 <div id="singler" class="section level2">
 <h2 class="hasAnchor">
@@ -462,12 +473,12 @@ T
 <p>Signac accuracy</p>
 <div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span class="va">logik</span> <span class="op">=</span> <span class="va">xy</span> <span class="op">!=</span> <span class="st">"Unclassified"</span>
-<span class="va">Signac_Accuracy</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">xy</span><span class="op">[</span><span class="va">logik</span><span class="op">]</span> <span class="op">==</span> <span class="va">True_labels</span><span class="op">[</span><span class="va">logik</span><span class="op">]</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">logik</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">2</span><span class="op">)</span>
+<span class="va">Signac_Accuracy</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">xy</span><span class="op">[</span><span class="va">logik</span><span class="op">]</span> <span class="op">==</span> <span class="va">True_labels</span><span class="op">[</span><span class="va">logik</span><span class="op">]</span><span class="op">)</span><span class="op">/</span><span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">logik</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">2</span><span class="op">)</span>
 <span class="va">Signac_Accuracy</span></code></pre></div>
 <pre><code>## [1] 95.32</code></pre>
 <p>SingleR accuracy</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span class="va">SingleR_Accuracy</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">xx</span> <span class="op">==</span> <span class="va">True_labels</span><span class="op">)</span> <span class="op">/</span> <span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">logik</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">2</span><span class="op">)</span>
+<code class="sourceCode R"><span class="va">SingleR_Accuracy</span> <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Round.html">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">xx</span> <span class="op">==</span> <span class="va">True_labels</span><span class="op">)</span><span class="op">/</span><span class="fu"><a href="https://rdrr.io/r/base/sum.html">sum</a></span><span class="op">(</span><span class="va">logik</span><span class="op">)</span> <span class="op">*</span> <span class="fl">100</span>, <span class="fl">2</span><span class="op">)</span>
 <span class="va">SingleR_Accuracy</span></code></pre></div>
 <pre><code>## [1] 55.21</code></pre>
 <p>Save results</p>
@@ -495,13 +506,13 @@ T
 ## 
 ## loaded via a namespace (and not attached):
 ##  [1] knitr_1.31        magrittr_2.0.1    R6_2.5.0          ragg_1.1.1       
-##  [5] rlang_0.4.10      fastmap_1.1.0     stringr_1.4.0     highr_0.8        
+##  [5] rlang_0.4.10      fastmap_1.1.0     highr_0.8         stringr_1.4.0    
 ##  [9] tools_4.0.0       xfun_0.21         jquerylib_0.1.3   htmltools_0.5.1.1
 ## [13] systemfonts_1.0.1 yaml_2.2.1        assertthat_0.2.1  digest_0.6.27    
 ## [17] rprojroot_2.0.2   pkgdown_1.6.1     crayon_1.4.1      textshaping_0.3.1
-## [21] sass_0.3.1        fs_1.5.0          memoise_2.0.0     cachem_1.0.3     
-## [25] evaluate_0.14     rmarkdown_2.7     stringi_1.5.3     compiler_4.0.0   
-## [29] bslib_0.2.4       desc_1.2.0        jsonlite_1.7.2</code></pre>
+## [21] formatR_1.7       sass_0.3.1        fs_1.5.0          memoise_2.0.0    
+## [25] cachem_1.0.3      evaluate_0.14     rmarkdown_2.7     stringi_1.5.3    
+## [29] compiler_4.0.0    bslib_0.2.4       desc_1.2.0        jsonlite_1.7.2</code></pre>
 </details>
 </div>
   </div>

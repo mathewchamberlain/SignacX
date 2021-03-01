@@ -1,0 +1,14 @@
+---
+title: 'Loading genes of immune / pharmacological interest'
+output: html_document
+---
+
+### Genes of interest
+
+In Figure 6 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we compiled data from three source ([CellPhoneDB](https://www.cellphonedb.org/), [GWAS catalog](https://www.ebi.ac.uk/gwas/) and [Fang et al. 2020](https://www.nature.com/articles/s41588-019-0456-1)) to find genes of immunological / pharmacological interest. These genes and their annotations can be accessed internally from within Signac:
+
+```r
+library(SignacX)
+# See ?Genes_Of_Interest
+data("Genes_Of_Interest")
+```

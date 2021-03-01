@@ -1,7 +1,6 @@
 ---
-title: 'Cell type classification with SignacX: PBMCs from 10X Genomics'
-author: 'Mathew Chamberlain'
-date: "`r Sys.Date()`"
+title: 'Cell type classification with SignacX: 1k PBMCs from 10X Genomics'
+date: Compiled `r Sys.Date()`
 output: rmarkdown::html_vignette
 vignette: >
   %\VignetteIndexEntry{Analysis of PBMCs from 10X Genomics}
@@ -34,7 +33,7 @@ celltypes = readRDS("./fls/celltypes.rds")
 # pbmc = readRDS("fls/pbmcs_signac.rds")
 ```
 
-This vignette shows how to use Signac with Seurat. There are three parts: Seurat, Signac and then visualization. We use an example PBMCs scRNA-seq data set from 10X Genomics. First, we set up a folder for holding the Signac reference data:
+This vignette shows how to use Signac with Seurat. There are three parts: Seurat, Signac and then visualization. We use an example PBMCs scRNA-seq data set from 10X Genomics.
 
 ## Seurat 
 
