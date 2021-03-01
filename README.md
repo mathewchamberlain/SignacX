@@ -3,6 +3,8 @@
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![GPL License][license-shield]][license-url]
+[![CRAN Version](https://www.r-pkg.org/badges/version/SignacX)](https://cran.r-project.org/package=SignacX)
+[![CRAN Downloads](https://cranlogs.r-pkg.org/badges/SignacX)](https://cran.r-project.org/package=SignacX)
 
 <!-- PROJECT LOGO -->
 <br />
@@ -93,8 +95,18 @@ To install SignacX in R, simply do:
 
 ### Installation
 
+#### Install from CRAN
+
+```r
+install.packages('SignacX')
+library(SignacX)
+```
+
+#### Install development version of SignacX
+
 ```r
 devtools::install_github("mathewchamberlain/SignacX")
+library(SignacX)
 ```
 
 ### Quick start
@@ -146,7 +158,7 @@ dat <- CID.writeJSON(celltypes, spring.dir = dir)
 After running the above functions, cellular phenotypes and Louvain clusters are ready to be visualized with SPRING Viewer, which can be setup locally as described [here](https://github.com/AllonKleinLab/SPRING_dev).
 
 ### Seurat
-Another way to use Signac is with Seurat. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_CITE-seq.html), we performed multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Signac integrated with Seurat. We repeated this analysis with another single cell RNA-seq data set [here](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_pbmcs.html).
+Another way to use Signac is with Seurat. [In this vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_CITE-seq.html), we performed multi-modal analysis of CITE-seq PBMCs from 10X Genomics using Signac integrated with Seurat.
 
 Note:
 * This same data set was also processed using SPRING [in this notebook](https://github.com/AllonKleinLab/SPRING_dev/blob/master/data_prep/spring_notebook_10X_CITEseq.ipynb), and subsequently classified with Signac, which was used to generate SPRING layouts for these data in the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) (Figures 2-4), which is available for interactive exploration [here](https://kleintools.hms.harvard.edu/tools/springViewer_1_6_dev.html?client_datasets/CITESEQ_EXPLORATORY_CITESEQ_5K_PBMCS/FullDataset_v1_protein).
