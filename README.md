@@ -24,7 +24,13 @@
 <!-- ABOUT THE PROJECT -->
 #### What is SignacX?
 
-SignacX is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. SignacX classifies the cellular phenotype for each individual cell in single cell RNA-sequencing data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). To learn more, check out the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), [website](https://mathewchamberlain.github.io/SignacX/) and [code base](https://github.com/mathewchamberlain/SignacX/).
+SignacX is software developed and maintained by the Savova lab at Sanofi with a focus on single cell genomics for clinical applications. SignacX classifies the cellular phenotype for each individual cell in single cell RNA-sequencing data using neural networks trained with sorted bulk gene expression data from the [Human Primary Cell Atlas](https://bmcgenomics.biomedcentral.com/articles/10.1186/1471-2164-14-632). To learn more, check out the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), [website](https://mathewchamberlain.github.io/SignacX/) and [code base](https://github.com/mathewchamberlain/SignacX/). You can install SignacX from CRAN by running:
+
+```R
+install.packages("SignacX")
+library(SignacX)
+```
+
 
 <!-- CONTACT -->
 #### Contact
