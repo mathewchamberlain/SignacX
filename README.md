@@ -10,12 +10,12 @@
   <p align="center">
     Get the most out of your single cell data.
     <br />
-    <a href="https://mathewchamberlain.github.io/SignacX/"><strong>Explore the website »</strong></a>
+    <a href="https://mathewchamberlain.github.io/SignacX/"><strong>Explore the Website »</strong></a>
     <br />
     <br />
     <a href="https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-Seurat_pbmcs.html">View Demo</a>
     ·
-    <a href="https://github.com/mathewchamberlain/SignacX/issues">Report Bug</a>
+    <a href="https://github.com/mathewchamberlain/SignacX/">View Code Base</a>
     ·
     <a href="https://github.com/mathewchamberlain/SignacX/issues">Request Feature</a>
   </p>
