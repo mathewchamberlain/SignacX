@@ -1,5 +1,5 @@
 ---
-title: 'Installation instructions for SignacX'
+title: 'Installation instructions'
 output: html_document
 ---
 
@@ -20,9 +20,9 @@ Any of the SignacX version 2 releases can be installed with the following comman
 devtools::install_github("mathewchamberlain/SignacX@2.X.X")
 ```
 
-### Install the development version of SignacX
+#### Install the latest development version of SignacX
 
-Install the development version of SignacX - directly from [GitHub](https://github.com/mathewchamberlain/SignacX).
+Install the latest development version of SignacX directly from [GitHub](https://github.com/mathewchamberlain/SignacX).
 
 ```{r eval = FALSE}
 devtools::install_github(repo = 'mathewchamberlain/SignacX')

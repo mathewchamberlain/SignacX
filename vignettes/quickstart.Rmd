@@ -1,5 +1,5 @@
 ---
-title: 'SignacX: Quick start'
+title: 'Quick start'
 output: html_document
 ---
 
@@ -17,3 +17,5 @@ labels = Signac(E = your_data_here)
 # Generate cell type labels
 celltypes = GenerateLabels(labels, E = your_data_here)
 ```
+
+Where 'your_data_here' is either a Seurat object or a sparse matrix loaded from SPRING.

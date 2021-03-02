@@ -1,9 +1,7 @@
 ---
-title: 'SignacX Single Cell Data Portal'
+title: 'Single Cell Data Portal'
 output: html_document
 ---
-
-### Data portal
 
 Here, we provide interactive access to data from the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full) with [SPRING Viewer](https://kleintools.hms.harvard.edu/tools/spring.html). Just click the "Explore" links below, and search your favorite gene.
 
@@ -31,7 +29,7 @@ Note:
 
 Special thanks to Allon Klein's lab (particularly Caleb Weinreb and Sam Wolock) for hosting the data.
 
-### Data portal (with CD56<sup>bright</sup> NK cells)
+Data portal with CD56<sup>bright</sup> NK cells
 
 In Figure 4 of the [pre-print](https://www.biorxiv.org/content/10.1101/2021.02.01.429207v3.full), we demonstrated that Signac mapped cell type labels from one single cell data set to another; learning CD56<sup>bright</sup> NK cells from CITE-seq data. [Here, we provide a vignette](https://htmlpreview.github.io/?https://github.com/mathewchamberlain/SignacX/master/vignettes/signac-SPRING_Learning.html) for reproducing this analysis, which can be used to map cell populations (or clusters of cells) from one data set to another. We also provide interactive access to the single cell data that were annotated with the CD56<sup>bright</sup> NK cell-model (Note: the CD56<sup>bright</sup> NK cells appear in the "CellStates" annotation layer as red cells).
 

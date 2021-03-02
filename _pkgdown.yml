@@ -12,7 +12,7 @@ navbar:
     - text: "Vignettes"
       menu:
         - text: Introductory Vignettes
-        - text: "PBMCs 1K tutorial"
+        - text: "PBMCs 1K tutorial - Seurat integration"
           href: articles/signac-Seurat_pbmcs.html
         - text: "Integrating SignacX with SPRING and Seurat"
           href: articles/springintegration.html
