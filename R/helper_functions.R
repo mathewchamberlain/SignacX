@@ -84,9 +84,15 @@ GenerateLabels = function(cr, E = NULL, smooth = TRUE, new_populations = NULL, n
   
   # check for Seurat object
   flag = class(E) == "Seurat"
-  if (flag) {
+  
+  if (flag){
     default.assay <- Seurat::DefaultAssay(E)
-    edges = E@graphs[[which(grepl(paste0(default.assay, "_nn"), names(E@graphs)))]]
+    logik = any(grepl(paste0(default.assay, "nn"), names(E@graphs)))
+    if (logik) {
+      edges = E@graphs[[which(grepl(paste0(default.assay, "nn"), names(E@graphs)))]]
+    } else {
+      edges = E@graphs[[1]]
+    }
     dM = CID.GetDistMat(edges)
   }
   
