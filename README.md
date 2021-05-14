@@ -35,7 +35,7 @@ library(SignacX)
 <!-- CONTACT -->
 #### Contact
 
-Mathew Chamberlain - mathew.chamberlain@sanofi.com
+Mathew Chamberlain - chamberlainphd@gmail.com
 
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
