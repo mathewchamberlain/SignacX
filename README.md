@@ -6,7 +6,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
-  <h3 align="center">SignacX 2.2.3</h3>
+  <h3 align="center">SignacX 2.2.4</h3>
   <p align="center">
     Get the most out of your single cell data.
     <br />
