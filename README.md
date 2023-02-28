@@ -1,7 +1,7 @@
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![CRAN Version](https://www.r-pkg.org/badges/version/SignacX)](https://cran.r-project.org/package=SignacX)
-[![CRAN Downloads](https://cranlogs.r-pkg.org/badges/SignacX)](https://cran.r-project.org/package=SignacX)
+[![CRAN Downloads](https://cranlogs.r-pkg.org/badges/grand-total/SignacX)](https://cran.r-project.org/package=SignacX)
 
 <!-- PROJECT LOGO -->
 <br />
