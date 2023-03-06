@@ -281,7 +281,7 @@ SignacBoot <- function (E, L, labels, size = 1000, impute = TRUE, spring.dir = N
   # bootstrap data
   dat = V[rownames(V) %in% rownames(mrks),]
   mrks$cluster = L[1]
-  mrks$cluster[mrks$avg_logFC < 0] = L[2]
+  mrks$cluster[mrks$avg_log2FC < 0] = L[2]
   mrks$gene = rownames(mrks)
   
   xx = labels
